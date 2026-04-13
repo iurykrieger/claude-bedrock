@@ -41,7 +41,7 @@ Fleeting notes **não precisam** estar completas — esse é o ponto. Elas exist
 | Parece ser... | Mas é... | Diferença-chave |
 |---|---|---|
 | Fleeting | Actor | Se tem repo, deploy, e time — é actor. Se só "alguém mencionou um serviço novo" sem detalhes, é fleeting |
-| Fleeting | Person | Se tem nome completo e time — é person. Se só "um engenheiro do acquiring", é fleeting |
+| Fleeting | Person | Se tem nome completo e time — é person. Se só "um engenheiro do payments", é fleeting |
 | Fleeting | Topic | Se tem objetivo claro e actors afetados — é topic. Se é "talvez a gente precise deprecar X", é fleeting |
 | Fleeting | Discussion | Se tem data, participantes, e decisões — é discussion. Se é "parece que houve uma reunião sobre Y", é fleeting |
 
@@ -103,14 +103,14 @@ O `/bedrock` referencia a fleeting note em resposta a uma query, sinalizando que
 
 ### Isso É uma fleeting note
 
-1. "Alguém mencionou um novo serviço de tokenização que vai substituir o autobahn, mas não sei o nome nem o repo." — Informação útil mas incompleta. É fleeting até ter dados concretos.
+1. "Alguém mencionou um novo serviço de tokenização que vai substituir o legacy-gateway, mas não sei o nome nem o repo." — Informação útil mas incompleta. É fleeting até ter dados concretos.
 
-2. "Parece que o squad Boleto está pensando em migrar o decryptor para Rust. Precisa confirmar." — Hipótese sem confirmação. É fleeting até ser validada.
+2. "Parece que o squad Notifications está pensando em migrar o crypto-service para Rust. Precisa confirmar." — Hipótese sem confirmação. É fleeting até ser validada.
 
-3. "Em alguma reunião falaram sobre mudar o provedor de SMS de boleto. Não sei quando nem quem estava." — Fragmento sem data, participantes, ou decisão. É fleeting.
+3. "Em alguma reunião falaram sobre mudar o provedor de SMS para notificações. Não sei quando nem quem estava." — Fragmento sem data, participantes, ou decisão. É fleeting.
 
 ### Isso NÃO é uma fleeting note
 
-1. "O charge-probe é um serviço Go que substitui o ProbeAPI. Repo: stone-payments/charge-probe. Squad Charge é responsável." — Dados concretos suficientes para ser actor.
+1. "O health-checker é um serviço Go que substitui o MonitorAPI. Repo: acme-corp/health-checker. Squad Orders é responsável." — Dados concretos suficientes para ser actor.
 
-2. "Reunião de planning (01/04/2026): Iury, Leonardo, Giovanna. Decisão: priorizar migração autobahn." — Dados completos para ser discussion.
+2. "Reunião de planning (01/04/2026): Alice, Bob, Carol. Decisão: priorizar migração legacy-gateway." — Dados completos para ser discussion.

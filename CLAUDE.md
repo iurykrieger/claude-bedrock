@@ -18,11 +18,11 @@ The vault organizes knowledge into 7 entity types, each in its own directory:
 
 | Entity | Directory | Filename pattern | Example |
 |---|---|---|---|
-| Actors | `actors/` | `repo-name.md` | `payment-card-api.md` |
-| People | `people/` | `first-last.md` | `fulano-da-silva.md` |
-| Teams | `teams/` | `squad-name.md` | `squad-acquiring.md` |
-| Topics | `topics/` | `YYYY-MM-category-slug.md` | `2026-04-feature-bolepix.md` |
-| Discussions | `discussions/` | `YYYY-MM-DD-slug.md` | `2026-04-02-daily-acquiring.md` |
+| Actors | `actors/` | `repo-name.md` | `billing-api.md` |
+| People | `people/` | `first-last.md` | `alice-smith.md` |
+| Teams | `teams/` | `squad-name.md` | `squad-payments.md` |
+| Topics | `topics/` | `YYYY-MM-category-slug.md` | `2026-04-feature-new-checkout.md` |
+| Discussions | `discussions/` | `YYYY-MM-DD-slug.md` | `2026-04-02-daily-payments.md` |
 | Projects | `projects/` | `slug.md` | `processing-3-0.md` |
 | Fleeting | `fleeting/` | `YYYY-MM-DD-slug.md` | `2026-04-09-novo-servico-tokenizacao.md` |
 
@@ -41,12 +41,12 @@ Entity semantic definitions live in the plugin's `entities/` directory — used 
 ### Frontmatter
 - YAML between `---` delimiters
 - **Keys always in English** (`type`, `name`, `status`, `updated_at`, `updated_by`)
-- **Values in pt-BR** (`description: "API de pagamentos com cartao"`)
+- **Values in pt-BR** (`description: "API de cobranca e faturamento"`)
 - Array references use wikilink syntax: `["[[name1]]", "[[name2]]"]`
 - Every entity must have `updated_at` (YYYY-MM-DD) and `updated_by` (person or `name@agent`)
 
 ### Wikilinks
-- Bare names only: `[[boleto-api]]`, never `[[actors/boleto-api]]`
+- Bare names only: `[[notification-service]]`, never `[[actors/notification-service]]`
 - Bidirectional links expected (see template for link table per entity type)
 - Add new links, **never remove** existing ones
 - Links to non-existent files are fine — Obsidian shows them as creation invitations
@@ -58,11 +58,11 @@ Tags use `/` separator for multi-dimensional filtering in Obsidian graph view:
 |---|---|---|
 | Type | `type/` | `actor`, `person`, `team`, `topic`, `discussion`, `project`, `fleeting` |
 | Status | `status/` | `active`, `deprecated`, `planning`, `blocked`, `done`, `in-progress`, `open`, `completed`, `cancelled`, `raw`, `reviewing`, `promoted`, `archived` |
-| Domain | `domain/` | `acquiring`, `banking`, `boleto`, `cards`, `charge`, `core`, `data`, `infra`, `insurance`, `marketplace`, `orders`, `pix`, `platform`, `security`, `staffs` |
-| Scope | `scope/` | `pci`, `sox`, `lgpd` |
+| Domain | `domain/` | `payments`, `finance`, `notifications`, `checkout`, `orders`, `integrations`, `compliance`, `core`, `data`, `infra`, `marketplace`, `internal-tools`, `platform`, `security` |
+| Scope | `scope/` | `pci`, `sox`, `lgpd` (fintech), `hipaa` (saude), `gdpr` (Europa), `soc2` (SaaS) |
 | Category | `category/` | `deprecation`, `bugfix`, `troubleshooting`, `rfc`, `incident`, `feature`, `compliance` |
 
-This list is extensible — new domains can be added as teams are incorporated into the vault.
+These are examples — both domains and scopes are extensible. Add new values as your organization grows (e.g. new teams, new compliance requirements).
 
 Rules:
 - `type/*` mandatory on all entities
@@ -127,8 +127,8 @@ These are the Claude Code skills provided by the Bedrock plugin:
 
 Examples:
 ```
-vault(ator): atualiza payment-card-api [fonte: github]
-vault: teaches roadmap-26q1-cards, creates 7 topics [fonte: confluence]
+vault(ator): atualiza billing-api [fonte: github]
+vault: teaches roadmap-26q1, creates 7 topics [fonte: confluence]
 vault: compress 25 entities across 8 clusters [fonte: compress]
 ```
 
@@ -148,7 +148,7 @@ The vault follows adapted Zettelkasten principles. Each entity type has a **role
 ### Linking Rules
 
 1. **Frontmatter = structural.** Arrays in frontmatter define organizational relationships (team, members, actors). Feed Dataview queries.
-2. **Body = semantic.** Wikilinks in the body must have textual context: "authorizes transactions via [[payment-card-api]]", not just "[[payment-card-api]]".
+2. **Body = semantic.** Wikilinks in the body must have textual context: "processes payments via [[billing-api]]", not just "[[billing-api]]".
 3. **Bridges are the connective tissue.** If two actors relate, the explanation lives in a topic or discussion — not duplicated in both.
 4. **Index notes point, they don't explain.** Projects direct the reader to bridges and permanents.
 5. **Fleeting notes are temporary.** They should be promoted (to permanent/bridge) or archived.
@@ -162,7 +162,7 @@ Details in `entities/*.md` (section "Papel Zettelkasten" per type) within the pl
 
 - **Never** use flat tags (`[actor]`) — always hierarchical (`[type/actor]`)
 - **Never** use path-qualified wikilinks — `[[name]]`, not `[[dir/name]]`
-- **Never** use display names in wikilinks — `[[boleto-api]]`, not `[[BoletoAPI]]`
+- **Never** use display names in wikilinks — `[[notification-service]]`, not `[[NotificationService]]`
 - **Never** delete content in people/teams/topics written by another agent or human
 - **Never** delete existing wikilinks or frontmatter fields
 - **Never** commit credentials, tokens, PANs, CVVs, or any sensitive data

@@ -16,7 +16,7 @@ last_synced_at: ""  # YYYY-MM-DD — ultimo sync via /sync-github (opcional)
 last_synced_sha: ""  # SHA do ultimo commit sincronizado (opcional)
 updated_at: YYYY-MM-DD
 updated_by: ""
-tags: [type/actor]  # + status/{active,deprecated,in-development} + domain/{acquiring,banking,boleto,cards,charge,core,data,infra,insurance,marketplace,orders,pix,platform,security,staffs} + scope/{pci,sox,lgpd}
+tags: [type/actor]  # + status/{active,deprecated,in-development} + domain/{payments,finance,notifications,checkout,orders,integrations,compliance,core,data,infra,marketplace,internal-tools,platform,security} + scope/{pci,sox,lgpd,hipaa,gdpr,soc2}
 ---
 
 <!-- Papel Zettelkasten: permanent note -->

@@ -27,7 +27,7 @@ Topics têm status, histórico de eventos, decisões tomadas, e próximos passos
 | Parece ser... | Mas é... | Diferença-chave |
 |---|---|---|
 | Topic | Discussion | Discussion é um evento pontual (reunião, conversa) com data fixa. Topic é um assunto que evolui no tempo com status e histórico |
-| Topic | Project | Project tem deadline, deliverables, e focal points. Topic é mais aberto — pode não ter deadline definida. Ex: "deprecação do autobahn" é topic; "migração para charge-api v2" é project |
+| Topic | Project | Project tem deadline, deliverables, e focal points. Topic é mais aberto — pode não ter deadline definida. Ex: "deprecação do legacy-gateway" é topic; "migração para orders-api v2" é project |
 | Topic | Actor (known_issue) | Se o problema afeta só 1 ator e é técnico, vai como known_issue no actor. Se afeta múltiplos atores ou tem impacto organizacional, é topic |
 
 ## Campos obrigatórios (frontmatter)
@@ -53,7 +53,7 @@ Topics têm status, histórico de eventos, decisões tomadas, e próximos passos
 ### Regras de Linking
 
 **Links estruturais (frontmatter):** `people` (wikilinks para persons envolvidas), `actors` (wikilinks para actors afetados). Definem quais permanentes este assunto conecta.
-**Links semânticos (corpo):** Links no corpo são o ponto central de um topic — devem explicar a relação entre permanentes com contexto rico. Ex: "a deprecação do [[autobahn]] está bloqueada porque clientes Pagar.me ainda dependem da tokenização provida por [[payment-card-api]]" em vez de apenas "[[autobahn]] e [[payment-card-api]]". O corpo do topic é onde vive a explicação da conexão entre permanentes.
+**Links semânticos (corpo):** Links no corpo são o ponto central de um topic — devem explicar a relação entre permanentes com contexto rico. Ex: "a deprecação do [[legacy-gateway]] está bloqueada porque clientes do sistema legado ainda dependem da tokenização provida por [[billing-api]]" em vez de apenas "[[legacy-gateway]] e [[billing-api]]". O corpo do topic é onde vive a explicação da conexão entre permanentes.
 **Relação com outros papéis:** Topics são o tecido conectivo entre permanentes. Se dois actors se relacionam, a explicação vive aqui — não duplicada em ambos os actors. Topics são referenciados por index notes (projects) que organizam múltiplos assuntos sob um objetivo.
 
 ### Critério de Completude
@@ -64,12 +64,12 @@ Um topic está completo quando: tem objetivo definido, pelo menos 1 actor ou per
 
 ### Isso É um topic
 
-1. "Estamos migrando todos os serviços Go de dd-trace para OpenTelemetry. Afeta boleto-api, decryptor, charge-api, e probe-consumer." — Iniciativa transversal com múltiplos atores. É topic (category: `rfc`).
+1. "Estamos migrando todos os serviços Go de dd-trace para OpenTelemetry. Afeta notification-service, crypto-service, orders-api, e metrics-collector." — Iniciativa transversal com múltiplos atores. É topic (category: `rfc`).
 
-2. "A depreciação do autobahn está bloqueada pela migração dos clientes Pagar.me. Status: em andamento desde março." — Assunto com lifecycle e status. É topic (category: `deprecation`).
+2. "A depreciação do legacy-gateway está bloqueada pela migração dos clientes do sistema legado. Status: em andamento desde março." — Assunto com lifecycle e status. É topic (category: `deprecation`).
 
 ### Isso NÃO é um topic
 
-1. "Preciso corrigir o timeout no endpoint /create do boleto-api." — Bug pontual em 1 ator. Vai como known_issue no actor, não como topic.
+1. "Preciso corrigir o timeout no endpoint /create do notification-service." — Bug pontual em 1 ator. Vai como known_issue no actor, não como topic.
 
 2. "Tivemos uma reunião sobre o plano de deprecação na segunda-feira." — Isso é uma discussion (evento). O plano de deprecação em si pode ser um topic.

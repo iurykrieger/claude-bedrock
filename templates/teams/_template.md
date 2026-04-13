@@ -1,7 +1,7 @@
 ---
 type: team
 name: ""
-aliases: []  # ["Short Name", "Full Name"] — min 1 alias (ex: ["Acquiring", "Squad Acquiring"])
+aliases: []  # ["Short Name", "Full Name"] — min 1 alias (ex: ["Payments", "Squad Payments"])
 scope: ""
 purpose: ""
 members: ["[[first-last]]"]
@@ -11,11 +11,11 @@ confluence_space: ""
 sources: []  # [{url: "https://...", type: "confluence|gdoc|github-repo|csv|markdown|manual", synced_at: YYYY-MM-DD}]
 updated_at: YYYY-MM-DD
 updated_by: ""
-tags: [type/team]  # + domain/{acquiring,banking,boleto,cards,charge,core,data,infra,insurance,marketplace,orders,pix,platform,security,staffs}
+tags: [type/team]  # + domain/{payments,finance,notifications,checkout,orders,integrations,compliance,core,data,infra,marketplace,internal-tools,platform,security}
 ---
 
 <!-- Papel Zettelkasten: permanent note -->
-<!-- Links no corpo devem ter contexto: "responsavel pela operacao do [[payment-card-api]]" -->
+<!-- Links no corpo devem ter contexto: "responsavel pela operacao do [[billing-api]]" -->
 
 # Team Name
 

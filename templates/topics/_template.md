@@ -15,7 +15,7 @@ tags: [type/topic]  # + status/{open,in-progress,completed,cancelled} + category
 ---
 
 <!-- Papel Zettelkasten: bridge note -->
-<!-- Links no corpo explicam PORQUE permanentes se relacionam: "a deprecacao do [[autobahn]] esta bloqueada porque clientes Pagar.me dependem da tokenizacao do [[payment-card-api]]" -->
+<!-- Links no corpo explicam PORQUE permanentes se relacionam: "a deprecacao do [[legacy-gateway]] esta bloqueada porque clientes do sistema legado dependem da tokenizacao do [[billing-api]]" -->
 
 # Topic Title
 

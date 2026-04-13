@@ -48,12 +48,12 @@ Leia a pergunta do usuario e identifique:
 
 1. **Entidades mencionadas** — nomes de sistemas, pessoas, times, assuntos, projetos, ou discussoes.
    Podem aparecer como:
-   - Nome exato do arquivo (ex: "payment-card-api", "squad-acquiring")
-   - Nome legivel (ex: "Payment Card API", "Squad Acquiring")
-   - Alias ou sigla (ex: "PCA", "BRB")
-   - Referencia contextual (ex: "o servico de cartao", "o time de boleto")
+   - Nome exato do arquivo (ex: "billing-api", "squad-payments")
+   - Nome legivel (ex: "Billing API", "Squad Payments")
+   - Alias ou sigla (ex: "BillingAPI", "BRB")
+   - Referencia contextual (ex: "o servico de cobranca", "o time de notificacoes")
 
-2. **Dominio(s) relevante(s)** — `acquiring`, `boleto`, `charge`, `orders`, `pix`, `cards`, `staffs`.
+2. **Dominio(s) relevante(s)** — `payments`, `notifications`, `orders`, `integrations`, `checkout`, `compliance`, `internal-tools`.
    Inferir a partir das entidades mencionadas ou do contexto da pergunta.
 
 3. **Tipo de informacao buscada:**
@@ -138,7 +138,7 @@ A partir dos resultados da Fase 1 (termos_de_busca, tipo_de_info, entidades_expl
   Usar a pergunta original do usuario como query.
 - **Perguntas de status/overview** ("o que e X?", "qual a stack de X?"):
   Reformular para focar na entidade: `"<entity-name>"`
-- **Perguntas amplas** ("me fala sobre o dominio acquiring"):
+- **Perguntas amplas** ("me fala sobre o dominio payments"):
   Pular para Fase 2.5 (explorar communities).
 
 #### 2-G.2 Executar graphify query
@@ -269,8 +269,8 @@ Registrar para cada entidade lida:
 
 ## Fase 2.5 — Explorar Communities (quando graph_available = true e pergunta ampla)
 
-Quando a pergunta e ampla e nao menciona entidades especificas (ex: "me fala sobre o dominio acquiring",
-"o que esta acontecendo com boleto?", "visao geral do processing"):
+Quando a pergunta e ampla e nao menciona entidades especificas (ex: "me fala sobre o dominio payments",
+"o que esta acontecendo com notifications?", "visao geral do processing"):
 
 ### 2.5.1 Identificar community relevante
 

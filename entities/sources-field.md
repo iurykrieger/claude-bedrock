@@ -12,10 +12,10 @@ O campo permite re-ingestao: ao registrar a URL/path e a data da ultima sincroni
 
 ```yaml
 sources:
-  - url: "https://allstone.atlassian.net/wiki/spaces/PROC/pages/..."
+  - url: "https://mycompany.atlassian.net/wiki/spaces/PROC/pages/..."
     type: "confluence"
     synced_at: 2026-04-09
-  - url: "https://github.com/stone-payments/payment-card-api"
+  - url: "https://github.com/acme-corp/billing-api"
     type: "github-repo"
     synced_at: 2026-04-10
 ```
@@ -70,7 +70,7 @@ Ambos podem coexistir na mesma entidade. Sao independentes.
 
 ```yaml
 sources:
-  - url: "https://allstone.atlassian.net/wiki/spaces/PROC/pages/8675099062"
+  - url: "https://mycompany.atlassian.net/wiki/spaces/PROC/pages/8675099062"
     type: "confluence"
     synced_at: 2026-04-09
 ```
@@ -79,10 +79,10 @@ sources:
 
 ```yaml
 sources:
-  - url: "https://github.com/stone-payments/payment-card-api"
+  - url: "https://github.com/acme-corp/billing-api"
     type: "github-repo"
     synced_at: 2026-04-10
-  - url: "https://allstone.atlassian.net/wiki/spaces/PROC/pages/123"
+  - url: "https://mycompany.atlassian.net/wiki/spaces/PROC/pages/123"
     type: "confluence"
     synced_at: 2026-04-05
 ```

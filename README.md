@@ -16,10 +16,30 @@ Or for local development/testing:
 claude --plugin-dir ./claude-bedrock
 ```
 
+## Getting Started
+
+After installing the plugin, run the setup skill to initialize your vault:
+
+```
+/bedrock:setup
+```
+
+The setup wizard will guide you through:
+
+1. **Language selection** — Choose the vault content language (default: English)
+2. **Dependency check** — Verify optional tools (graphify, confluence-to-markdown, gdoc-to-markdown)
+3. **Vault objective** — Pick a preset (engineering team, product management, company wiki, personal second brain, open source project, or custom)
+4. **Scaffold** — Create directories, templates, config, and connected example entities
+
+This creates all entity directories, copies templates, generates a vault-level `CLAUDE.md`, and scaffolds example entities with bidirectional wikilinks so you can see the graph in Obsidian immediately.
+
+Configuration is stored in `.bedrock/config.json`. Run `/bedrock:setup` again to reconfigure.
+
 ## Skills
 
 | Skill | Purpose |
 |---|---|
+| `/bedrock:setup` | Initialize and configure a new vault with guided setup |
 | `/bedrock:query` | Smart vault reader — answers questions by searching and cross-referencing entities |
 | `/bedrock:teach` | Ingest external sources (Confluence, GDocs, GitHub, CSV) — extracts entities |
 | `/bedrock:preserve` | Single write point — entity detection, matching, create/update, bidirectional links |
@@ -28,7 +48,7 @@ claude --plugin-dir ./claude-bedrock
 
 ## Vault Structure
 
-After installing the plugin, your vault should follow this directory layout:
+After running `/bedrock:setup`, your vault will follow this directory layout:
 
 ```
 your-vault/
@@ -60,7 +80,7 @@ All vault content follows these conventions (enforced via the plugin's CLAUDE.md
 - **Language:** Portuguese (pt-BR), technical terms in English
 - **Frontmatter:** Keys in English, values in pt-BR
 - **Wikilinks:** Bare names only (`[[name]]`, never `[[dir/name]]`)
-- **Tags:** Hierarchical (`type/actor`, `status/active`, `domain/acquiring`)
+- **Tags:** Hierarchical (`type/actor`, `status/active`, `domain/payments`)
 - **Aliases:** Minimum 1 per entity
 - **Git:** Trunk-based, commit convention `vault(<type>): <verb> <name> [fonte: <source>]`
 

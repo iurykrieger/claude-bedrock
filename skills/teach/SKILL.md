@@ -56,7 +56,7 @@ Se nenhum argumento foi fornecido: perguntar ao usuario "Qual fonte deseja inger
 
 ### 1.2 Leitura de repositorio GitHub
 
-Para URLs do GitHub (ex: `https://github.com/stone-payments/payment-card-api`):
+Para URLs do GitHub (ex: `https://github.com/acme-corp/billing-api`):
 
 1. Extrair `owner/repo` da URL
 2. Usar GitHub MCP diretamente (NAO via subagent — permissoes MCP nao sao herdadas):
@@ -77,8 +77,8 @@ entidades e relacoes semanticas (funcoes, classes, conceitos, decisoes de design
 tambem e obrigatoria — faz parte do fluxo do /bedrock:teach, nao e passo separado.
 
 **Pre-condicoes:**
-1. Extrair `repo-name` da URL (ultimo segmento: `stone-payments/payment-card-api` → `payment-card-api`)
-2. Verificar se o repo existe localmente em `../<repo-name>/` (repos podem estar em subdiretorios como `../acquiring/<repo-name>/` — buscar recursivamente)
+1. Extrair `repo-name` da URL (ultimo segmento: `acme-corp/billing-api` → `billing-api`)
+2. Verificar se o repo existe localmente em `../<repo-name>/` (repos podem estar em subdiretorios como `../payments/<repo-name>/` — buscar recursivamente)
 3. Se o repo NAO existe localmente em nenhum subdiretorio de `../`: clonar via `git clone` do GitHub e prosseguir.
 
 **Se o repo existe localmente:**
@@ -374,7 +374,7 @@ Use Glob para listar todos os arquivos em cada diretorio de entidades (excluindo
 - `fleeting/*.md`
 
 Para cada arquivo encontrado:
-- Extraia o filename sem extensao (ex: `payment-card-api`)
+- Extraia o filename sem extensao (ex: `billing-api`)
 - Use Read para extrair o campo `name` do frontmatter YAML
 - Armazene: `{filename, name, tipo}` para matching na Fase 3
 
@@ -390,9 +390,9 @@ Para cada entidade catalogada na Fase 2, verifique se o filename OU o name apare
 
 **Regras de match:**
 - Normalize para comparacao: lowercase, sem acentos, sem hifens
-- Match parcial e aceitavel para nomes compostos (ex: "payment card" match "payment-card-api")
-- NAO matchar substrings de 3 letras ou menos (ex: "api" NAO match "payment-card-api")
-- NAO matchar palavras genericas (ex: "stone", "service", "system")
+- Match parcial e aceitavel para nomes compostos (ex: "billing api" match "billing-api")
+- NAO matchar substrings de 3 letras ou menos (ex: "api" NAO match "billing-api")
+- NAO matchar palavras genericas (ex: "company", "service", "system")
 
 Para cada match, registre:
 - Tipo (actor, person, team, topic, discussion, project)
@@ -507,9 +507,9 @@ Para cada entidade nova, registre:
 
 | # | Tipo | Nome | Acao | Info extraida | Fonte |
 |---|---|---|---|---|---|
-| 1 | actor | payment-card-api | update | Mencionado como dependencia do novo fluxo | textual |
+| 1 | actor | billing-api | update | Mencionado como dependencia do novo fluxo | textual |
 | 2 | discussion | 2026-04-04-planning-q2 | create | Ata de reuniao com decisoes sobre migracao | textual |
-| 3 | person | fulano-silva | create | Mencionado como DRI do projeto X | textual |
+| 3 | person | alice-smith | create | Mencionado como DRI do projeto X | textual |
 | 4 | knowledge-node | ProcessTransaction | create | Funcao de orquestracao do fluxo de autorizacao | graphify |
 | 5 | knowledge-node | KafkaEventPublisher | create | Publicacao de eventos Kafka | graphify |
 
@@ -547,7 +547,7 @@ entities:
     source_url: "<url_ou_path da Fase 1>"
     source_type: "<source_type da Fase 1>"
   - type: actor
-    name: "payment-card-api"
+    name: "billing-api"
     action: update
     content: "novo contexto extraido na Fase 3..."
     source: "<source_type da Fase 1>"
@@ -567,8 +567,8 @@ entities:
 
 **Regras adicionais para knowledge-nodes (fonte graphify):**
 - `type`: `knowledge-node`
-- `metadata.graphify_node_id`: id do no no graphify (ex: `payment_card_api_processTransaction`)
-- `metadata.actor`: wikilink do ator pai (ex: `"[[payment-card-api]]"`)
+- `metadata.graphify_node_id`: id do no no graphify (ex: `billing_api_processTransaction`)
+- `metadata.actor`: wikilink do ator pai (ex: `"[[billing-api]]"`)
 - `metadata.node_type`: `function`, `class`, `module`, `concept`, `decision`, `interface`, `endpoint`
 - `metadata.source_file`: caminho relativo no repo do ator
 - `metadata.confidence`: `EXTRACTED`, `INFERRED`, ou `AMBIGUOUS`
@@ -614,8 +614,8 @@ Apresente ao usuario:
 | Tipo | Nome | Acao |
 |---|---|---|
 | discussion | 2026-04-04-planning-q2 | create |
-| actor | payment-card-api | update |
-| person | fulano-silva | create |
+| actor | billing-api | update |
+| person | alice-smith | create |
 
 ### Proveniencia
 Cada entidade acima recebeu no campo `sources` do frontmatter:

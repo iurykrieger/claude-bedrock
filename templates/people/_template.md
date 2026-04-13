@@ -5,9 +5,9 @@ aliases: []  # ["Full Name Capitalized", "Nickname"] — min 1 alias
 role: ""
 team: "[[squad-name]]"
 focal_points: []
-email: ""  # email corporativo completo (ex: iury.krieger@stone.com.br)
+email: ""  # email corporativo completo (ex: alice.smith@company.com)
 github: ""  # opcional — login do GitHub, quando aplicável
-slack: ""  # opcional — arroba do Slack (ex: @iury.krieger)
+slack: ""  # opcional — arroba do Slack (ex: @alice.smith)
 jira: ""
 sources: []  # [{url: "https://...", type: "confluence|gdoc|github-repo|csv|markdown|manual", synced_at: YYYY-MM-DD}]
 updated_at: YYYY-MM-DD
@@ -16,15 +16,15 @@ tags: [type/person]  # + domain/* opcional
 ---
 
 <!-- Papel Zettelkasten: permanent note -->
-<!-- Links no corpo devem ter contexto: "lidera a migracao do [[autobahn]] para [[payment-card-api]]" -->
+<!-- Links no corpo devem ter contexto: "lidera a migracao do [[legacy-gateway]] para [[billing-api]]" -->
 
 <!-- Filename convention: prefixo do email corporativo, pontos → hífens.
-     Ex: iury.krieger@stone.com.br → iury-krieger.md
+     Ex: alice.smith@company.com → alice-smith.md
      Quando email desconhecido: first-last.md baseado no nome completo. -->
 
 # First Last
 
-> Breve descrição (2-3 linhas) sobre a atribuição atual da pessoa na StoneCo — cargo, área de atuação, e contexto relevante.
+> Breve descrição (2-3 linhas) sobre a atribuição atual da pessoa na organização — cargo, área de atuação, e contexto relevante.
 
 ## Time
 

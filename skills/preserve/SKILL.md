@@ -173,10 +173,10 @@ Para cada entidade do input, verificar se ja existe no vault:
 
 **Regras de match (em ordem de prioridade):**
 
-1. **Match exato por filename** (case-insensitive): `payment-card-api` == `payment-card-api`
-2. **Match por name/title field** (case-insensitive): `"Payment Card API"` encontra `payment-card-api.md`
-3. **Match por aliases** (case-insensitive): `"PCA"` encontra `payment-card-api.md` se alias contem "PCA"
-4. **Match por filename sem hifens** (case-insensitive): `payment-card-api` → `paymentcardapi` encontra "PaymentCardAPI"
+1. **Match exato por filename** (case-insensitive): `billing-api` == `billing-api`
+2. **Match por name/title field** (case-insensitive): `"Billing API"` encontra `billing-api.md`
+3. **Match por aliases** (case-insensitive): `"BillingAPI"` encontra `billing-api.md` se alias contem "BillingAPI"
+4. **Match por filename sem hifens** (case-insensitive): `billing-api` → `billingapi` encontra "BillingAPI"
 5. **Match por graphify_node_id** (para knowledge-nodes): match exato por `graphify_node_id` no frontmatter. Este e o match mais confiavel para knowledge-nodes e tem prioridade sobre os demais quando presente.
 
 **Regras de seguranca:**
@@ -223,18 +223,18 @@ Para cada entidade, apresentar:
 ### Entidades a criar
 | # | Tipo | Nome | Arquivo | Relacoes |
 |---|---|---|---|---|
-| 1 | actor | payment-new-api | actors/payment-new-api.md | [[squad-acquiring]], [[fulano]] |
+| 1 | actor | billing-new-api | actors/billing-new-api.md | [[squad-payments]], [[alice-smith]] |
 
 ### Entidades a atualizar
 | # | Tipo | Nome | Arquivo | Mudancas |
 |---|---|---|---|---|
-| 1 | actor | payment-card-api | actors/payment-card-api.md | Adicionar secao "Atividade Recente" |
+| 1 | actor | billing-api | actors/billing-api.md | Adicionar secao "Atividade Recente" |
 
 ### Vinculacoes bidirecionais
 | Entidade origem | Entidade destino | Secao adicionada |
 |---|---|---|
-| [[payment-new-api]] | [[squad-acquiring]] | "Related Actors" em squad-acquiring |
-| [[squad-acquiring]] | [[payment-new-api]] | "team" em payment-new-api |
+| [[billing-new-api]] | [[squad-payments]] | "Related Actors" em squad-payments |
+| [[squad-payments]] | [[billing-new-api]] | "team" em billing-new-api |
 
 ### Fontes consultadas
 - ✅ Vault local
@@ -320,9 +320,9 @@ Ao preencher o corpo da entidade, aplicar regras de linking semantico por papel:
 - **Permanent notes** (actors, people, teams): wikilinks no corpo devem ter contexto textual.
   Ex: "recebe autorizacoes do [[payment-gateway]] via gRPC" — nao apenas "[[payment-gateway]]"
 - **Bridge notes** (topics, discussions): wikilinks no corpo explicam *porque* permanentes se relacionam.
-  Ex: "a deprecacao do [[autobahn]] esta bloqueada porque clientes dependem do [[payment-card-api]]"
+  Ex: "a deprecacao do [[legacy-gateway]] esta bloqueada porque clientes dependem do [[billing-api]]"
 - **Index notes** (projects): wikilinks no corpo apontam para onde o conhecimento esta.
-  Ex: "progresso documentado em [[2026-06-deprecation-autobahn]]"
+  Ex: "progresso documentado em [[2026-06-deprecation-legacy-gateway]]"
 - **Fleeting notes**: wikilinks exploratorios permitidos sem contexto textual completo.
 
 ### 4.2 Atualizar entidades existentes
@@ -491,13 +491,13 @@ Apresente ao usuario:
 ### Entidades atualizadas
 | Tipo | Nome | Arquivo | Mudancas |
 |---|---|---|---|
-| actor | payment-card-api | actors/payment-card-api.md | Atividade Recente, wikilinks |
+| actor | billing-api | actors/billing-api.md | Atividade Recente, wikilinks |
 
 ### Vinculacoes bidirecionais aplicadas
 | Origem | Destino | Tipo |
 |---|---|---|
-| [[payment-new-api]] | [[squad-acquiring]] | frontmatter: actors[] |
-| [[squad-acquiring]] | [[payment-new-api]] | frontmatter: team |
+| [[billing-new-api]] | [[squad-payments]] | frontmatter: actors[] |
+| [[squad-payments]] | [[billing-new-api]] | frontmatter: team |
 
 ### Fontes consultadas
 - ✅ Vault local

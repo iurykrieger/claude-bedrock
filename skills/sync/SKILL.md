@@ -104,15 +104,15 @@ Varra todas as entidades para coletar URLs unicas.
    Deduplicar por URL. Para cada URL unica, registrar todas as entidades que a referenciam:
    ```
    {
-     "https://allstone.atlassian.net/...": {
+     "https://mycompany.atlassian.net/...": {
        type: "confluence",
        synced_at: "2026-04-09",
-       entities: ["actors/payment-card-api.md", "topics/2026-04-feature-x.md"]
+       entities: ["actors/billing-api.md", "topics/2026-04-feature-x.md"]
      },
-     "https://github.com/stone-payments/pca": {
+     "https://github.com/acme-corp/billing-api": {
        type: "github-repo",
        synced_at: "2026-04-10",
-       entities: ["actors/payment-card-api.md"]
+       entities: ["actors/billing-api.md"]
      }
    }
    ```
@@ -196,7 +196,7 @@ Use Glob para listar todos os arquivos em cada diretorio de entidades (excluindo
 - `fleeting/*.md`
 
 Para cada arquivo encontrado:
-- Extraia o filename sem extensao (ex: `payment-card-api`)
+- Extraia o filename sem extensao (ex: `billing-api`)
 - Use Read para extrair o campo `name` (ou `title`) e `aliases` do frontmatter YAML
 - Armazene: `{filename, name, aliases, tipo}` para matching
 
@@ -208,9 +208,9 @@ Para cada source lida com sucesso na Fase 2:
    - Para cada entidade catalogada na Fase 3.2, verificar se o filename, name ou alias aparece no conteudo
    - Regras de match:
      - Normalize para comparacao: lowercase, sem acentos, sem hifens
-     - Match parcial aceitavel para nomes compostos (ex: "payment card" match "payment-card-api")
-     - NAO matchar substrings de 3 letras ou menos (ex: "api" NAO match "payment-card-api")
-     - NAO matchar palavras genericas (ex: "stone", "service", "system")
+     - Match parcial aceitavel para nomes compostos (ex: "billing api" match "billing-api")
+     - NAO matchar substrings de 3 letras ou menos (ex: "api" NAO match "billing-api")
+     - NAO matchar palavras genericas (ex: "company", "service", "system")
 
 2. **Comparar com `entities_generated` da source:**
    - Entidade no conteudo E ja no vault → candidata a `update` (se ha info nova no conteudo)
@@ -249,8 +249,8 @@ com todas as mudancas de TODAS as sources:
 
 | # | Source | Tipo | Nome | Acao | Info |
 |---|---|---|---|---|---|
-| 1 | roadmap-26q1-cards | topic | 2026-04-feature-x | create | Novo topico mencionado |
-| 2 | eventos-cobranca-pix | actor | pix-receiver | update | Descricao atualizada |
+| 1 | roadmap-26q1 | topic | 2026-04-feature-x | create | Novo topico mencionado |
+| 2 | eventos-cobranca | actor | webhook-receiver | update | Descricao atualizada |
 | ... | ... | ... | ... | ... | ... |
 
 Total: N creates, M updates em P sources.
@@ -286,7 +286,7 @@ entities:
       people: ["person-slug-1"]
     source: "confluence"
   - type: actor
-    name: "pix-receiver"
+    name: "webhook-receiver"
     action: update
     content: "novo contexto extraido na Fase 3..."
     source: "github-repo"
@@ -353,8 +353,8 @@ Apresente ao usuario:
 ### Por source
 | Source | Tipo | Entidades | Status |
 |---|---|---|---|
-| roadmap-26q1-cards | confluence | 3 creates, 2 updates | ✅ |
-| stone-payments-pca | github-repo | 0 creates, 1 update | ✅ |
+| roadmap-26q1 | confluence | 3 creates, 2 updates | ✅ |
+| acme-corp-billing-api | github-repo | 0 creates, 1 update | ✅ |
 | manual-notes | manual | — | ⏭️ ignorada |
 | fonte-quebrada | confluence | — | ❌ erro (motivo) |
 
@@ -406,13 +406,13 @@ Não faça git commit/push. Não atualize `topics/` nem `actors/`. Não leia CLA
 1. Use Glob para listar todos os arquivos `actors/*.md`
 2. Exclua `actors/_template.md`
 3. Para cada arquivo, use Read para extrair do frontmatter YAML:
-   - `repositorio` — URL do GitHub (ex: `https://github.com/stone-payments/payment-card-api/`)
-   - `time` — wikilink do squad (ex: `[[squad-acquiring]]`)
-   - `nome` — nome canônico do ator (ex: `payment-card-api`)
+   - `repositorio` — URL do GitHub (ex: `https://github.com/acme-corp/billing-api/`)
+   - `time` — wikilink do squad (ex: `[[squad-payments]]`)
+   - `nome` — nome canônico do ator (ex: `billing-api`)
 4. Parsear `owner/repo` da URL: extrair os dois segmentos de path após `github.com/`
 5. **Pular** atores sem campo `repositorio`, com URL vazia, ou com URL que não contenha `github.com`
 6. Armazene a lista de atores válidos: `{nome, owner, repo, time_wikilink, time_slug}`
-   - `time_slug`: extraído do wikilink, ex: `[[squad-acquiring]]` → `squad-acquiring`
+   - `time_slug`: extraído do wikilink, ex: `[[squad-payments]]` → `squad-payments`
 
 Ao final desta fase, reporte: "Fase 1: N atores encontrados, M com repositório válido, K pulados."
 
@@ -448,10 +448,10 @@ Ao final desta fase, reporte: "Fase 2: N repositórios acessados, M com commits,
    - `github`: login em lowercase
    - `nome`: `commit.author.name` do commit mais recente (fallback: login se nome vazio)
    - `pontos_focais`: lista de nomes canônicos de atores onde a pessoa tem commits (sem duplicatas)
-   - `time_counts`: contagem de commits por squad (ex: `{squad-acquiring: 15, squad-boleto: 3}`)
+   - `time_counts`: contagem de commits por squad (ex: `{squad-payments: 15, squad-notifications: 3}`)
    - `time`: squad com mais commits; em caso de empate, primeiro alfabeticamente
    - `filename`: derivado de `nome` → lowercase, sem acentos (normalizar NFD e remover combining marks), espaços→hífens, caracteres especiais removidos, kebab-case
-     - Ex: `Fulano da Silva` → `fulano-da-silva.md`
+     - Ex: `Alice Smith` → `alice-smith.md`
      - Ex: `José María` → `jose-maria.md`
      - Fallback: se nome não disponível, usar login como filename
 
@@ -503,11 +503,11 @@ _Nenhum assunto vinculado ainda._
 ```
 
 Onde:
-- `{pontos_focais_yaml}` = array YAML de wikilinks, ex: `["[[payment-card-api]]", "[[boleto-api]]"]`
+- `{pontos_focais_yaml}` = array YAML de wikilinks, ex: `["[[billing-api]]", "[[notification-service]]"]`
 - `{lista_pontos_focais}` = lista markdown, ex:
   ```
-  - [[payment-card-api]] — commits recentes
-  - [[boleto-api]] — commits recentes
+  - [[billing-api]] — commits recentes
+  - [[notification-service]] — commits recentes
   ```
 - `{data_hoje_YYYY-MM-DD}` = data de hoje no formato `YYYY-MM-DD`
 
@@ -565,8 +565,8 @@ Imprima um resumo consolidado:
 
 | Squad | Pessoas |
 |---|---|
-| squad-acquiring | fulano, ciclano |
-| squad-boleto | beltrano |
+| squad-payments | alice, bob |
+| squad-notifications | carol |
 | ... | ... |
 
 ### Repositórios inacessíveis
@@ -824,10 +824,10 @@ Monte a lista de entidades no formato aceito pelo `/bedrock:preserve`.
 
     | PR | Repo | Status | Evidencia |
     |---|---|---|---|
-    | #42 | payment-card-api | merged | Implementa feature X |
+    | #42 | billing-api | merged | Implementa feature X |
 
     > [!info] Status sugerido: in-progress
-    > Baseado em PR #42 mergeada em payment-card-api que implementa feature X.
+    > Baseado em PR #42 mergeada em billing-api que implementa feature X.
     > Detectado automaticamente por sync-github@agent.
   source: "github"
 ```
@@ -842,10 +842,10 @@ Monte a lista de entidades no formato aceito pelo `/bedrock:preserve`.
 
     | PR | Repo | Status | Evidencia |
     |---|---|---|---|
-    | #15 | charge-api | merged | Resolve blocker Y |
+    | #15 | orders-api | merged | Resolve blocker Y |
 
     > [!info] Status sugerido: active
-    > Baseado em PR #15 mergeada em charge-api que resolve blocker Y.
+    > Baseado em PR #15 mergeada em orders-api que resolve blocker Y.
     > O status do projeto reflete uma decisao de gestao — revise esta sugestao.
     > Detectado automaticamente por sync-github@agent.
   source: "github"
@@ -861,8 +861,8 @@ Monte a lista de entidades no formato aceito pelo `/bedrock:preserve`.
 
     | PR | Titulo | Status | Autor | Data |
     |---|---|---|---|---|
-    | #42 | Feature X | merged | fulano | 2026-04-10 |
-    | #34 | Refatoracao Y | open | ciclano | 2026-04-09 |
+    | #42 | Feature X | merged | alice | 2026-04-10 |
+    | #34 | Refatoracao Y | open | bob | 2026-04-09 |
   source: "github"
 ```
 
@@ -958,7 +958,7 @@ tags: [type/fleeting, status/raw]
 
 | Actor | PR | Entidade | Tipo | Status Sugerido | Evidencia |
 |---|---|---|---|---|---|
-| [[payment-card-api]] | #42 | [[2026-04-feature-x]] | topic | in-progress | PR implementa feature X |
+| [[billing-api]] | #42 | [[2026-04-feature-x]] | topic | in-progress | PR implementa feature X |
 | ... | ... | ... | ... | ... | ... |
 
 ## Correlacoes para Revisao Humana (Media Confianca)
@@ -968,22 +968,22 @@ tags: [type/fleeting, status/raw]
 
 | Actor | PR | Entidade | Tipo | Status Sugerido | Evidencia |
 |---|---|---|---|---|---|
-| [[boleto-api]] | #33 | [[2026-04-bugfix-timeout-boleto]] | topic | in-progress | PR titulo menciona timeout |
+| [[notification-service]] | #33 | [[2026-04-bugfix-timeout-notifications]] | topic | in-progress | PR titulo menciona timeout |
 | ... | ... | ... | ... | ... | ... |
 
 ## Atividade por Actor
 
 | Actor | PRs Relevantes | Resumo |
 |---|---|---|
-| [[payment-card-api]] | #42 merged, #43 open | Feature X concluida, refatoracao Y em progresso |
-| [[boleto-api]] | #33 merged | Fix de timeout |
+| [[billing-api]] | #42 merged, #43 open | Feature X concluida, refatoracao Y em progresso |
+| [[notification-service]] | #33 merged | Fix de timeout |
 | ... | ... | ... |
 
 ## Actors Atualizados (Watermark)
 
 | Actor | last_synced_at | last_synced_sha |
 |---|---|---|
-| [[payment-card-api]] | YYYY-MM-DD | abc1234 |
+| [[billing-api]] | YYYY-MM-DD | abc1234 |
 | ... | ... | ... |
 
 ## Erros

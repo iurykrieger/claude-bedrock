@@ -25,8 +25,8 @@ Projects têm status (planning → active → blocked → completed), progresso 
 
 | Parece ser... | Mas é... | Diferença-chave |
 |---|---|---|
-| Project | Topic | Topic é um assunto aberto (ex: "deprecação de serviços legados"). Project é uma iniciativa fechada (ex: "migrar autobahn para payment-card-api até Q3"). Topic pode existir sem deadline; project sempre tem (mesmo que estimada) |
-| Project | Actor | Se o resultado final é um sistema novo, ele começa como project e vira actor quando tiver repo e deploy. Ex: "projeto de criação do charge-probe" → depois vira actor `charge-probe` |
+| Project | Topic | Topic é um assunto aberto (ex: "deprecação de serviços legados"). Project é uma iniciativa fechada (ex: "migrar legacy-gateway para billing-api até Q3"). Topic pode existir sem deadline; project sempre tem (mesmo que estimada) |
+| Project | Actor | Se o resultado final é um sistema novo, ele começa como project e vira actor quando tiver repo e deploy. Ex: "projeto de criação do health-checker" → depois vira actor `health-checker` |
 | Project | Discussion | Discussion é evento pontual. Project é esforço contínuo com progresso. Uma discussion pode criar ou atualizar um project |
 
 ## Campos obrigatórios (frontmatter)
@@ -55,7 +55,7 @@ Projects têm status (planning → active → blocked → completed), progresso 
 ### Regras de Linking
 
 **Links estruturais (frontmatter):** `focal_points` (wikilinks para persons), `related_topics`, `related_actors`, `related_teams` (wikilinks). Definem quais entidades compõem esta iniciativa.
-**Links semânticos (corpo):** Links no corpo devem apontar para onde o conhecimento está, sem repetir conteúdo. Ex: "o progresso da migração está documentado em [[2026-06-deprecation-autobahn]]" em vez de replicar o histórico aqui. O corpo do project é curadoria — direciona o leitor para as notas certas.
+**Links semânticos (corpo):** Links no corpo devem apontar para onde o conhecimento está, sem repetir conteúdo. Ex: "o progresso da migração está documentado em [[2026-06-deprecation-legacy-gateway]]" em vez de replicar o histórico aqui. O corpo do project é curadoria — direciona o leitor para as notas certas.
 **Relação com outros papéis:** Projects não contêm conhecimento próprio — apontam para bridges (topics que detalham os assuntos) e permanentes (actors e people envolvidos). Se um project está explicando algo em detalhe, esse detalhe deveria estar num topic.
 
 ### Critério de Completude
@@ -66,12 +66,12 @@ Um project está completo quando: tem objetivo, pelo menos 1 focal point, e refe
 
 ### Isso É um project
 
-1. "Migração do autobahn para payment-card-api: deadline Q3/2026. Responsável: Leonardo. Bloqueio: clientes Pagar.me que ainda usam o autobahn." — Iniciativa com deadline, responsável, bloqueio. É project.
+1. "Migração do legacy-gateway para billing-api: deadline Q3/2026. Responsável: Bob. Bloqueio: clientes do sistema legado que ainda usam o legacy-gateway." — Iniciativa com deadline, responsável, bloqueio. É project.
 
-2. "Virada OneV2 Charge API: estamos construindo a nova API de cobranças. Squad Charge lidera, previsão de go-live em maio. Envolve charge-api, card engine, pix engine." — Esforço de construção com timeline e múltiplos atores. É project.
+2. "V2 Orders API: estamos construindo a nova API de pedidos. Squad Orders lidera, previsão de go-live em maio. Envolve orders-api, billing engine, integration engine." — Esforço de construção com timeline e múltiplos atores. É project.
 
 ### Isso NÃO é um project
 
 1. "A gente precisa melhorar a observabilidade dos serviços Go." — Assunto aberto sem deadline nem deliverable concreto. É topic.
 
-2. "Corrigir o bug de timeout no boleto-api até sexta." — Tarefa pontual de 1 pessoa. Não é project.
+2. "Corrigir o bug de timeout no notification-service até sexta." — Tarefa pontual de 1 pessoa. Não é project.

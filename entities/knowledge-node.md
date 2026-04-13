@@ -43,7 +43,7 @@ Knowledge-nodes sao sub-entidades de atores — cada knowledge-node pertence a e
 | `node_type` | string | `function`, `class`, `module`, `concept`, `decision`, `interface`, `endpoint` |
 | `source_file` | string | Caminho relativo no repo do ator (ex: `src/Controllers/PaymentController.cs`) |
 | `description` | string | Descricao em pt-BR da funcao/papel deste no |
-| `graphify_node_id` | string | ID unico do no no graph.json (ex: `payment_card_api_processTransaction`) |
+| `graphify_node_id` | string | ID unico do no no graph.json (ex: `billing_api_processTransaction`) |
 | `confidence` | string | `EXTRACTED`, `INFERRED`, ou `AMBIGUOUS` — nivel de confianca da extracao |
 | `updated_at` | date | YYYY-MM-DD |
 | `updated_by` | string | Quem atualizou |
@@ -75,15 +75,15 @@ Um knowledge-node esta completo quando: tem `graphify_node_id` valido, `actor` d
 
 ### Isso E um knowledge-node
 
-1. "A funcao `ProcessTransaction` em `src/Controllers/PaymentController.cs` do `payment-card-api` e responsavel por orquestrar o fluxo de autorizacao com o acquirer selecionado." — Funcao especifica de um ator, extraida por AST. E knowledge-node.
+1. "A funcao `ProcessTransaction` em `src/Controllers/PaymentController.cs` do `billing-api` e responsavel por orquestrar o fluxo de processamento com o provedor selecionado." — Funcao especifica de um ator, extraida por AST. E knowledge-node.
 
-2. "A classe `KafkaEventPublisher` implementa o padrao de publicacao de eventos para topicos Kafka seguindo o contrato de charge." — Classe interna de um ator. E knowledge-node.
+2. "A classe `KafkaEventPublisher` implementa o padrao de publicacao de eventos para topicos Kafka seguindo o contrato de pedidos." — Classe interna de um ator. E knowledge-node.
 
 3. "O endpoint `POST /v1/payments/authorize` recebe requests de autorizacao e delega ao `AuthorizationService`." — Endpoint de API de um ator. E knowledge-node.
 
 ### Isso NAO e um knowledge-node
 
-1. "O payment-card-api esta sendo refatorado para suportar internacionalizacao." — Informacao de alto nivel sobre o ator. E um topic.
+1. "O billing-api esta sendo refatorado para suportar internacionalizacao." — Informacao de alto nivel sobre o ator. E um topic.
 
 2. "Decidimos na daily que o padrao de retry vai mudar para exponential backoff." — Decisao tomada em reuniao. E uma discussion.
 

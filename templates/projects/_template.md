@@ -1,7 +1,7 @@
 ---
 type: project
 name: ""
-aliases: []  # ["SIGLA", "Short Name"] — min 1 alias (ex: ["Virada OneV2"])
+aliases: []  # ["SIGLA", "Short Name"] — min 1 alias (ex: ["V2 Migration"])
 description: ""
 status: ""  # planning | active | blocked | completed
 deadline: ""
@@ -23,7 +23,7 @@ tags: [type/project]  # + status/{planning,active,blocked,completed} + domain/* 
 ---
 
 <!-- Papel Zettelkasten: index note -->
-<!-- Links no corpo apontam para onde o conhecimento esta: "progresso documentado em [[2026-06-deprecation-autobahn]]" — curadoria, nao repeticao -->
+<!-- Links no corpo apontam para onde o conhecimento esta: "progresso documentado em [[2026-06-deprecation-legacy-gateway]]" — curadoria, nao repeticao -->
 
 # Project Name
 

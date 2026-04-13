@@ -56,7 +56,7 @@ Discussions são **eventos pontuais com data fixa** — não evoluem no tempo co
 ### Regras de Linking
 
 **Links estruturais (frontmatter):** `related_people`, `related_actors`, `related_teams`, `related_topics`, `related_projects` (wikilinks). Definem quais entidades participaram ou foram discutidas no evento.
-**Links semânticos (corpo):** Links no corpo devem contextualizar a participação ou menção. Ex: "[[leonardo-otero]] apresentou a proposta de migração do [[autobahn]] para o [[payment-card-api]]" em vez de apenas listar nomes. O corpo da discussion é a narrativa do evento — quem disse o quê sobre qual sistema e por qual razão.
+**Links semânticos (corpo):** Links no corpo devem contextualizar a participação ou menção. Ex: "[[bob-jones]] apresentou a proposta de migração do [[legacy-gateway]] para o [[billing-api]]" em vez de apenas listar nomes. O corpo da discussion é a narrativa do evento — quem disse o quê sobre qual sistema e por qual razão.
 **Relação com outros papéis:** Discussions são pontes temporais — registram quando e como permanentes se conectaram num momento específico. Diferem de topics porque são eventos pontuais, não assuntos que evoluem. Uma discussion pode gerar ou atualizar topics e projects.
 
 ### Critério de Completude
@@ -67,12 +67,12 @@ Uma discussion está completa quando: tem data, pelo menos 1 participante (perso
 
 ### Isso É uma discussion
 
-1. "Reunião de planning Q2 (01/04/2026): participaram Iury, Leonardo, Giovanna. Decisão: priorizar migração do autobahn. Action: Leonardo vai mapear dependências até sexta." — Meeting notes com participantes, decisão, e action item. É discussion.
+1. "Reunião de planning Q2 (01/04/2026): participaram Alice, Bob, Carol. Decisão: priorizar migração do legacy-gateway. Action: Bob vai mapear dependências até sexta." — Meeting notes com participantes, decisão, e action item. É discussion.
 
-2. "Alinhamento sobre observabilidade (03/04/2026): decidimos migrar de DataDog para OpenTelemetry nos serviços Go. Responsável: squad Boleto começa pelo decryptor." — Conversa com decisão e ação. É discussion.
+2. "Alinhamento sobre observabilidade (03/04/2026): decidimos migrar de DataDog para OpenTelemetry nos serviços Go. Responsável: squad Notifications começa pelo crypto-service." — Conversa com decisão e ação. É discussion.
 
 ### Isso NÃO é uma discussion
 
-1. "Documento de arquitetura do charge-api descrevendo o fluxo hexagonal." — Documentação técnica. Não é discussion.
+1. "Documento de arquitetura do orders-api descrevendo o fluxo hexagonal." — Documentação técnica. Não é discussion.
 
-2. "Release notes v2.3.0 do payment-card-api: adicionado suporte a SafraPay." — Changelog de um actor. Não é discussion.
+2. "Release notes v2.3.0 do billing-api: adicionado suporte a PartnerPay." — Changelog de um actor. Não é discussion.

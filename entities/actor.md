@@ -12,12 +12,12 @@ Actors podem ser APIs HTTP, workers/consumers de fila, cronjobs, lambdas, ou mon
 
 - O conteúdo menciona um sistema/serviço com repositório GitHub próprio que ainda não existe em `actors/`
 - O conteúdo descreve uma nova aplicação sendo desenvolvida (status: `in-development`)
-- O conteúdo referencia um repositório de qualquer organização GitHub da StoneCo não catalogado
+- O conteúdo referencia um repositório da organização GitHub da empresa não catalogado
 
 ## Quando NÃO criar
 
 - É uma biblioteca/SDK interna usada por outros atores (ex: `opentelemetry-golang-lib`) — isso é uma dependência, não um ator
-- É um módulo dentro de outro repositório (ex: `charge-cdc` dentro do workspace `charge-api`) — o ator é o repositório raiz
+- É um módulo dentro de outro repositório (ex: `orders-cdc` dentro do workspace `orders-api`) — o ator é o repositório raiz
 - É uma ferramenta de CI/CD ou infraestrutura compartilhada (ex: ArgoCD, Karavela, Terraform modules)
 - É um serviço externo/third-party (ex: DataDog, New Relic, AWS SQS) — mencione como dependência de um ator, não como ator próprio
 
@@ -65,9 +65,9 @@ Um actor está completo quando: tem repositório identificado, stack documentada
 
 ### Isso É um actor
 
-1. "O `payment-card-api` é uma API .NET 8 que processa autorizações de cartão. Roda em EKS via ArgoCD no namespace `runtime-acquiring-prd`." — Sistema com repo, deploy, runtime. É actor.
+1. "O `billing-api` é uma API .NET 8 que processa cobranças e faturas. Roda em EKS via ArgoCD no namespace `runtime-payments-prd`." — Sistema com repo, deploy, runtime. É actor.
 
-2. "Estamos subindo o `charge-probe` em Go para substituir o probe antigo. Já tem repo no GitHub e pipeline de CI." — Sistema novo com repo próprio. É actor (status: `in-development`).
+2. "Estamos subindo o `health-checker` em Go para substituir o probe antigo. Já tem repo no GitHub e pipeline de CI." — Sistema novo com repo próprio. É actor (status: `in-development`).
 
 ### Isso NÃO é um actor
 

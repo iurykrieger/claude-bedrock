@@ -267,7 +267,7 @@ Confirma a limpeza de orfaos? (sim/nao/parcial)
 
 **IMPORTANTE:** A limpeza de orfaos e SEPARADA da consolidacao de duplicatas.
 O usuario pode confirmar uma sem a outra. Permitir confirmacao parcial por ator
-(ex: "limpar orfaos so do payment-card-api").
+(ex: "limpar orfaos so do billing-api").
 
 **PARAR AQUI e aguardar confirmacao do usuario.**
 

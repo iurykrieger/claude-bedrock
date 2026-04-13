@@ -19,7 +19,7 @@ tags: [type/discussion]  # + domain/* opcional
 ---
 
 <!-- Papel Zettelkasten: bridge note -->
-<!-- Links no corpo contextualizam participacao: "[[leonardo-otero]] apresentou a proposta de migracao do [[autobahn]]" -->
+<!-- Links no corpo contextualizam participacao: "[[bob-jones]] apresentou a proposta de migracao do [[legacy-gateway]]" -->
 
 # Discussion Title
 

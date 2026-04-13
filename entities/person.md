@@ -4,9 +4,9 @@
 
 ## O que é
 
-Uma **person** é qualquer colaborador interno da StoneCo (Stone, Pagar.me, Ton) que seja identificável e relevante para o contexto do vault — engenheiro, tech lead, gerente, product manager, engineering manager, designer, DRI, ou qualquer outro profissional que participe de decisões, operações ou contribuições técnicas.
+Uma **person** é qualquer colaborador interno da organização que seja identificável e relevante para o contexto do vault — engenheiro, tech lead, gerente, product manager, engineering manager, designer, DRI, ou qualquer outro profissional que participe de decisões, operações ou contribuições técnicas.
 
-A identificação primária é o **prefixo do email corporativo** (ex: `iury.krieger@stone.com.br` → filename `iury-krieger.md`), que garante idempotência e universalidade — todo colaborador possui email corporativo, independente de ter ou não conta no GitHub.
+A identificação primária é o **prefixo do email corporativo** (ex: `alice.smith@company.com` → filename `alice-smith.md`), que garante idempotência e universalidade — todo colaborador possui email corporativo, independente de ter ou não conta no GitHub.
 
 Persons são conectadas a teams e actors via wikilinks. O vault rastreia pessoas para entender: quem trabalha em quê, quem é focal point de qual sistema, quem participou de quais decisões, e qual é o papel de cada pessoa na organização.
 
@@ -19,7 +19,7 @@ Persons são conectadas a teams e actors via wikilinks. O vault rastreia pessoas
 
 ## Quando NÃO criar
 
-- É uma menção genérica sem nome completo (ex: "o pessoal do time de boleto", "alguém do infra") — isso é referência a team, não a person
+- É uma menção genérica sem nome completo (ex: "o pessoal do time de notificações", "alguém do infra") — isso é referência a team, não a person
 - É um usuário final ou cliente (ex: "o lojista reportou um bug") — persons são colaboradores internos
 - É um stakeholder externo sem participação direta na organização (ex: "o auditor da PCI")
 - É uma pessoa mencionada apenas uma vez sem contexto de time/ator — provavelmente não é relevante para o vault
@@ -28,7 +28,7 @@ Persons são conectadas a teams e actors via wikilinks. O vault rastreia pessoas
 
 | Parece ser... | Mas é... | Diferença-chave |
 |---|---|---|
-| Person | Team | Se o conteúdo diz "a galera do acquiring", é referência ao team. Person é um indivíduo com nome |
+| Person | Team | Se o conteúdo diz "a galera do payments", é referência ao team. Person é um indivíduo com nome |
 | Person | Actor | Nomes como `ralph` podem ser tanto pessoa quanto repo. Se tem email corporativo e participa de um time, é person. Se tem deploy, é actor |
 | Person | Discussion participant | Se a pessoa só aparece como participante de uma reunião, ela pode ser criada como person E referenciada na discussion |
 
@@ -48,17 +48,17 @@ Persons são conectadas a teams e actors via wikilinks. O vault rastreia pessoas
 
 | Campo | Tipo | Descrição |
 |---|---|---|
-| `email` | string | Email corporativo completo (ex: `iury.krieger@stone.com.br`) |
+| `email` | string | Email corporativo completo (ex: `alice.smith@company.com`) |
 | `github` | string | Login do GitHub (quando aplicável) |
-| `slack` | string | Arroba do Slack (ex: `@iury.krieger`) |
+| `slack` | string | Arroba do Slack (ex: `@alice.smith`) |
 | `jira` | string | Usuário do Jira |
 
 ## Convenção de filename
 
 O filename de uma person é derivado do **prefixo do email corporativo**, normalizado:
-- Pontos viram hífens: `iury.krieger` → `iury-krieger`
+- Pontos viram hífens: `alice.smith` → `alice-smith`
 - Lowercase, sem acentos
-- Exemplo: `iury.krieger@stone.com.br` → `iury-krieger.md`
+- Exemplo: `alice.smith@company.com` → `alice-smith.md`
 
 Quando o email não é conhecido, usar `first-last.md` baseado no nome completo (normalizado).
 
@@ -70,7 +70,7 @@ Quando o email não é conhecido, usar `first-last.md` baseado no nome completo 
 ### Regras de Linking
 
 **Links estruturais (frontmatter):** `team` (wikilink para squad), `focal_points` (wikilinks para actors). Definem a posição organizacional — em qual time e em quais sistemas a pessoa atua.
-**Links semânticos (corpo):** Wikilinks no corpo devem ter contexto textual. Ex: "lidera a migração do [[autobahn]] para [[payment-card-api]]" em vez de apenas "[[autobahn]]". Links no corpo explicam contribuições, responsabilidades, e envolvimento em decisões.
+**Links semânticos (corpo):** Wikilinks no corpo devem ter contexto textual. Ex: "lidera a migração do [[legacy-gateway]] para [[billing-api]]" em vez de apenas "[[legacy-gateway]]". Links no corpo explicam contribuições, responsabilidades, e envolvimento em decisões.
 **Relação com outros papéis:** Persons são referenciadas por bridge notes (topics, discussions) que registram participação em eventos e assuntos. Não duplicar na person o histórico de discussions — a person descreve quem é, o topic/discussion descreve o que aconteceu.
 
 ### Critério de Completude
@@ -81,14 +81,14 @@ Uma person está completa quando: tem nome completo, time atribuído, e pelo men
 
 ### Isso É uma person
 
-1. "Leonardo Bittencourt é engenheiro do squad Acquiring e trabalha principalmente no payment-card-api." — Indivíduo com nome, time, e ator focal. É person.
+1. "Bob Jones é engenheiro do squad Payments e trabalha principalmente no billing-api." — Indivíduo com nome, time, e ator focal. É person.
 
-2. "O PR #142 no boleto-api foi aberto por `jadersgomes` (Jaderson Gomes)." — Contribuidor identificável com GitHub login e ator. É person.
+2. "O PR #142 no notification-service foi aberto por `davewilson` (Dave Wilson)." — Contribuidor identificável com GitHub login e ator. É person.
 
-3. "Maria Silva é Product Manager do squad Charge e lidera o projeto de migração OneV2." — Profissional com nome, time e projeto. É person, mesmo sem commits.
+3. "Eve Martin é Product Manager do squad Orders e lidera o projeto de migração V2." — Profissional com nome, time e projeto. É person, mesmo sem commits.
 
 ### Isso NÃO é uma person
 
-1. "O time de boleto vai cuidar da migração." — Referência ao team, não a um indivíduo. Não criar person.
+1. "O time de notificações vai cuidar da migração." — Referência ao team, não a um indivíduo. Não criar person.
 
 2. "Um lojista reportou timeout nas cobranças de cartão." — Usuário final, não contribuidor interno. Não criar person.
