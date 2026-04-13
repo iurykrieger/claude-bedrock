@@ -61,7 +61,7 @@ ls .bedrock/config.json 2>/dev/null
    > 1. **Reconfigure** — Update language, domains, and regenerate vault CLAUDE.md (directories and entities are NOT touched)
    > 2. **Skip** — Exit with no changes
 
-   - **Reconfigure**: proceed to Phase 1, but set `RECONFIGURE_MODE = true`. In Phase 3, skip directory creation (3.1), template copying (3.2), and example entity generation (3.5).
+   - **Reconfigure**: proceed to Phase 1, but set `RECONFIGURE_MODE = true`. In Phase 3, skip directory creation (3.1), template copying (3.2), Obsidian configuration (3.5), and example entity generation (3.6).
    - **Skip**: exit with "No changes made. Vault is already initialized."
 
 **If `.bedrock/config.json` does NOT exist:** proceed to Phase 1 with `RECONFIGURE_MODE = false`.
@@ -485,7 +485,136 @@ New domains can be added as the vault grows.
 If the language is pt-BR, write sections headers and descriptions in Portuguese.
 If en-US, write in English. Etc.
 
-### 3.5 Create Example Entities
+### 3.5 Create Obsidian Configuration
+
+> **Skip if `RECONFIGURE_MODE = true`.**
+
+Create a `.obsidian/` directory with default configuration files so the vault is
+ready to use in Obsidian immediately — with wikilinks, a color-coded graph view,
+and a minimal plugin setup.
+
+**Step 1:** Create the `.obsidian/` directory:
+
+```bash
+mkdir -p .obsidian
+```
+
+**Step 2:** For each config file below, check if it already exists. If it does,
+skip it and log `"Skipped .obsidian/<file> — already exists"`. If it does not exist,
+create it with the content specified.
+
+#### `.obsidian/app.json`
+
+```json
+{
+  "useMarkdownLinks": false,
+  "newLinkFormat": "shortest",
+  "strictLineBreaks": false,
+  "showFrontmatter": true
+}
+```
+
+- `useMarkdownLinks: false` — Obsidian uses wikilinks (matches Bedrock's `[[name]]` convention)
+- `newLinkFormat: "shortest"` — generates bare `[[name]]` links without path prefix
+- `showFrontmatter: true` — frontmatter is central to Bedrock entities; visible by default
+
+#### `.obsidian/appearance.json`
+
+```json
+{
+  "baseFontSize": 16,
+  "theme": "obsidian"
+}
+```
+
+- `theme: "obsidian"` — Obsidian's built-in dark theme. Clean, high-contrast.
+
+#### `.obsidian/graph.json`
+
+```json
+{
+  "collapse-filter": true,
+  "search": "",
+  "showTags": false,
+  "showAttachments": false,
+  "hideUnresolved": false,
+  "showOrphans": true,
+  "collapse-color-groups": false,
+  "colorGroups": [
+    {
+      "query": "tag:#type/actor",
+      "color": { "a": 1, "rgb": 4886745 }
+    },
+    {
+      "query": "tag:#type/person",
+      "color": { "a": 1, "rgb": 5294200 }
+    },
+    {
+      "query": "tag:#type/team",
+      "color": { "a": 1, "rgb": 15241530 }
+    },
+    {
+      "query": "tag:#type/topic",
+      "color": { "a": 1, "rgb": 10181046 }
+    },
+    {
+      "query": "tag:#type/discussion",
+      "color": { "a": 1, "rgb": 15844367 }
+    },
+    {
+      "query": "tag:#type/project",
+      "color": { "a": 1, "rgb": 15158332 }
+    },
+    {
+      "query": "tag:#type/fleeting",
+      "color": { "a": 1, "rgb": 9807270 }
+    }
+  ],
+  "collapse-display": true,
+  "showArrow": false,
+  "textFadeMultiplier": 0,
+  "nodeSizeMultiplier": 1,
+  "lineSizeMultiplier": 1,
+  "collapse-forces": true,
+  "centerStrength": 0.5,
+  "repelStrength": 10,
+  "linkStrength": 1,
+  "linkDistance": 250,
+  "scale": 1,
+  "close": false
+}
+```
+
+**Color palette (7 entity types):**
+
+| Entity | Tag query | Color | RGB int |
+|---|---|---|---|
+| actor | `tag:#type/actor` | Blue (#4A90D9) | `4886745` |
+| person | `tag:#type/person` | Green (#50C878) | `5294200` |
+| team | `tag:#type/team` | Orange (#E8913A) | `15241530` |
+| topic | `tag:#type/topic` | Purple (#9B59B6) | `10181046` |
+| discussion | `tag:#type/discussion` | Gold (#F1C40F) | `15844367` |
+| project | `tag:#type/project` | Red (#E74C3C) | `15158332` |
+| fleeting | `tag:#type/fleeting` | Grey (#95A5A6) | `9807270` |
+
+Key graph settings:
+- `collapse-color-groups: false` — color groups panel starts expanded so users see the mapping
+- `showTags: false` — tag nodes hidden to keep graph focused on entities
+- `showOrphans: true` — orphan entities visible for vault health
+
+#### `.obsidian/core-plugins.json`
+
+```json
+["graph"]
+```
+
+- Only `graph` enabled — the minimum required for the color groups to work.
+  All other core plugins are disabled for a clean experience.
+
+**Step 3:** Track the results for the setup summary (Phase 4). For each file,
+record whether it was `Created` or `Skipped (already exists)`.
+
+### 3.6 Create Example Entities
 
 > **Skip if `RECONFIGURE_MODE = true` or `SKIP_EXAMPLES = true`.**
 
@@ -494,7 +623,7 @@ Using the resolved preset data from Phase 2, create connected example entities.
 
 The entities form a mini-graph where every wikilink has a matching backlink.
 
-#### 3.5.1 Determine Entity Set
+#### 3.6.1 Determine Entity Set
 
 **For all presets except `personal`:** Create 6 entities:
 1. Team: `teams/<team_name>.md`
@@ -510,7 +639,7 @@ The entities form a mini-graph where every wikilink has a matching backlink.
 3. Topic: `topics/<topic_slug>.md`
 4. Project: `projects/<project_slug>.md`
 
-#### 3.5.2 Create Team Entity
+#### 3.6.2 Create Team Entity
 
 > **Skip for `personal` preset.**
 
@@ -558,7 +687,7 @@ tags: [type/team, domain/<first_domain>]
 - <responsibility derived from team_purpose>
 ```
 
-#### 3.5.3 Create Person Entities
+#### 3.6.3 Create Person Entities
 
 Read the person template from `<base_dir>/../../templates/people/_template.md` as structural reference.
 
@@ -606,7 +735,7 @@ Member of [[<team_name>]].
 
 **For `personal` preset:** Omit the `team` field (set to `""`), omit the `Team` section, and write only 1 person entity.
 
-#### 3.5.4 Create Actor Entity
+#### 3.6.4 Create Actor Entity
 
 Read the actor template from `<base_dir>/../../templates/actors/_template.md` as structural reference.
 
@@ -664,7 +793,7 @@ tags: [type/actor, status/<actor_status>, domain/<first_domain>]
 
 **For `personal` preset:** Set `team` to `""` and omit the Team row from the Details table.
 
-#### 3.5.5 Create Topic Entity
+#### 3.6.5 Create Topic Entity
 
 Read the topic template from `<base_dir>/../../templates/topics/_template.md` as structural reference.
 
@@ -728,7 +857,7 @@ with real context about the topic's background and motivation.
 - [[<project_slug>]] — <brief description>
 ```
 
-#### 3.5.6 Create Project Entity
+#### 3.6.6 Create Project Entity
 
 Read the project template from `<base_dir>/../../templates/projects/_template.md` as structural reference.
 
@@ -809,7 +938,7 @@ with the real project description, motivation, and expected outcomes.
 
 **For `personal` preset:** Remove the `related_teams` field and the "Related Teams" section.
 
-#### 3.5.7 Verify Bidirectional Links
+#### 3.6.7 Verify Bidirectional Links
 
 After creating all entities, verify the wikilink graph is fully bidirectional.
 
@@ -851,6 +980,10 @@ After all files are created, present the user with a summary and next steps.
 |---|---|
 | Config | .bedrock/config.json |
 | CLAUDE.md | CLAUDE.md |
+| Obsidian | .obsidian/app.json |
+| Obsidian | .obsidian/appearance.json |
+| Obsidian | .obsidian/graph.json |
+| Obsidian | .obsidian/core-plugins.json |
 | Template | actors/_template.md |
 | Template | people/_template.md |
 | Template | teams/_template.md |
@@ -887,6 +1020,10 @@ After all files are created, present the user with a summary and next steps.
 
 6. **Replace example content** — The example entities are there to show you how Bedrock works.
    Edit or delete them as you start adding real content.
+
+> **Tip:** The graph view is preconfigured with 7 colors — one for each entity type.
+> Open Graph View (Ctrl/Cmd+G) to see your entities color-coded by type.
+> Customize colors in Graph View → Groups if you prefer different colors.
 
 > **Tip:** The example entities are fully connected with bidirectional wikilinks.
 > Open the Obsidian graph view to see how they relate to each other — this is the
