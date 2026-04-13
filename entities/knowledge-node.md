@@ -1,90 +1,90 @@
 # Entity: Knowledge Node
 
-> Fonte de verdade para campos obrigatorios: `actors/_template_node.md`
+> Source of truth for required fields: `actors/_template_node.md`
 
-## O que e
+## What it is
 
-Um **knowledge-node** e uma unidade granular de conhecimento extraida automaticamente pelo graphify a partir do codigo-fonte ou documentacao de um ator. Representa funcoes, classes, modulos, conceitos, decisoes, interfaces ou endpoints que foram identificados pela analise semantica (AST + LLM) do repositorio.
+A **knowledge-node** is a granular unit of knowledge automatically extracted by graphify from an actor's source code or documentation. It represents functions, classes, modules, concepts, decisions, interfaces, or endpoints that were identified by semantic analysis (AST + LLM) of the repository.
 
-Knowledge-nodes sao sub-entidades de atores — cada knowledge-node pertence a exatamente um ator e vive dentro da pasta do ator em `actors/<actor-name>/nodes/`. Eles formam a camada de detalhamento fino do grafo de conhecimento, conectando o vault a informacoes que existem no codigo mas nao seriam capturadas por descricoes de alto nivel.
+Knowledge-nodes are sub-entities of actors — each knowledge-node belongs to exactly one actor and lives inside the actor's folder at `actors/<actor-name>/nodes/`. They form the fine-grained detail layer of the knowledge graph, connecting the vault to information that exists in the code but would not be captured by high-level descriptions.
 
-## Quando criar
+## When to create
 
-- O graphify extraiu um no do repositorio de um ator (funcao, classe, modulo, interface, endpoint) com relevancia semantica
-- O graphify extraiu um conceito ou decisao de arquitetura a partir de documentacao vinculada a um ator
-- O no tem `confidence` EXTRACTED ou INFERRED (nao puramente AMBIGUOUS)
-- O ator correspondente ja existe no vault
+- graphify extracted a node from an actor's repository (function, class, module, interface, endpoint) with semantic relevance
+- graphify extracted a concept or architectural decision from documentation linked to an actor
+- The node has `confidence` EXTRACTED or INFERRED (not purely AMBIGUOUS)
+- The corresponding actor already exists in the vault
 
-## Quando NAO criar
+## When NOT to create
 
-- O no e trivial (getter/setter generico, boilerplate, auto-generated code) — filtrar por relevancia
-- O no ja existe como outra entidade no vault (ex: um conceito que ja e um topic)
-- O ator correspondente nao existe no vault — criar o ator primeiro
-- O no tem confidence AMBIGUOUS sem edges que o conectem a outros nos — informacao isolada sem valor
-- O conteudo e sensivel (credenciais, tokens, PANs, CVVs) — nunca persistir dados sensiveis
+- The node is trivial (generic getter/setter, boilerplate, auto-generated code) — filter by relevance
+- The node already exists as another entity in the vault (e.g., a concept that is already a topic)
+- The corresponding actor does not exist in the vault — create the actor first
+- The node has confidence AMBIGUOUS without edges connecting it to other nodes — isolated information without value
+- The content is sensitive (credentials, tokens, PANs, CVVs) — never persist sensitive data
 
-## Como distinguir de outros tipos
+## How to distinguish from other types
 
-| Parece ser... | Mas e... | Diferenca-chave |
+| Looks like... | But is... | Key difference |
 |---|---|---|
-| Knowledge-node | Topic | Se o conteudo e uma decisao de arquitetura ampla que afeta multiplos atores, e um topic. Se e especifico de uma funcao/classe de um ator, e knowledge-node |
-| Knowledge-node | Actor | Se tem repositorio e deploy independente, e ator. Knowledge-nodes sao partes internas de um ator |
-| Knowledge-node | Fleeting | Se veio do graphify com confidence EXTRACTED/INFERRED e tem `graphify_node_id`, e knowledge-node. Se e uma ideia solta sem vinculo ao grafo, e fleeting |
-| Knowledge-node | Discussion | Se descreve uma decisao tomada em reuniao/debate, e discussion. Se descreve uma decisao de design encontrada no codigo, e knowledge-node |
+| Knowledge-node | Topic | If the content is a broad architectural decision affecting multiple actors, it is a topic. If it is specific to a function/class of one actor, it is a knowledge-node |
+| Knowledge-node | Actor | If it has its own repository and independent deployment, it is an actor. Knowledge-nodes are internal parts of an actor |
+| Knowledge-node | Fleeting | If it came from graphify with confidence EXTRACTED/INFERRED and has a `graphify_node_id`, it is a knowledge-node. If it is a loose idea without a link to the graph, it is fleeting |
+| Knowledge-node | Discussion | If it describes a decision made in a meeting/debate, it is a discussion. If it describes a design decision found in the code, it is a knowledge-node |
 
-## Campos obrigatorios (frontmatter)
+## Required fields (frontmatter)
 
-| Campo | Tipo | Descricao |
+| Field | Type | Description |
 |---|---|---|
-| `type` | string | Sempre `"knowledge-node"` |
-| `name` | string | Nome legivel do no (ex: `"ProcessTransaction"`, `"KafkaEventPublisher"`) |
-| `aliases` | array | Nomes alternativos (min 1). Ex: `["Process Transaction", "processTransaction"]` |
-| `actor` | wikilink | `"[[actor-name]]"` — ator pai ao qual este no pertence |
+| `type` | string | Always `"knowledge-node"` |
+| `name` | string | Human-readable name of the node (e.g., `"ProcessTransaction"`, `"KafkaEventPublisher"`) |
+| `aliases` | array | Alternative names (min 1). E.g., `["Process Transaction", "processTransaction"]` |
+| `actor` | wikilink | `"[[actor-name]]"` — parent actor to which this node belongs |
 | `node_type` | string | `function`, `class`, `module`, `concept`, `decision`, `interface`, `endpoint` |
-| `source_file` | string | Caminho relativo no repo do ator (ex: `src/Controllers/PaymentController.cs`) |
-| `description` | string | Descricao em pt-BR da funcao/papel deste no |
-| `graphify_node_id` | string | ID unico do no no graph.json (ex: `billing_api_processTransaction`) |
-| `confidence` | string | `EXTRACTED`, `INFERRED`, ou `AMBIGUOUS` — nivel de confianca da extracao |
+| `source_file` | string | Relative path in the actor's repo (e.g., `src/Controllers/PaymentController.cs`) |
+| `description` | string | Description of this node's function/role |
+| `graphify_node_id` | string | Unique node ID in graph.json (e.g., `billing_api_processTransaction`) |
+| `confidence` | string | `EXTRACTED`, `INFERRED`, or `AMBIGUOUS` — extraction confidence level |
 | `updated_at` | date | YYYY-MM-DD |
-| `updated_by` | string | Quem atualizou |
-| `tags` | array | Tags hierarquicas: `[type/knowledge-node]` + `domain/*` herdado do ator |
+| `updated_by` | string | Who updated it |
+| `tags` | array | Hierarchical tags: `[type/knowledge-node]` + `domain/*` inherited from the actor |
 
-### Campos opcionais
+### Optional fields
 
-| Campo | Tipo | Descricao |
+| Field | Type | Description |
 |---|---|---|
-| `relations` | array | Wikilinks para outros knowledge-nodes ou entidades relacionadas |
-| `source_location` | string | Linha ou range no source_file (ex: `L42-L85`) |
+| `relations` | array | Wikilinks to other knowledge-nodes or related entities |
+| `source_location` | string | Line or range in the source_file (e.g., `L42-L85`) |
 
-## Papel Zettelkasten
+## Zettelkasten Role
 
-**Classificacao:** extensao de permanent note (sub-entidade de actor)
-**Proposito no grafo:** Representar detalhes granulares de implementacao de atores — funcoes, classes, decisoes de design — que enriquecem o grafo de conhecimento sem poluir as permanent notes de alto nivel.
+**Classification:** permanent note extension (sub-entity of actor)
+**Purpose in the graph:** Represent granular implementation details of actors — functions, classes, design decisions — that enrich the knowledge graph without polluting the high-level permanent notes.
 
-### Regras de Linking
+### Linking Rules
 
-**Links estruturais (frontmatter):** `actor` (wikilink para o ator pai). Define a hierarquia — todo knowledge-node pertence a exatamente um ator.
-**Links semanticos (corpo):** Wikilinks no corpo devem ter contexto textual quando possivel. Ex: "chama [[ProcessPayment]] para executar a transacao" em vez de apenas "[[ProcessPayment]]". Para knowledge-nodes com muitas relacoes, links no frontmatter (`relations`) sao aceitaveis sem contexto textual.
-**Relacao com outros papeis:** Knowledge-nodes sao referenciados pelo ator pai (secao "Knowledge Nodes") e podem ser referenciados por bridge notes (topics, discussions) quando relevante. Knowledge-nodes entre si se referenciam via `relations` e edges do graph.json.
+**Structural links (frontmatter):** `actor` (wikilink to the parent actor). Defines the hierarchy — every knowledge-node belongs to exactly one actor.
+**Semantic links (body):** Wikilinks in the body should have textual context when possible. E.g., "calls [[ProcessPayment]] to execute the transaction" instead of just "[[ProcessPayment]]". For knowledge-nodes with many relations, links in the frontmatter (`relations`) are acceptable without textual context.
+**Relationship with other roles:** Knowledge-nodes are referenced by the parent actor ("Knowledge Nodes" section) and can be referenced by bridge notes (topics, discussions) when relevant. Knowledge-nodes reference each other via `relations` and edges from graph.json.
 
-### Criterio de Completude
+### Completeness Criteria
 
-Um knowledge-node esta completo quando: tem `graphify_node_id` valido, `actor` definido, `node_type` definido, `source_file` identificado, e `description` auto-contida. Se faltam `graphify_node_id` ou `actor`, o conteudo deve ir para `fleeting/`.
+A knowledge-node is complete when: it has a valid `graphify_node_id`, defined `actor`, defined `node_type`, identified `source_file`, and a self-contained `description`. If `graphify_node_id` or `actor` is missing, the content should go to `fleeting/`.
 
-## Exemplos
+## Examples
 
-### Isso E um knowledge-node
+### This IS a knowledge-node
 
-1. "A funcao `ProcessTransaction` em `src/Controllers/PaymentController.cs` do `billing-api` e responsavel por orquestrar o fluxo de processamento com o provedor selecionado." — Funcao especifica de um ator, extraida por AST. E knowledge-node.
+1. "The function `ProcessTransaction` in `src/Controllers/PaymentController.cs` of `billing-api` is responsible for orchestrating the processing flow with the selected provider." — Specific function of an actor, extracted by AST. It is a knowledge-node.
 
-2. "A classe `KafkaEventPublisher` implementa o padrao de publicacao de eventos para topicos Kafka seguindo o contrato de pedidos." — Classe interna de um ator. E knowledge-node.
+2. "The class `KafkaEventPublisher` implements the event publishing pattern for Kafka topics following the orders contract." — Internal class of an actor. It is a knowledge-node.
 
-3. "O endpoint `POST /v1/payments/authorize` recebe requests de autorizacao e delega ao `AuthorizationService`." — Endpoint de API de um ator. E knowledge-node.
+3. "The endpoint `POST /v1/payments/authorize` receives authorization requests and delegates to `AuthorizationService`." — API endpoint of an actor. It is a knowledge-node.
 
-### Isso NAO e um knowledge-node
+### This is NOT a knowledge-node
 
-1. "O billing-api esta sendo refatorado para suportar internacionalizacao." — Informacao de alto nivel sobre o ator. E um topic.
+1. "The billing-api is being refactored to support internationalization." — High-level information about the actor. It is a topic.
 
-2. "Decidimos na daily que o padrao de retry vai mudar para exponential backoff." — Decisao tomada em reuniao. E uma discussion.
+2. "We decided in the daily that the retry pattern will change to exponential backoff." — Decision made in a meeting. It is a discussion.
 
-3. "Talvez exista um race condition no void worker." — Hipotese sem confirmacao. E fleeting.
+3. "There might be a race condition in the void worker." — Unconfirmed hypothesis. It is fleeting.

@@ -15,47 +15,47 @@ source: ""  # session | meeting-notes | jira | confluence | manual
 sources: []  # [{url: "https://...", type: "confluence|gdoc|github-repo|csv|markdown|manual", synced_at: YYYY-MM-DD}]
 updated_at: YYYY-MM-DD
 updated_by: ""
-tags: [type/discussion]  # + domain/* opcional
+tags: [type/discussion]  # + domain/* optional
 ---
 
-<!-- Papel Zettelkasten: bridge note -->
-<!-- Links no corpo contextualizam participacao: "[[bob-jones]] apresentou a proposta de migracao do [[legacy-gateway]]" -->
+<!-- Zettelkasten role: bridge note -->
+<!-- Links in the body contextualize participation: "[[bob-jones]] presented the migration proposal for [[legacy-gateway]]" -->
 
 # Discussion Title
 
 > Brief summary of the discussion in 1-2 sentences.
 
-## Contexto
+## Context
 
 Description of the context and motivation for this discussion.
 
-## Participantes
+## Participants
 
-| Pessoa | Papel |
+| Person | Role |
 |---|---|
-| [[first-last]] | participante |
+| [[first-last]] | participant |
 
-## Atores Discutidos
+## Discussed Actors
 
-| Ator | Contexto |
+| Actor | Context |
 |---|---|
-| [[repo-name]] | contexto da mencao |
+| [[repo-name]] | context of the mention |
 
-## Conclusoes
+## Conclusions
 
-- Conclusao 1
-- Conclusao 2
+- Conclusion 1
+- Conclusion 2
 
-## Itens de Acao
+## Action Items
 
-- [ ] Acao 1 — responsavel: [[first-last]]
-- [ ] Acao 2 — responsavel: [[first-last]]
+- [ ] Action 1 — owner: [[first-last]]
+- [ ] Action 2 — owner: [[first-last]]
 
-## Projetos Relacionados
+## Related Projects
 
 - [[project-slug]]
 
-## Topicos Relacionados
+## Related Topics
 
 - [[YYYY-MM-type-slug]]
 

@@ -24,7 +24,7 @@ The vault organizes knowledge into 7 entity types, each in its own directory:
 | Topics | `topics/` | `YYYY-MM-category-slug.md` | `2026-04-feature-new-checkout.md` |
 | Discussions | `discussions/` | `YYYY-MM-DD-slug.md` | `2026-04-02-daily-payments.md` |
 | Projects | `projects/` | `slug.md` | `processing-3-0.md` |
-| Fleeting | `fleeting/` | `YYYY-MM-DD-slug.md` | `2026-04-09-novo-servico-tokenizacao.md` |
+| Fleeting | `fleeting/` | `YYYY-MM-DD-slug.md` | `2026-04-09-new-tokenization-service.md` |
 
 Each entity type has a `_template.md` defining the required frontmatter and structure. **Always follow the template when creating new entities.**
 
@@ -35,13 +35,13 @@ Entity semantic definitions live in the plugin's `entities/` directory — used 
 ## Writing Rules
 
 ### Language
-- **Portuguese (pt-BR)** for all content
+- **English (en-US)** for all content by default (configurable via `/bedrock:setup`)
 - Technical terms in English are accepted (PCI, API, Kafka, etc.)
 
 ### Frontmatter
 - YAML between `---` delimiters
 - **Keys always in English** (`type`, `name`, `status`, `updated_at`, `updated_by`)
-- **Values in pt-BR** (`description: "API de cobranca e faturamento"`)
+- **Values in the vault's configured language** (`description: "Billing and invoicing API"`)
 - Array references use wikilink syntax: `["[[name1]]", "[[name2]]"]`
 - Every entity must have `updated_at` (YYYY-MM-DD) and `updated_by` (person or `name@agent`)
 
@@ -59,7 +59,7 @@ Tags use `/` separator for multi-dimensional filtering in Obsidian graph view:
 | Type | `type/` | `actor`, `person`, `team`, `topic`, `discussion`, `project`, `fleeting` |
 | Status | `status/` | `active`, `deprecated`, `planning`, `blocked`, `done`, `in-progress`, `open`, `completed`, `cancelled`, `raw`, `reviewing`, `promoted`, `archived` |
 | Domain | `domain/` | `payments`, `finance`, `notifications`, `checkout`, `orders`, `integrations`, `compliance`, `core`, `data`, `infra`, `marketplace`, `internal-tools`, `platform`, `security` |
-| Scope | `scope/` | `pci`, `sox`, `lgpd` (fintech), `hipaa` (saude), `gdpr` (Europa), `soc2` (SaaS) |
+| Scope | `scope/` | `pci`, `sox`, `lgpd` (fintech), `hipaa` (health), `gdpr` (Europe), `soc2` (SaaS) |
 | Category | `category/` | `deprecation`, `bugfix`, `troubleshooting`, `rfc`, `incident`, `feature`, `compliance` |
 
 These are examples — both domains and scopes are extensible. Add new values as your organization grows (e.g. new teams, new compliance requirements).
@@ -117,19 +117,19 @@ These are the Claude Code skills provided by the Bedrock plugin:
 
 - **Trunk-based**: push directly to `main`
 - **Pull before write**: `git pull --rebase origin main`
-- **Commit convention**: `vault(<type>): <verb> <name> [fonte: <source>]`
+- **Commit convention**: `vault(<type>): <verb> <name> [source: <origin>]`
 
 | Field | Values |
 |---|---|
-| `<type>` | `pessoa`, `time`, `ator`, `assunto`, `discussao`, `projeto`, `nota` |
-| `<verb>` | `cria`, `atualiza`, `vincula`, `comprime` |
-| `<source>` | `memoria`, `github`, `jira`, `confluence`, `gdoc`, `sheets`, `manual`, `compress` |
+| `<type>` | `person`, `team`, `actor`, `topic`, `discussion`, `project`, `note` |
+| `<verb>` | `creates`, `updates`, `links`, `compresses` |
+| `<origin>` | `memory`, `github`, `jira`, `confluence`, `gdoc`, `sheets`, `manual`, `compress` |
 
 Examples:
 ```
-vault(ator): atualiza billing-api [fonte: github]
-vault: teaches roadmap-26q1, creates 7 topics [fonte: confluence]
-vault: compress 25 entities across 8 clusters [fonte: compress]
+vault(actor): updates billing-api [source: github]
+vault: teaches roadmap-26q1, creates 7 topics [source: confluence]
+vault: compresses 25 entities across 8 clusters [source: compress]
 ```
 
 ---
@@ -154,7 +154,7 @@ The vault follows adapted Zettelkasten principles. Each entity type has a **role
 5. **Fleeting notes are temporary.** They should be promoted (to permanent/bridge) or archived.
 6. **Provenance via `sources` field.** Every entity can record where its data came from in the `sources` frontmatter field (list of `{url, type, synced_at}`). See `entities/sources-field.md` in the plugin.
 
-Details in `entities/*.md` (section "Papel Zettelkasten" per type) within the plugin directory.
+Details in `entities/*.md` (section "Zettelkasten Role" per type) within the plugin directory.
 
 ---
 

@@ -1,94 +1,94 @@
 # Entity: Person
 
-> Fonte de verdade para campos obrigatórios: `people/_template.md`
+> Source of truth for required fields: `people/_template.md`
 
-## O que é
+## What it is
 
-Uma **person** é qualquer colaborador interno da organização que seja identificável e relevante para o contexto do vault — engenheiro, tech lead, gerente, product manager, engineering manager, designer, DRI, ou qualquer outro profissional que participe de decisões, operações ou contribuições técnicas.
+A **person** is any internal collaborator of the organization who is identifiable and relevant to the vault's context — engineer, tech lead, manager, product manager, engineering manager, designer, DRI, or any other professional who participates in decisions, operations, or technical contributions.
 
-A identificação primária é o **prefixo do email corporativo** (ex: `alice.smith@company.com` → filename `alice-smith.md`), que garante idempotência e universalidade — todo colaborador possui email corporativo, independente de ter ou não conta no GitHub.
+The primary identification is the **corporate email prefix** (e.g., `alice.smith@company.com` -> filename `alice-smith.md`), which ensures idempotency and universality — every collaborator has a corporate email, regardless of whether they have a GitHub account.
 
-Persons são conectadas a teams e actors via wikilinks. O vault rastreia pessoas para entender: quem trabalha em quê, quem é focal point de qual sistema, quem participou de quais decisões, e qual é o papel de cada pessoa na organização.
+Persons are connected to teams and actors via wikilinks. The vault tracks people to understand: who works on what, who is the focal point for which system, who participated in which decisions, and what each person's role is in the organization.
 
-## Quando criar
+## When to create
 
-- O conteúdo menciona uma pessoa por nome completo E é possível associá-la a um time ou ator do vault
-- O conteúdo identifica um contribuidor ativo (commits, PRs, code reviews) em repositórios de atores conhecidos
-- O conteúdo nomeia um DRI, focal point, ou responsável por uma ação/decisão
-- O conteúdo menciona um profissional (PM, EM, designer, etc.) que participa ativamente de um time ou projeto do vault, mesmo sem contribuição direta em código
+- The content mentions a person by full name AND it is possible to associate them with a team or actor in the vault
+- The content identifies an active contributor (commits, PRs, code reviews) in repositories of known actors
+- The content names a DRI, focal point, or person responsible for an action/decision
+- The content mentions a professional (PM, EM, designer, etc.) who actively participates in a team or project in the vault, even without direct code contribution
 
-## Quando NÃO criar
+## When NOT to create
 
-- É uma menção genérica sem nome completo (ex: "o pessoal do time de notificações", "alguém do infra") — isso é referência a team, não a person
-- É um usuário final ou cliente (ex: "o lojista reportou um bug") — persons são colaboradores internos
-- É um stakeholder externo sem participação direta na organização (ex: "o auditor da PCI")
-- É uma pessoa mencionada apenas uma vez sem contexto de time/ator — provavelmente não é relevante para o vault
+- It is a generic mention without a full name (e.g., "the notifications team folks", "someone from infra") — that is a reference to a team, not a person
+- It is an end user or customer (e.g., "the merchant reported a bug") — persons are internal collaborators
+- It is an external stakeholder without direct participation in the organization (e.g., "the PCI auditor")
+- It is a person mentioned only once without team/actor context — probably not relevant to the vault
 
-## Como distinguir de outros tipos
+## How to distinguish from other types
 
-| Parece ser... | Mas é... | Diferença-chave |
+| Looks like... | But is... | Key difference |
 |---|---|---|
-| Person | Team | Se o conteúdo diz "a galera do payments", é referência ao team. Person é um indivíduo com nome |
-| Person | Actor | Nomes como `ralph` podem ser tanto pessoa quanto repo. Se tem email corporativo e participa de um time, é person. Se tem deploy, é actor |
-| Person | Discussion participant | Se a pessoa só aparece como participante de uma reunião, ela pode ser criada como person E referenciada na discussion |
+| Person | Team | If the content says "the payments folks", it is a reference to the team. A person is an individual with a name |
+| Person | Actor | Names like `ralph` can be either a person or a repo. If it has a corporate email and participates in a team, it is a person. If it deploys, it is an actor |
+| Person | Discussion participant | If the person only appears as a participant in a meeting, they can be created as a person AND referenced in the discussion |
 
-## Campos obrigatórios (frontmatter)
+## Required fields (frontmatter)
 
-| Campo | Tipo | Descrição |
+| Field | Type | Description |
 |---|---|---|
-| `type` | string | Sempre `"person"` |
-| `name` | string | Nome completo da pessoa |
-| `role` | string | Cargo/função em pt-BR |
+| `type` | string | Always `"person"` |
+| `name` | string | Person's full name |
+| `role` | string | Job title/function |
 | `team` | wikilink | `"[[squad-name]]"` |
-| `focal_points` | array | Wikilinks para actors: `["[[repo-name]]"]` |
+| `focal_points` | array | Wikilinks to actors: `["[[repo-name]]"]` |
 | `updated_at` | date | YYYY-MM-DD |
-| `updated_by` | string | Quem atualizou |
+| `updated_by` | string | Who updated it |
 
-## Campos opcionais (frontmatter)
+## Optional fields (frontmatter)
 
-| Campo | Tipo | Descrição |
+| Field | Type | Description |
 |---|---|---|
-| `email` | string | Email corporativo completo (ex: `alice.smith@company.com`) |
-| `github` | string | Login do GitHub (quando aplicável) |
-| `slack` | string | Arroba do Slack (ex: `@alice.smith`) |
-| `jira` | string | Usuário do Jira |
+| `email` | string | Full corporate email (e.g., `alice.smith@company.com`) |
+| `github` | string | GitHub login (when applicable) |
+| `slack` | string | Slack handle (e.g., `@alice.smith`) |
+| `jira` | string | Jira username |
 
-## Convenção de filename
+## Filename convention
 
-O filename de uma person é derivado do **prefixo do email corporativo**, normalizado:
-- Pontos viram hífens: `alice.smith` → `alice-smith`
-- Lowercase, sem acentos
-- Exemplo: `alice.smith@company.com` → `alice-smith.md`
+A person's filename is derived from the **corporate email prefix**, normalized:
+- Dots become hyphens: `alice.smith` -> `alice-smith`
+- Lowercase, no accents
+- Example: `alice.smith@company.com` -> `alice-smith.md`
 
-Quando o email não é conhecido, usar `first-last.md` baseado no nome completo (normalizado).
+When the email is not known, use `first-last.md` based on the full name (normalized).
 
-## Papel Zettelkasten
+## Zettelkasten Role
 
-**Classificação:** permanent note
-**Propósito no grafo:** Representar fatos consolidados sobre colaboradores internos — quem são, onde trabalham, e com quais sistemas contribuem.
+**Classification:** permanent note
+**Purpose in the graph:** Represent consolidated facts about internal collaborators — who they are, where they work, and which systems they contribute to.
 
-### Regras de Linking
+### Linking Rules
 
-**Links estruturais (frontmatter):** `team` (wikilink para squad), `focal_points` (wikilinks para actors). Definem a posição organizacional — em qual time e em quais sistemas a pessoa atua.
-**Links semânticos (corpo):** Wikilinks no corpo devem ter contexto textual. Ex: "lidera a migração do [[legacy-gateway]] para [[billing-api]]" em vez de apenas "[[legacy-gateway]]". Links no corpo explicam contribuições, responsabilidades, e envolvimento em decisões.
-**Relação com outros papéis:** Persons são referenciadas por bridge notes (topics, discussions) que registram participação em eventos e assuntos. Não duplicar na person o histórico de discussions — a person descreve quem é, o topic/discussion descreve o que aconteceu.
+**Structural links (frontmatter):** `team` (wikilink to squad), `focal_points` (wikilinks to actors). These define the organizational position — which team and which systems the person works on.
+**Semantic links (body):** Wikilinks in the body must have textual context. E.g., "leads the migration from [[legacy-gateway]] to [[billing-api]]" instead of just "[[legacy-gateway]]". Body links explain contributions, responsibilities, and involvement in decisions.
+**Relationship with other roles:** Persons are referenced by bridge notes (topics, discussions) that record participation in events and subjects. Do not duplicate in the person the history of discussions — the person describes who they are, the topic/discussion describes what happened.
 
-### Critério de Completude
+### Completeness Criteria
 
-Uma person está completa quando: tem nome completo, time atribuído, e pelo menos 1 focal point ou papel definido. Se apenas o nome é mencionado sem contexto de time ou papel, o conteúdo deve ir para `fleeting/` até ser consolidado.
+A person is complete when: they have a full name, assigned team, and at least 1 focal point or defined role. If only the name is mentioned without team or role context, the content should go to `fleeting/` until consolidated.
 
-## Exemplos
+## Examples
 
-### Isso É uma person
+### This IS a person
 
-1. "Bob Jones é engenheiro do squad Payments e trabalha principalmente no billing-api." — Indivíduo com nome, time, e ator focal. É person.
+1. "Bob Jones is an engineer on squad Payments and works primarily on billing-api." — Individual with name, team, and focal actor. It is a person.
 
-2. "O PR #142 no notification-service foi aberto por `davewilson` (Dave Wilson)." — Contribuidor identificável com GitHub login e ator. É person.
+2. "PR #142 on notification-service was opened by `davewilson` (Dave Wilson)." — Identifiable contributor with GitHub login and actor. It is a person.
 
-3. "Eve Martin é Product Manager do squad Orders e lidera o projeto de migração V2." — Profissional com nome, time e projeto. É person, mesmo sem commits.
+3. "Eve Martin is a Product Manager on squad Orders and leads the V2 migration project." — Professional with name, team, and project. It is a person, even without commits.
 
-### Isso NÃO é uma person
+### This is NOT a person
 
-1. "O time de notificações vai cuidar da migração." — Referência ao team, não a um indivíduo. Não criar person.
+1. "The notifications team will handle the migration." — Reference to a team, not an individual. Do not create a person.
 
-2. "Um lojista reportou timeout nas cobranças de cartão." — Usuário final, não contribuidor interno. Não criar person.
+2. "A merchant reported a timeout on card charges." — End user, not an internal collaborator. Do not create a person.

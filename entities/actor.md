@@ -1,76 +1,76 @@
 # Entity: Actor
 
-> Fonte de verdade para campos obrigatórios: `actors/_template.md`
+> Source of truth for required fields: `actors/_template.md`
 
-## O que é
+## What it is
 
-Um **actor** é um sistema, serviço, API ou aplicação com ciclo de vida próprio — possui repositório no GitHub, processo de deploy independente, e é operado por um time específico. Actors são a unidade fundamental de infraestrutura no Second Brain: cada ator representa algo que roda em produção (ou já rodou, se deprecated).
+An **actor** is a system, service, API, or application with its own lifecycle — it has a GitHub repository, an independent deployment process, and is operated by a specific team. Actors are the fundamental infrastructure unit in the Second Brain: each actor represents something that runs in production (or has run, if deprecated).
 
-Actors podem ser APIs HTTP, workers/consumers de fila, cronjobs, lambdas, ou monolitos. O critério-chave é: **tem repositório próprio e deploy independente**.
+Actors can be HTTP APIs, queue workers/consumers, cronjobs, lambdas, or monoliths. The key criterion is: **has its own repository and independent deployment**.
 
-## Quando criar
+## When to create
 
-- O conteúdo menciona um sistema/serviço com repositório GitHub próprio que ainda não existe em `actors/`
-- O conteúdo descreve uma nova aplicação sendo desenvolvida (status: `in-development`)
-- O conteúdo referencia um repositório da organização GitHub da empresa não catalogado
+- The content mentions a system/service with its own GitHub repository that does not yet exist in `actors/`
+- The content describes a new application being developed (status: `in-development`)
+- The content references an organization GitHub repository not yet cataloged
 
-## Quando NÃO criar
+## When NOT to create
 
-- É uma biblioteca/SDK interna usada por outros atores (ex: `opentelemetry-golang-lib`) — isso é uma dependência, não um ator
-- É um módulo dentro de outro repositório (ex: `orders-cdc` dentro do workspace `orders-api`) — o ator é o repositório raiz
-- É uma ferramenta de CI/CD ou infraestrutura compartilhada (ex: ArgoCD, Karavela, Terraform modules)
-- É um serviço externo/third-party (ex: DataDog, New Relic, AWS SQS) — mencione como dependência de um ator, não como ator próprio
+- It is an internal library/SDK used by other actors (e.g., `opentelemetry-golang-lib`) — that is a dependency, not an actor
+- It is a module within another repository (e.g., `orders-cdc` within the `orders-api` workspace) — the actor is the root repository
+- It is a CI/CD tool or shared infrastructure (e.g., ArgoCD, Karavela, Terraform modules)
+- It is an external/third-party service (e.g., DataDog, New Relic, AWS SQS) — mention it as a dependency of an actor, not as its own actor
 
-## Como distinguir de outros tipos
+## How to distinguish from other types
 
-| Parece ser... | Mas é... | Diferença-chave |
+| Looks like... | But is... | Key difference |
 |---|---|---|
-| Actor | Topic (deprecation) | Se o foco é "este sistema vai ser desligado", é um topic de deprecação que **referencia** o actor. O actor é o sistema; o topic é o assunto sobre ele |
-| Actor | Project | Se o foco é "estamos construindo um sistema novo", é um project até o sistema ter repo e deploy. Depois de criado, o sistema vira actor |
-| Actor | Person | Nomes de repo podem parecer nomes de pessoas (ex: `ralph`). Se tem repo GitHub e faz deploy, é actor |
+| Actor | Topic (deprecation) | If the focus is "this system is going to be shut down", it is a deprecation topic that **references** the actor. The actor is the system; the topic is the subject about it |
+| Actor | Project | If the focus is "we are building a new system", it is a project until the system has a repo and deployment. Once created, the system becomes an actor |
+| Actor | Person | Repo names can look like people's names (e.g., `ralph`). If it has a GitHub repo and deploys, it is an actor |
 
-## Campos obrigatórios (frontmatter)
+## Required fields (frontmatter)
 
-| Campo | Tipo | Descrição |
+| Field | Type | Description |
 |---|---|---|
-| `type` | string | Sempre `"actor"` |
-| `name` | string | Nome do repositório (kebab-case) |
+| `type` | string | Always `"actor"` |
+| `name` | string | Repository name (kebab-case) |
 | `category` | string | `api`, `worker`, `consumer`, `producer`, `cronjob`, `lambda`, `monolith` |
-| `description` | string | Descrição em pt-BR da função do sistema |
-| `repository` | string | URL do repositório GitHub |
-| `stack` | string | Stack técnica separada por ` · ` |
+| `description` | string | Description of the system's function |
+| `repository` | string | GitHub repository URL |
+| `stack` | string | Tech stack separated by ` · ` |
 | `status` | string | `active`, `deprecated`, `in-development` |
 | `team` | wikilink | `"[[squad-name]]"` |
 | `criticality` | string | `very-high`, `high`, `medium`, `low` |
-| `pci` | boolean | Se opera em escopo PCI DSS |
+| `pci` | boolean | Whether it operates under PCI DSS scope |
 | `updated_at` | date | YYYY-MM-DD |
-| `updated_by` | string | Quem atualizou |
+| `updated_by` | string | Who updated it |
 
-## Papel Zettelkasten
+## Zettelkasten Role
 
-**Classificação:** permanent note
-**Propósito no grafo:** Representar fatos consolidados sobre sistemas e serviços que rodam em produção.
+**Classification:** permanent note
+**Purpose in the graph:** Represent consolidated facts about systems and services that run in production.
 
-### Regras de Linking
+### Linking Rules
 
-**Links estruturais (frontmatter):** `team` (wikilink para squad responsável). Definem a estrutura organizacional — quem opera o sistema.
-**Links semânticos (corpo):** Wikilinks no corpo devem ter contexto textual explicando a relação. Ex: "recebe autorizações do [[payment-gateway]] via gRPC" em vez de apenas "[[payment-gateway]]". Links no corpo explicam dependências técnicas, fluxos de dados, e integrações — o *porquê* da conexão.
-**Relação com outros papéis:** Actors são referenciados por bridge notes (topics, discussions) que explicam o que está acontecendo com o sistema. Não duplicar no actor explicações que pertencem a um topic — o actor descreve o sistema, o topic descreve o assunto sobre ele.
+**Structural links (frontmatter):** `team` (wikilink to the responsible squad). These define the organizational structure — who operates the system.
+**Semantic links (body):** Wikilinks in the body must have textual context explaining the relationship. E.g., "receives authorizations from [[payment-gateway]] via gRPC" instead of just "[[payment-gateway]]". Body links explain technical dependencies, data flows, and integrations — the *why* of the connection.
+**Relationship with other roles:** Actors are referenced by bridge notes (topics, discussions) that explain what is happening with the system. Do not duplicate in the actor explanations that belong in a topic — the actor describes the system, the topic describes the subject about it.
 
-### Critério de Completude
+### Completeness Criteria
 
-Um actor está completo quando: tem repositório identificado, stack documentada, status definido, time responsável atribuído, e descrição auto-contida (compreensível sem precisar ler outras notas). Se faltam dados fundamentais (sem repo, sem time, sem descrição), o conteúdo deve ir para `fleeting/` até ser consolidado.
+An actor is complete when: it has an identified repository, documented stack, defined status, assigned responsible team, and a self-contained description (understandable without reading other notes). If fundamental data is missing (no repo, no team, no description), the content should go to `fleeting/` until consolidated.
 
-## Exemplos
+## Examples
 
-### Isso É um actor
+### This IS an actor
 
-1. "O `billing-api` é uma API .NET 8 que processa cobranças e faturas. Roda em EKS via ArgoCD no namespace `runtime-payments-prd`." — Sistema com repo, deploy, runtime. É actor.
+1. "The `billing-api` is a .NET 8 API that processes charges and invoices. It runs on EKS via ArgoCD in the `runtime-payments-prd` namespace." — System with repo, deployment, runtime. It is an actor.
 
-2. "Estamos subindo o `health-checker` em Go para substituir o probe antigo. Já tem repo no GitHub e pipeline de CI." — Sistema novo com repo próprio. É actor (status: `in-development`).
+2. "We are spinning up `health-checker` in Go to replace the old probe. It already has a GitHub repo and CI pipeline." — New system with its own repo. It is an actor (status: `in-development`).
 
-### Isso NÃO é um actor
+### This is NOT an actor
 
-1. "Usamos a lib `opentelemetry-golang-lib` para instrumentação." — Biblioteca compartilhada, não tem deploy próprio. É dependência de actors.
+1. "We use the `opentelemetry-golang-lib` library for instrumentation." — Shared library, has no independent deployment. It is a dependency of actors.
 
-2. "O ArgoCD faz o deploy de todos os serviços do squad." — Ferramenta de infra compartilhada, não tem deploy independente como produto. Não é ator.
+2. "ArgoCD handles deployment for all squad services." — Shared infrastructure tool, does not have independent deployment as a product. It is not an actor.

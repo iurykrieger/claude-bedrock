@@ -1,94 +1,94 @@
 ---
 name: compress
 description: >
-  Varre o vault, identifica conteudo duplicado ou fragmentado entre entidades do mesmo tipo,
-  monta proposta de unificacao em formato tabela, e executa apos confirmacao do usuario.
-  Gera health report (wikilinks unresolved, entidades orfas, desatualizadas).
-  Use quando: "bedrock compress", "bedrock-compress", "limpar vault", "consolidar vault", "unificar entidades",
-  "encontrar duplicacoes", "/bedrock:compress".
+  Scans the vault, identifies duplicated or fragmented content between entities of the same type,
+  builds a unification proposal in table format, and executes after user confirmation.
+  Generates a health report (unresolved wikilinks, orphan entities, stale entities).
+  Use when: "bedrock compress", "bedrock-compress", "clean vault", "consolidate vault", "unify entities",
+  "find duplications", "/bedrock:compress".
 user_invocable: true
 allowed-tools: Bash, Read, Write, Edit, Glob, Grep, Agent
 ---
 
-# /bedrock:compress — Consolidacao e Health Check do Vault
+# /bedrock:compress — Vault Consolidation and Health Check
 
 ## Plugin Paths
 
-Entity definitions e templates estao no diretorio do plugin, nao na raiz do vault.
-Use o "Base directory for this skill" informado na invocacao para resolver os paths:
+Entity definitions and templates are in the plugin directory, not the vault root.
+Use the "Base directory for this skill" provided at invocation to resolve paths:
 
 - Entity definitions: `<base_dir>/../../entities/`
 - Templates: `<base_dir>/../../templates/{type}/_template.md`
-- CLAUDE.md do plugin: `<base_dir>/../../CLAUDE.md` (ja injetado automaticamente no contexto)
+- Plugin CLAUDE.md: `<base_dir>/../../CLAUDE.md` (already injected automatically into context)
 
-Onde `<base_dir>` e o path informado em "Base directory for this skill".
-
----
-
-## Visao Geral
-
-Esta skill varre todas as entidades do vault, detecta conteudo semanticamente duplicado
-ou fragmentado DENTRO do mesmo tipo de entidade, propoe unificacao ao usuario, e executa
-apos confirmacao explicita. Tambem gera um health report do vault.
-
-**Voce e um agente de execucao.** Siga as fases abaixo na ordem, sem pular etapas.
-
-**Regras criticas:**
-- **NUNCA** executar mudancas sem confirmacao explicita do usuario
-- **NUNCA** comparar entidades de tipos diferentes (actor vs topic, etc.)
-- **NUNCA** deletar entidades — apenas consolidar conteudo
-- **NUNCA** alterar frontmatter (exceto `updated_at` e `updated_by`)
-- **NUNCA** alterar templates (`_template.md`), conventions, ou patterns
-- **NUNCA** remover wikilinks existentes
-- People/Teams/Topics: **append-only** — adicionar nota de consolidacao, nunca deletar conteudo
-- Actors: **merge livre** — pode editar corpo livremente
+Where `<base_dir>` is the path provided in "Base directory for this skill".
 
 ---
 
-## Fase 0 — Sincronizar o Vault
+## Overview
+
+This skill scans all entities in the vault, detects semantically duplicated
+or fragmented content WITHIN the same entity type, proposes unification to the user, and executes
+after explicit confirmation. It also generates a vault health report.
+
+**You are an execution agent.** Follow the phases below in order, without skipping steps.
+
+**Critical rules:**
+- **NEVER** execute changes without explicit user confirmation
+- **NEVER** compare entities of different types (actor vs topic, etc.)
+- **NEVER** delete entities — only consolidate content
+- **NEVER** modify frontmatter (except `updated_at` and `updated_by`)
+- **NEVER** modify templates (`_template.md`), conventions, or patterns
+- **NEVER** remove existing wikilinks
+- People/Teams/Topics: **append-only** — add consolidation note, never delete content
+- Actors: **free merge** — may edit body freely
+
+---
+
+## Phase 0 — Sync the Vault
 
 Execute:
 ```bash
 git pull --rebase origin main
 ```
 
-Se falhar:
-- Sem remote: avisar "Nenhum remote configurado. Trabalhando localmente." e prosseguir.
-- Conflito: `git rebase --abort` e avisar o usuario. NAO prosseguir sem resolver.
+If it fails:
+- No remote: warn "No remote configured. Working locally." and proceed.
+- Conflict: `git rebase --abort` and warn the user. Do NOT proceed without resolving.
 
 ---
 
-## Fase 1 — Varrer o Vault
+## Phase 1 — Scan the Vault
 
-Para cada tipo de entidade (`actors`, `people`, `teams`, `topics`, `discussions`, `projects`, `fleeting`):
+For each entity type (`actors`, `people`, `teams`, `topics`, `discussions`, `projects`, `fleeting`):
 
-1. Listar todos os arquivos `.md` no diretorio, **excluindo `_template.md` e `_template_node.md`**
-   - Para actors: incluir tanto `actors/*.md` (flat) quanto `actors/*/*.md` (pasta)
-   - Incluir knowledge-nodes: `actors/*/nodes/*.md`
-2. Para cada entidade, ler frontmatter + corpo
-3. Para knowledge-nodes: extrair adicionalmente `graphify_node_id` e `actor` do frontmatter
-4. Extrair **claims** — afirmacoes factuais distintas:
-   - Cada bullet point, linha de tabela, ou paragrafo e um claim potencial
-   - **Ignorar** secoes estruturais vazias (placeholders do template)
-   - **Ignorar** secao "Expected Bidirectional Links" (referencia, nao conteudo)
-   - **Ignorar** secao "Atividade Recente" (temporal, nao factual)
-   - **Ignorar** callouts obrigatorios padrao (`[!warning] Deprecated`, `[!danger] PCI Scope`, etc.)
+1. List all `.md` files in the directory, **excluding `_template.md` and `_template_node.md`**
+   - For actors: include both `actors/*.md` (flat) and `actors/*/*.md` (folder)
+   - Include knowledge-nodes: `actors/*/nodes/*.md`
+2. For each entity, read frontmatter + body
+3. For knowledge-nodes: additionally extract `graphify_node_id` and `actor` from frontmatter
+4. Extract **claims** — distinct factual assertions:
+   - Each bullet point, table row, or paragraph is a potential claim
+   - **Ignore** empty structural sections (template placeholders)
+   - **Ignore** "Expected Bidirectional Links" section (reference, not content)
+   - **Ignore** "Recent Activity" section (temporal, not factual)
+   - **Ignore** standard mandatory callouts (`[!warning] Deprecated`, `[!danger] PCI Scope`, etc.)
 
-**Output:** mapa `tipo → [{entidade, claims[]}]`
+**Output:** map `type → [{entity, claims[]}]`
 
-### Otimizacao para vaults grandes
+### Optimization for large vaults
 
-Se o vault tiver mais de 100 entidades em um tipo, processar em batches de 30.
-Usar subagents via Agent tool para paralelizar leitura por tipo de entidade.
+If the vault has more than 100 entities in a type, process in batches of 30.
+Use subagents via Agent tool to parallelize reading by entity type.
 
 ---
 
-## Fase 1.5 — Integridade do Grafo (graphify)
+## Phase 1.5 — Graph Integrity (graphify)
 
-Se `graphify-out/graph.json` existe, verificar consistencia entre o grafo e o vault.
-Se NAO existe: pular esta fase e reportar "Graph.json nao encontrado. Rode /bedrock:teach para gerar." no health report.
+If `graphify-out/graph.json` exists, verify consistency between the graph and the vault.
+If it does NOT exist: skip this phase and report "Graph.json not found. Run /bedrock:teach to generate." in the health report.
 
-### 1.5.1 Carregar dados
+### 1.5.1 Load data
 
 ```bash
 $(cat graphify-out/.graphify_python 2>/dev/null || echo python3) -c "
@@ -97,307 +97,307 @@ from pathlib import Path
 g = json.loads(Path('graphify-out/graph.json').read_text())
 nodes = g.get('nodes', [])
 code_nodes = [n for n in nodes if n.get('file_type') == 'code']
-print(f'{len(nodes)} nos total, {len(code_nodes)} nos de codigo')
+print(f'{len(nodes)} total nodes, {len(code_nodes)} code nodes')
 "
 ```
 
-Coletar:
-- `graph_nodes`: todos os nos do graph.json com `file_type: code` e seus `id`
-- `vault_knowledge_nodes`: todos os knowledge-nodes em `actors/*/nodes/*.md` com seus `graphify_node_id`
-- `vault_actors`: lista de atores (pastas em `actors/` que contem `<name>.md`)
+Collect:
+- `graph_nodes`: all nodes from graph.json with `file_type: code` and their `id`
+- `vault_knowledge_nodes`: all knowledge-nodes in `actors/*/nodes/*.md` with their `graphify_node_id`
+- `vault_actors`: list of actors (folders in `actors/` that contain `<name>.md`)
 
-### 1.5.2 Verificacao A — Knowledge-nodes orfaos (ator removido)
+### 1.5.2 Check A — Orphan knowledge-nodes (actor removed)
 
-Para cada knowledge-node encontrado na Fase 1:
-1. Extrair `actor` do frontmatter (wikilink para o ator pai)
-2. Resolver o ator: verificar se `actors/<actor-name>/<actor-name>.md` existe
-3. Se NAO existe: marcar como **orfao (ator removido)**
+For each knowledge-node found in Phase 1:
+1. Extract `actor` from frontmatter (wikilink to the parent actor)
+2. Resolve the actor: verify if `actors/<actor-name>/<actor-name>.md` exists
+3. If it does NOT exist: mark as **orphan (actor removed)**
 
-### 1.5.3 Verificacao B — Knowledge-nodes orfaos (no removido do grafo)
+### 1.5.3 Check B — Orphan knowledge-nodes (node removed from graph)
 
-Para cada knowledge-node com `graphify_node_id` definido:
-1. Verificar se o `graphify_node_id` existe em `graph_nodes` (IDs do graph.json)
-2. Se NAO existe: marcar como **orfao (no removido do grafo)** — provavelmente o codigo
-   foi deletado no repositorio e o /bedrock:teach re-processou sem gerar este no
+For each knowledge-node with `graphify_node_id` defined:
+1. Verify if the `graphify_node_id` exists in `graph_nodes` (IDs from graph.json)
+2. If it does NOT exist: mark as **orphan (node removed from graph)** — the code was probably
+   deleted from the repository and /bedrock:teach reprocessed without generating this node
 
-### 1.5.4 Verificacao C — Nos do grafo nao persistidos
+### 1.5.4 Check C — Graph nodes not persisted
 
-Para cada no em `graph_nodes` (nos com `file_type: code` no graph.json):
-1. Verificar se existe knowledge-node em `vault_knowledge_nodes` com `graphify_node_id` correspondente
-2. Se NAO existe: registrar como **no nao persistido** — o /bedrock:teach extraiu este no mas o
-   /bedrock:preserve nao o gravou no vault (pode indicar que /bedrock:teach nao completou a fase de preservacao)
+For each node in `graph_nodes` (nodes with `file_type: code` in graph.json):
+1. Verify if a knowledge-node exists in `vault_knowledge_nodes` with the corresponding `graphify_node_id`
+2. If it does NOT exist: register as **node not persisted** — /bedrock:teach extracted this node but
+   /bedrock:preserve did not write it to the vault (may indicate that /bedrock:teach did not complete the preservation phase)
 
-### 1.5.5 Verificacao D — graph.json stale
+### 1.5.5 Check D — graph.json stale
 
-1. Verificar data de modificacao de `graphify-out/graph.json`
+1. Check the modification date of `graphify-out/graph.json`
 ```bash
 stat -f "%Sm" -t "%Y-%m-%d" graphify-out/graph.json 2>/dev/null || stat -c "%y" graphify-out/graph.json 2>/dev/null | cut -d' ' -f1
 ```
-2. Se a data e anterior a 30 dias: marcar como **stale**
-3. Sugerir: "Graph.json desatualizado (>30 dias). Rode /bedrock:teach ou /sync para atualizar."
+2. If the date is older than 30 days: mark as **stale**
+3. Suggest: "Graph.json is outdated (>30 days). Run /bedrock:teach or /sync to update."
 
-### 1.5.6 Resultado
+### 1.5.6 Result
 
-Armazenar contadores para o health report:
-- `graph_exists`: sim/nao
+Store counters for the health report:
+- `graph_exists`: yes/no
 - `graph_total_nodes`: N
 - `vault_knowledge_nodes_count`: M
-- `nodes_synced`: nos presentes tanto no grafo quanto no vault
-- `orphan_actor_removed`: knowledge-nodes cujo ator nao existe
-- `orphan_node_removed`: knowledge-nodes cujo graphify_node_id nao esta no grafo
-- `nodes_not_persisted`: nos do grafo sem knowledge-node correspondente
-- `graph_updated_at`: data de modificacao do graph.json
-- `graph_stale`: sim/nao
+- `nodes_synced`: nodes present in both the graph and the vault
+- `orphan_actor_removed`: knowledge-nodes whose actor does not exist
+- `orphan_node_removed`: knowledge-nodes whose graphify_node_id is not in the graph
+- `nodes_not_persisted`: graph nodes without a corresponding knowledge-node
+- `graph_updated_at`: modification date of graph.json
+- `graph_stale`: yes/no
 
 ---
 
-## Fase 2 — Detectar Duplicacao
+## Phase 2 — Detect Duplication
 
-Para cada tipo de entidade, comparar claims **DENTRO do mesmo tipo** (NUNCA cross-type).
+For each entity type, compare claims **WITHIN the same type** (NEVER cross-type).
 
-**Knowledge-nodes:** comparar DENTRO do mesmo ator (knowledge-nodes de atores diferentes nao sao
-comparados entre si, pois podem representar funcoes legitimamente similares em repos distintos).
-Dois knowledge-nodes do mesmo ator com descricoes semanticamente identicas → cluster.
+**Knowledge-nodes:** compare WITHIN the same actor (knowledge-nodes from different actors are not
+compared with each other, as they may represent legitimately similar functions in distinct repos).
+Two knowledge-nodes from the same actor with semantically identical descriptions → cluster.
 
-### 2.1 Duplicacao semantica
-Dois claims que dizem a mesma coisa com palavras diferentes.
-Exemplo:
-- Actor A: "API de pagamentos com cartao"
-- Actor B: "Servico que processa pagamentos de cartao de credito"
+### 2.1 Semantic duplication
+Two claims that say the same thing with different words.
+Example:
+- Actor A: "Card payments API"
+- Actor B: "Service that processes credit card payments"
 
-### 2.2 Fragmentacao
-Informacao sobre o mesmo assunto dispersa em 3+ entidades sem consolidacao.
-Exemplo:
-- Actor A menciona "usa Kafka para eventos"
-- Actor B menciona "publica eventos no Kafka"
-- Actor C menciona "consome eventos Kafka de B"
-- Nenhuma entidade consolida o fluxo completo
+### 2.2 Fragmentation
+Information about the same subject scattered across 3+ entities without consolidation.
+Example:
+- Actor A mentions "uses Kafka for events"
+- Actor B mentions "publishes events to Kafka"
+- Actor C mentions "consumes Kafka events from B"
+- No entity consolidates the complete flow
 
-### 2.3 Gerar clusters
+### 2.3 Generate clusters
 
-Para cada duplicacao encontrada, criar um cluster:
+For each duplication found, create a cluster:
 
 ```yaml
 cluster:
   id: N
-  tipo: actor | person | team | topic | discussion | project
-  descricao: "descricao do conteudo duplicado"
-  entidades:
-    - nome: "entity-a"
-      claim: "texto do claim duplicado"
-    - nome: "entity-b"
-      claim: "texto do claim duplicado"
-  entidade_principal: "entity-a"  # a mais completa/relevante
-  conteudo_unificado: "texto consolidado"
+  type: actor | person | team | topic | discussion | project
+  description: "description of the duplicated content"
+  entities:
+    - name: "entity-a"
+      claim: "text of the duplicated claim"
+    - name: "entity-b"
+      claim: "text of the duplicated claim"
+  primary_entity: "entity-a"  # the most complete/relevant
+  unified_content: "consolidated text"
 ```
 
-**Criterios para escolher a entidade principal:**
-- Mais completa (mais claims, mais detalhes)
-- Mais recente (`updated_at` mais recente)
-- Mais conectada (mais wikilinks inbound/outbound)
+**Criteria for choosing the primary entity:**
+- Most complete (more claims, more details)
+- Most recent (most recent `updated_at`)
+- Most connected (more inbound/outbound wikilinks)
 
-Se nenhuma duplicacao for encontrada, informar o usuario e pular para o Health Report (Fase 4.2).
+If no duplication is found, inform the user and skip to the Health Report (Phase 4.2).
 
 ---
 
-## Fase 3 — Montar Proposta
+## Phase 3 — Build Proposal
 
-Para cada cluster, apresentar ao usuario:
+For each cluster, present to the user:
 
 ```markdown
-### Cluster N: <descricao do conteudo duplicado>
+### Cluster N: <description of the duplicated content>
 
-**Tipo:** <tipo da entidade>
+**Type:** <entity type>
 
-**Entidades envolvidas:**
-| Entidade | Claim |
+**Entities involved:**
+| Entity | Claim |
 |---|---|
-| [[entity-a]] | "descricao X do servico" |
-| [[entity-b]] | "servico faz X" |
+| [[entity-a]] | "description X of the service" |
+| [[entity-b]] | "service does X" |
 
-**Proposta:**
-- **Manter em:** [[entity-a]] (entidade mais completa/relevante)
-- **Conteudo unificado:** "descricao consolidada..."
-- **Remover de / Consolidar em:** [[entity-b]]
+**Proposal:**
+- **Keep in:** [[entity-a]] (most complete/relevant entity)
+- **Unified content:** "consolidated description..."
+- **Remove from / Consolidate in:** [[entity-b]]
 
-**Impacto:** N entidades, M claims
+**Impact:** N entities, M claims
 ```
 
-### Resumo da proposta
+### Proposal summary
 
-Apos listar todos os clusters:
+After listing all clusters:
 
 ```markdown
-## Resumo
+## Summary
 
-| # | Descricao | Tipo | Entidades | Claims |
+| # | Description | Type | Entities | Claims |
 |---|---|---|---|---|
 | 1 | ... | actor | 2 | 3 |
 | 2 | ... | topic | 3 | 5 |
 
-**Total:** N clusters, M entidades, P claims
+**Total:** N clusters, M entities, P claims
 
-Confirma a execucao? (sim/nao)
+Confirm execution? (yes/no)
 ```
 
-### Proposta de limpeza de orfaos do grafo (se Fase 1.5 encontrou orfaos)
+### Graph orphan cleanup proposal (if Phase 1.5 found orphans)
 
-Se a Fase 1.5 identificou knowledge-nodes orfaos ou nos nao persistidos, apresentar proposta adicional:
+If Phase 1.5 identified orphan knowledge-nodes or unpersisted nodes, present an additional proposal:
 
 ```markdown
-## Orfaos do Grafo
+## Graph Orphans
 
-### Knowledge-nodes orfaos (ator removido)
-| # | Knowledge-node | Ator (removido) | Acao proposta |
+### Orphan knowledge-nodes (actor removed)
+| # | Knowledge-node | Actor (removed) | Proposed action |
 |---|---|---|---|
 | 1 | [[node-name]] | [[actor-name]] | `git rm actors/<actor>/nodes/<node>.md` |
 
-### Knowledge-nodes orfaos (no removido do grafo)
-| # | Knowledge-node | graphify_node_id | Acao proposta |
+### Orphan knowledge-nodes (node removed from graph)
+| # | Knowledge-node | graphify_node_id | Proposed action |
 |---|---|---|---|
-| 1 | [[node-name]] | `id_no_grafo` | `git rm actors/<actor>/nodes/<node>.md` |
+| 1 | [[node-name]] | `id_in_graph` | `git rm actors/<actor>/nodes/<node>.md` |
 
-### Nos do grafo nao persistidos
-| # | Node ID | Label | Acao proposta |
+### Graph nodes not persisted
+| # | Node ID | Label | Proposed action |
 |---|---|---|---|
-| 1 | `node_id` | Node Label | Rodar `/bedrock:teach` no ator correspondente |
+| 1 | `node_id` | Node Label | Run `/bedrock:teach` on the corresponding actor |
 
-Confirma a limpeza de orfaos? (sim/nao/parcial)
+Confirm orphan cleanup? (yes/no/partial)
 ```
 
-**IMPORTANTE:** A limpeza de orfaos e SEPARADA da consolidacao de duplicatas.
-O usuario pode confirmar uma sem a outra. Permitir confirmacao parcial por ator
-(ex: "limpar orfaos so do billing-api").
+**IMPORTANT:** Orphan cleanup is SEPARATE from duplicate consolidation.
+The user can confirm one without the other. Allow partial confirmation by actor
+(e.g., "clean orphans only from billing-api").
 
-**PARAR AQUI e aguardar confirmacao do usuario.**
+**STOP HERE and wait for user confirmation.**
 
-Se o usuario disser "nao" ou pedir ajustes, ajustar a proposta e reapresentar.
-Se o usuario confirmar parcialmente (ex: "so os clusters 1 e 3"), executar apenas os confirmados.
+If the user says "no" or asks for adjustments, adjust the proposal and re-present.
+If the user partially confirms (e.g., "only clusters 1 and 3"), execute only the confirmed ones.
 
 ---
 
-## Fase 4 — Executar
+## Phase 4 — Execute
 
-### 4.1 Consolidar entidades
+### 4.1 Consolidate entities
 
-Para cada cluster confirmado pelo usuario:
+For each cluster confirmed by the user:
 
-#### Actors (merge livre)
-1. Ler a entidade principal (`entity-a`)
-2. Incorporar o conteudo unificado no corpo da entidade principal
-3. Ler a entidade secundaria (`entity-b`)
-4. Remover o claim duplicado do corpo da entidade secundaria
-5. Atualizar frontmatter de ambas:
+#### Actors (free merge)
+1. Read the primary entity (`entity-a`)
+2. Incorporate the unified content into the body of the primary entity
+3. Read the secondary entity (`entity-b`)
+4. Remove the duplicated claim from the body of the secondary entity
+5. Update frontmatter of both:
    ```yaml
-   updated_at: <data de hoje YYYY-MM-DD>
+   updated_at: <today's date YYYY-MM-DD>
    updated_by: "compress@agent"
    ```
 
 #### People / Teams / Topics (append-only)
-1. Ler a entidade principal (`entity-a`)
-2. Adicionar o conteudo unificado como nova secao ou complemento no corpo
-3. Ler a entidade secundaria (`entity-b`)
-4. **NAO deletar** o conteudo original. Adicionar callout apos o claim duplicado:
+1. Read the primary entity (`entity-a`)
+2. Add the unified content as a new section or supplement in the body
+3. Read the secondary entity (`entity-b`)
+4. **Do NOT delete** the original content. Add a callout after the duplicated claim:
    ```markdown
-   > [!info] Conteudo consolidado em [[entity-a]]
-   > Este conteudo foi consolidado na entidade principal. Consulte [[entity-a]] para a versao mais completa.
+   > [!info] Content consolidated in [[entity-a]]
+   > This content has been consolidated in the primary entity. See [[entity-a]] for the most complete version.
    ```
-5. Atualizar frontmatter de ambas:
+5. Update frontmatter of both:
    ```yaml
-   updated_at: <data de hoje YYYY-MM-DD>
+   updated_at: <today's date YYYY-MM-DD>
    updated_by: "compress@agent"
    ```
 
 #### Discussions / Projects (append-only)
-Seguir a mesma regra de People/Teams/Topics: append-only com callout de consolidacao.
+Follow the same rule as People/Teams/Topics: append-only with consolidation callout.
 
-#### Knowledge-nodes orfaos (se confirmado pelo usuario)
+#### Orphan knowledge-nodes (if confirmed by the user)
 
-Para cada knowledge-node orfao confirmado (ator removido ou no removido do grafo):
-1. Executar `git rm actors/<actor>/nodes/<node-name>.md`
-2. Se a pasta `actors/<actor>/nodes/` ficou vazia: manter (nao deletar pasta vazia)
-3. Remover referencia do knowledge-node na secao "Knowledge Nodes" do ator pai (se ator existe)
-4. Atualizar `updated_at` e `updated_by` do ator pai (se tocado)
+For each confirmed orphan knowledge-node (actor removed or node removed from graph):
+1. Execute `git rm actors/<actor>/nodes/<node-name>.md`
+2. If the folder `actors/<actor>/nodes/` becomes empty: keep it (do not delete empty folder)
+3. Remove the knowledge-node reference from the "Knowledge Nodes" section of the parent actor (if actor exists)
+4. Update `updated_at` and `updated_by` of the parent actor (if touched)
 
-**IMPORTANTE:** Knowledge-nodes sao a unica entidade que pode ser deletada via `git rm`.
-Todas as outras entidades seguem a regra de consolidacao (nunca deletar).
-O graph.json NAO e modificado — se nos precisam ser removidos do grafo, rodar /bedrock:teach com `--update`.
+**IMPORTANT:** Knowledge-nodes are the only entity that can be deleted via `git rm`.
+All other entities follow the consolidation rule (never delete).
+The graph.json is NOT modified — if nodes need to be removed from the graph, run /bedrock:teach with `--update`.
 
-### 4.2 Gerar Health Report
+### 4.2 Generate Health Report
 
-Aproveitar a varredura completa do vault para gerar:
+Leverage the full vault scan to generate:
 
-#### Wikilinks unresolved
-- Varrer todos os arquivos de entidade
-- Extrair todos os wikilinks `[[nome]]`
-- Verificar se existe arquivo correspondente em algum diretorio de entidade
-- Listar os que nao resolvem
+#### Unresolved wikilinks
+- Scan all entity files
+- Extract all wikilinks `[[name]]`
+- Check if a corresponding file exists in any entity directory
+- List those that do not resolve
 
-#### Entidades orfas
-- Entidades sem nenhum wikilink inbound (nenhuma outra entidade aponta para ela)
-- Verificar via Grep em todos os arquivos de entidade
+#### Orphan entities
+- Entities with no inbound wikilinks (no other entity points to them)
+- Check via Grep across all entity files
 
-#### Entidades desatualizadas
-- Entidades com `updated_at` mais antigo que 60 dias a partir da data atual
-- Extrair `updated_at` do frontmatter de cada entidade
+#### Stale entities
+- Entities with `updated_at` older than 60 days from the current date
+- Extract `updated_at` from the frontmatter of each entity
 
-#### Fleeting notes estagnadas
-- Fleeting notes com status `raw` ha mais de 30 dias (baseado em `captured_at`)
-- Para cada fleeting note estagnada, verificar se atende criterios de promocao (ver `entities/fleeting.md`):
-  - **Massa critica:** >3 paragrafos com fontes verificaveis → sugerir promocao
-  - **Corroboracao:** informacao confirmada por permanente existente → sugerir promocao
-  - Se nenhum criterio atendido → sugerir arquivamento (`status: archived`)
-- Incluir no health report com acoes sugeridas:
+#### Stagnant fleeting notes
+- Fleeting notes with `raw` status for more than 30 days (based on `captured_at`)
+- For each stagnant fleeting note, check if it meets promotion criteria (see `entities/fleeting.md`):
+  - **Critical mass:** >3 paragraphs with verifiable sources → suggest promotion
+  - **Corroboration:** information confirmed by an existing permanent → suggest promotion
+  - If no criteria met → suggest archiving (`status: archived`)
+- Include in the health report with suggested actions:
   ```
-  | Fleeting Note | Dias em raw | Acao sugerida |
+  | Fleeting Note | Days in raw | Suggested action |
   |---|---|---|
-  | [[2026-03-05-novo-servico]] | 35 | Promover (massa critica) |
-  | [[2026-03-01-ideia-vaga]] | 39 | Arquivar (sem criterio de promocao) |
+  | [[2026-03-05-novo-servico]] | 35 | Promote (critical mass) |
+  | [[2026-03-01-ideia-vaga]] | 39 | Archive (no promotion criteria met) |
   ```
 
-#### Integridade do Grafo (se graphify-out/graph.json existe)
+#### Graph Integrity (if graphify-out/graph.json exists)
 
-Usando os dados coletados na Fase 1.5, gerar a secao de integridade:
+Using the data collected in Phase 1.5, generate the integrity section:
 
 ```markdown
-## Integridade do Grafo
+## Graph Integrity
 
-| Metrica | Valor |
+| Metric | Value |
 |---|---|
-| Graph.json existe | sim/nao |
-| Nos no graph.json | N |
-| Knowledge-nodes no vault | M |
-| Nos sincronizados (grafo <-> vault) | X |
-| Knowledge-nodes orfaos (ator removido) | Y |
-| Knowledge-nodes orfaos (no removido do grafo) | Z |
-| Nos do grafo nao persistidos | W |
-| Graph.json atualizado em | YYYY-MM-DD |
-| Graph.json stale (>30d) | sim/nao |
+| Graph.json exists | yes/no |
+| Nodes in graph.json | N |
+| Knowledge-nodes in vault | M |
+| Synced nodes (graph <-> vault) | X |
+| Orphan knowledge-nodes (actor removed) | Y |
+| Orphan knowledge-nodes (node removed from graph) | Z |
+| Graph nodes not persisted | W |
+| Graph.json updated at | YYYY-MM-DD |
+| Graph.json stale (>30d) | yes/no |
 ```
 
-Se graph.json nao existe: reportar apenas "Graph.json nao encontrado. Rode /bedrock:teach para gerar."
-Se graph.json existe mas nao ha orfaos: reportar todos os contadores com zeros.
-Se graph.json e stale: adicionar aviso "Sugestao: rode /bedrock:teach ou /sync para atualizar o grafo."
+If graph.json does not exist: report only "Graph.json not found. Run /bedrock:teach to generate."
+If graph.json exists but there are no orphans: report all counters with zeros.
+If graph.json is stale: add warning "Suggestion: run /bedrock:teach or /sync to update the graph."
 
-**Filtro:** Reportar apenas achados acionaveis. Ignorar:
-- Wikilinks para entidades que sao referencia valida mas ainda nao criadas (aceitavel no Obsidian)
-- Templates e arquivos de configuracao
+**Filter:** Report only actionable findings. Ignore:
+- Wikilinks to entities that are valid references but not yet created (acceptable in Obsidian)
+- Templates and configuration files
 
 ---
 
-## Fase 5 — Git Commit + Relatorio
+## Phase 5 — Git Commit + Report
 
 ### 5.1 Commit
 
 ```bash
 git add actors/ people/ teams/ topics/ discussions/ projects/ fleeting/
-# Mensagem inclui knowledge-nodes orfaos removidos (se houver)
-git commit -m "vault: compress N entities [fonte: compress]"
-# Se knowledge-nodes orfaos foram removidos, usar:
-# git commit -m "vault: compress N entities, remove M knowledge-nodes orfaos [fonte: compress]"
+# Message includes removed orphan knowledge-nodes (if any)
+git commit -m "vault: compress N entities [source: compress]"
+# If orphan knowledge-nodes were removed, use:
+# git commit -m "vault: compress N entities, remove M orphan knowledge-nodes [source: compress]"
 ```
 
-Onde N = numero total de entidades tocadas.
+Where N = total number of entities touched.
 
 ### 5.2 Push
 
@@ -405,52 +405,52 @@ Onde N = numero total de entidades tocadas.
 git push origin main
 ```
 
-Se falhar:
+If it fails:
 ```bash
 git pull --rebase origin main && git push origin main
 ```
 
-Max 2 tentativas. Se falhar apos 2: avisar o usuario que o push falhou.
+Max 2 attempts. If it fails after 2: warn the user that the push failed.
 
-### 5.3 Relatorio Final
+### 5.3 Final Report
 
-Apresentar ao usuario:
+Present to the user:
 
 ```markdown
-## /bedrock:compress — Relatorio
+## /bedrock:compress — Report
 
-### Clusters processados
-| # | Descricao | Tipo | Entidades | Claims unificados |
+### Processed clusters
+| # | Description | Type | Entities | Unified claims |
 |---|---|---|---|---|
 | 1 | ... | actor | 2 | 3 |
 | 2 | ... | topic | 3 | 5 |
 
-**Total:** N clusters, M entidades, P claims unificados
+**Total:** N clusters, M entities, P unified claims
 
 ### Health Report
-| Check | Count | Detalhes |
+| Check | Count | Details |
 |---|---|---|
-| Wikilinks unresolved | N | [[link1]], [[link2]], ... |
-| Entidades orfas | N | [[entity1]], [[entity2]], ... |
-| Entidades desatualizadas (>60d) | N | [[entity3]], [[entity4]], ... |
+| Unresolved wikilinks | N | [[link1]], [[link2]], ... |
+| Orphan entities | N | [[entity1]], [[entity2]], ... |
+| Stale entities (>60d) | N | [[entity3]], [[entity4]], ... |
 
 ### Git
-- Commit: `vault: compress N entities [fonte: compress]`
-- Push: sucesso / falhou (motivo)
+- Commit: `vault: compress N entities [source: compress]`
+- Push: success / failed (reason)
 ```
 
-Se nenhum cluster foi processado (nao havia duplicacao ou usuario recusou tudo),
-apresentar apenas o Health Report.
+If no clusters were processed (no duplication found or user refused all),
+present only the Health Report.
 
 ---
 
-## Tratamento de Erros
+## Error Handling
 
-| Situacao | Acao |
+| Situation | Action |
 |---|---|
-| Vault vazio (sem entidades) | Informar "Nenhuma entidade encontrada no vault." e encerrar |
-| Nenhuma duplicacao encontrada | Informar e pular para Health Report |
-| Usuario recusa todos os clusters | Informar e pular para Health Report |
-| Erro ao ler entidade | Pular entidade, avisar no relatorio |
-| Conflito no git push | Rebase + retry (max 2). Se falhar: avisar usuario |
-| Entidade sem frontmatter | Pular entidade, avisar no relatorio |
+| Empty vault (no entities) | Report "No entities found in the vault." and end |
+| No duplication found | Report and skip to Health Report |
+| User refuses all clusters | Report and skip to Health Report |
+| Error reading entity | Skip entity, warn in the report |
+| Conflict on git push | Rebase + retry (max 2). If it fails: warn the user |
+| Entity without frontmatter | Skip entity, warn in the report |

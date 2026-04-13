@@ -1,7 +1,7 @@
 ---
 type: team
 name: ""
-aliases: []  # ["Short Name", "Full Name"] — min 1 alias (ex: ["Payments", "Squad Payments"])
+aliases: []  # ["Short Name", "Full Name"] — min 1 alias (e.g., ["Payments", "Squad Payments"])
 scope: ""
 purpose: ""
 members: ["[[first-last]]"]
@@ -14,8 +14,8 @@ updated_by: ""
 tags: [type/team]  # + domain/{payments,finance,notifications,checkout,orders,integrations,compliance,core,data,infra,marketplace,internal-tools,platform,security}
 ---
 
-<!-- Papel Zettelkasten: permanent note -->
-<!-- Links no corpo devem ter contexto: "responsavel pela operacao do [[billing-api]]" -->
+<!-- Zettelkasten role: permanent note -->
+<!-- Links in the body must have context: "responsible for operating [[billing-api]]" -->
 
 # Team Name
 

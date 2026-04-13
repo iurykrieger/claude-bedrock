@@ -586,16 +586,16 @@ tags: [type/person, domain/<first_domain>]
 
 > <person_role> on [[<team_name>]]. <brief context about their focus>.
 
-## Time
+## Team
 
 Member of [[<team_name>]].
 
-## Pontos Focais
+## Focal Points
 
 <for each focal_point:>
 - [[<focal_point>]] — <brief involvement context>
 
-## Assuntos Ativos
+## Active Topics
 
 - [[<topic_slug>]] — <brief description>
 
@@ -604,7 +604,7 @@ Member of [[<team_name>]].
 - [[<project_slug>]] — <brief description>
 ```
 
-**For `personal` preset:** Omit the `team` field (set to `""`), omit the `Time` section, and write only 1 person entity.
+**For `personal` preset:** Omit the `team` field (set to `""`), omit the `Team` section, and write only 1 person entity.
 
 #### 3.5.4 Create Actor Entity
 
@@ -819,7 +819,7 @@ After creating all entities, verify the wikilink graph is fully bidirectional.
 Team → Person 1: members[] ✓ | Person 1 → Team: team field ✓
 Team → Person 2: members[] ✓ | Person 2 → Team: team field ✓
 Team → Actor: actors[] ✓ | Actor → Team: team field ✓
-Topic → Person 1: people[] ✓ | Person 1 → Topic: "Assuntos Ativos" ✓
+Topic → Person 1: people[] ✓ | Person 1 → Topic: "Active Topics" ✓
 Topic → Actor: actors[] ✓ | Actor → Topic: "Related Topics" ✓
 Project → Person 1: focal_points[] ✓ | Person 1 → Project: "Projects" ✓
 Project → Actor: related_actors[] ✓ | Actor → Project: "Related Projects" ✓

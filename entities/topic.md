@@ -1,75 +1,75 @@
 # Entity: Topic
 
-> Fonte de verdade para campos obrigatórios: `topics/_template.md`
+> Source of truth for required fields: `topics/_template.md`
 
-## O que é
+## What it is
 
-Um **topic** é um assunto transversal com lifecycle próprio (open → in-progress → completed/cancelled). Topics representam iniciativas, incidentes, RFCs, deprecações, ou qualquer tema que evolui no tempo e afeta múltiplos atores ou pessoas. São o "tracker" de assuntos do Second Brain.
+A **topic** is a cross-cutting subject with its own lifecycle (open → in-progress → completed/cancelled). Topics represent initiatives, incidents, RFCs, deprecations, or any theme that evolves over time and affects multiple actors or people. They are the "tracker" of subjects in the Second Brain.
 
-Topics têm status, histórico de eventos, decisões tomadas, e próximos passos. São o lugar onde se registra **o que está acontecendo** com um tema ao longo do tempo.
+Topics have status, event history, decisions made, and next steps. They are the place where you record **what is happening** with a subject over time.
 
-## Quando criar
+## When to create
 
-- O conteúdo descreve uma iniciativa transversal que afeta mais de 1 ator (ex: migração de observabilidade, depreciação de serviços)
-- O conteúdo relata um incidente ou problema sistêmico com impacto cross-team
-- O conteúdo propõe uma RFC ou mudança arquitetural que precisa de tracking
-- O conteúdo descreve um processo de deprecação de um sistema
+- The content describes a cross-cutting initiative that affects more than 1 actor (e.g., observability migration, service deprecation)
+- The content reports an incident or systemic problem with cross-team impact
+- The content proposes an RFC or architectural change that needs tracking
+- The content describes a system deprecation process
 
-## Quando NÃO criar
+## When NOT to create
 
-- É uma tarefa pontual sem evolução temporal (ex: "corrigir o bug X no PR #123") — isso é trabalho operacional, não topic
-- É um bug isolado em um único ator sem impacto cross-team — registrar como known_issue no actor
-- É uma feature request sem impacto transversal — pode ser um item em um project, não um topic
-- É uma conversa/reunião — isso é uma discussion. Topics são assuntos; discussions são eventos
+- It is a one-off task without temporal evolution (e.g., "fix bug X in PR #123") — that is operational work, not a topic
+- It is an isolated bug in a single actor without cross-team impact — record it as a known_issue in the actor
+- It is a feature request without cross-cutting impact — it could be an item in a project, not a topic
+- It is a conversation/meeting — that is a discussion. Topics are subjects; discussions are events
 
-## Como distinguir de outros tipos
+## How to distinguish from other types
 
-| Parece ser... | Mas é... | Diferença-chave |
+| Looks like... | But is... | Key difference |
 |---|---|---|
-| Topic | Discussion | Discussion é um evento pontual (reunião, conversa) com data fixa. Topic é um assunto que evolui no tempo com status e histórico |
-| Topic | Project | Project tem deadline, deliverables, e focal points. Topic é mais aberto — pode não ter deadline definida. Ex: "deprecação do legacy-gateway" é topic; "migração para orders-api v2" é project |
-| Topic | Actor (known_issue) | Se o problema afeta só 1 ator e é técnico, vai como known_issue no actor. Se afeta múltiplos atores ou tem impacto organizacional, é topic |
+| Topic | Discussion | A discussion is a one-time event (meeting, conversation) with a fixed date. A topic is a subject that evolves over time with status and history |
+| Topic | Project | A project has a deadline, deliverables, and focal points. A topic is more open — it may not have a defined deadline. E.g., "deprecation of legacy-gateway" is a topic; "migration to orders-api v2" is a project |
+| Topic | Actor (known_issue) | If the problem affects only 1 actor and is technical, it goes as a known_issue in the actor. If it affects multiple actors or has organizational impact, it is a topic |
 
-## Campos obrigatórios (frontmatter)
+## Required fields (frontmatter)
 
-| Campo | Tipo | Descrição |
+| Field | Type | Description |
 |---|---|---|
-| `type` | string | Sempre `"topic"` |
-| `title` | string | Título descritivo do assunto |
+| `type` | string | Always `"topic"` |
+| `title` | string | Descriptive title of the subject |
 | `category` | string | `bugfix`, `troubleshooting`, `rfc`, `incident`, `feature`, `deprecation`, `compliance` |
 | `status` | string | `open`, `in-progress`, `completed`, `cancelled` |
-| `people` | array | Wikilinks para persons: `["[[first-last]]"]` |
-| `actors` | array | Wikilinks para actors: `["[[repo-name]]"]` |
-| `objective` | string | Objetivo do topic em pt-BR |
+| `people` | array | Wikilinks to persons: `["[[first-last]]"]` |
+| `actors` | array | Wikilinks to actors: `["[[repo-name]]"]` |
+| `objective` | string | Topic objective |
 | `created_at` | date | YYYY-MM-DD |
 | `updated_at` | date | YYYY-MM-DD |
-| `updated_by` | string | Quem atualizou |
+| `updated_by` | string | Who last updated |
 
-## Papel Zettelkasten
+## Zettelkasten Role
 
-**Classificação:** bridge note
-**Propósito no grafo:** Conectar notas permanentes (actors, people, teams) explicando *porquê* se relacionam no contexto de um assunto que evolui no tempo.
+**Classification:** bridge note
+**Purpose in the graph:** Connect permanent notes (actors, people, teams) explaining *why* they relate in the context of a subject that evolves over time.
 
-### Regras de Linking
+### Linking Rules
 
-**Links estruturais (frontmatter):** `people` (wikilinks para persons envolvidas), `actors` (wikilinks para actors afetados). Definem quais permanentes este assunto conecta.
-**Links semânticos (corpo):** Links no corpo são o ponto central de um topic — devem explicar a relação entre permanentes com contexto rico. Ex: "a deprecação do [[legacy-gateway]] está bloqueada porque clientes do sistema legado ainda dependem da tokenização provida por [[billing-api]]" em vez de apenas "[[legacy-gateway]] e [[billing-api]]". O corpo do topic é onde vive a explicação da conexão entre permanentes.
-**Relação com outros papéis:** Topics são o tecido conectivo entre permanentes. Se dois actors se relacionam, a explicação vive aqui — não duplicada em ambos os actors. Topics são referenciados por index notes (projects) que organizam múltiplos assuntos sob um objetivo.
+**Structural links (frontmatter):** `people` (wikilinks to involved persons), `actors` (wikilinks to affected actors). Define which permanents this subject connects.
+**Semantic links (body):** Links in the body are the central point of a topic — they should explain the relationship between permanents with rich context. E.g., "the deprecation of [[legacy-gateway]] is blocked because legacy system clients still depend on the tokenization provided by [[billing-api]]" instead of just "[[legacy-gateway]] and [[billing-api]]". The topic body is where the explanation of the connection between permanents lives.
+**Relationship with other roles:** Topics are the connective tissue between permanents. If two actors relate, the explanation lives here — not duplicated in both actors. Topics are referenced by index notes (projects) that organize multiple subjects under an objective.
 
-### Critério de Completude
+### Completeness Criteria
 
-Um topic está completo quando: tem objetivo definido, pelo menos 1 actor ou person referenciado com contexto, e status atualizado. Se o assunto é vago, sem atores concretos ou objetivo claro, o conteúdo deve ir para `fleeting/` até amadurecer.
+A topic is complete when: it has a defined objective, at least 1 actor or person referenced with context, and an updated status. If the subject is vague, without concrete actors or a clear objective, the content should go to `fleeting/` until it matures.
 
-## Exemplos
+## Examples
 
-### Isso É um topic
+### This IS a topic
 
-1. "Estamos migrando todos os serviços Go de dd-trace para OpenTelemetry. Afeta notification-service, crypto-service, orders-api, e metrics-collector." — Iniciativa transversal com múltiplos atores. É topic (category: `rfc`).
+1. "We are migrating all Go services from dd-trace to OpenTelemetry. Affects notification-service, crypto-service, orders-api, and metrics-collector." — Cross-cutting initiative with multiple actors. It is a topic (category: `rfc`).
 
-2. "A depreciação do legacy-gateway está bloqueada pela migração dos clientes do sistema legado. Status: em andamento desde março." — Assunto com lifecycle e status. É topic (category: `deprecation`).
+2. "The deprecation of legacy-gateway is blocked by the migration of legacy system clients. Status: in progress since March." — Subject with lifecycle and status. It is a topic (category: `deprecation`).
 
-### Isso NÃO é um topic
+### This is NOT a topic
 
-1. "Preciso corrigir o timeout no endpoint /create do notification-service." — Bug pontual em 1 ator. Vai como known_issue no actor, não como topic.
+1. "I need to fix the timeout on the /create endpoint of notification-service." — One-off bug in 1 actor. Goes as a known_issue in the actor, not as a topic.
 
-2. "Tivemos uma reunião sobre o plano de deprecação na segunda-feira." — Isso é uma discussion (evento). O plano de deprecação em si pode ser um topic.
+2. "We had a meeting about the deprecation plan on Monday." — That is a discussion (event). The deprecation plan itself may be a topic.

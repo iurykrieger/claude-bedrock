@@ -1,36 +1,36 @@
 ---
 type: fleeting
 title: ""
-aliases: []  # ["Short Title"] — min 1 alias se titulo for longo
+aliases: []  # ["Short Title"] — min 1 alias if title is long
 source: ""  # session | teach | manual
 captured_at: YYYY-MM-DD
 status: "raw"  # raw | reviewing | promoted | archived
-promoted_to: ""  # "[[nota-destino]]" quando promovida
+promoted_to: ""  # "[[target-note]]" when promoted
 sources: []  # [{url: "https://...", type: "confluence|gdoc|github-repo|csv|markdown|manual", synced_at: YYYY-MM-DD}]
 updated_at: YYYY-MM-DD
 updated_by: ""
-tags: [type/fleeting, status/raw]  # + domain/* opcional
+tags: [type/fleeting, status/raw]  # + domain/* optional
 ---
 
-<!-- Papel Zettelkasten: fleeting note -->
-<!-- Conteudo em maturacao — links exploratórios permitidos sem contexto textual completo -->
+<!-- Zettelkasten role: fleeting note -->
+<!-- Content in maturation — exploratory links allowed without full textual context -->
 
 # Fleeting Title
 
-> Captura bruta de informação. Fonte: `source`.
+> Raw information capture. Source: `source`.
 
-## Conteudo
+## Content
 
-Informação capturada — ideias, fragmentos, menções. Não precisa estar completa ou bem estruturada.
+Captured information — ideas, fragments, mentions. Does not need to be complete or well structured.
 
-## Conexoes Possiveis
+## Possible Connections
 
-Wikilinks exploratórios para entidades que parecem relacionadas:
-- [[entity-name]] — motivo da possível conexão
+Exploratory wikilinks to entities that seem related:
+- [[entity-name]] — reason for the possible connection
 
-## Contexto de Captura
+## Capture Context
 
-De onde veio, quando, e qualquer contexto adicional que ajude na futura promoção.
+Where it came from, when, and any additional context that helps with future promotion.
 
 ---
 

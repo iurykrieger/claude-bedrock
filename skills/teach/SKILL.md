@@ -1,92 +1,92 @@
 ---
 name: teach
 description: >
-  Ensina o Second Brain a reconhecer uma nova fonte de dados externa. Ingere conteudo de
-  Confluence, Google Docs, CSV, Markdown local ou repositorio GitHub, extrai entidades
-  (actors, discussions, projects, people, teams, topics), incorpora no vault e registra
-  a fonte para re-ingestao futura.
-  Use quando: "bedrock teach", "bedrock-teach", "ensinar", "ingerir fonte", "importar documento", "/bedrock:teach",
-  ou quando o usuario fornecer uma URL de Confluence, Google Docs, GitHub ou um path
-  de arquivo local para incorporar ao vault.
+  Teaches the Second Brain to recognize a new external data source. Ingests content from
+  Confluence, Google Docs, CSV, local Markdown, or GitHub repositories, extracts entities
+  (actors, discussions, projects, people, teams, topics), incorporates them into the vault,
+  and registers the source for future re-ingestion.
+  Use when: "bedrock teach", "bedrock-teach", "teach", "ingest source", "import document", "/bedrock:teach",
+  or when the user provides a Confluence, Google Docs, or GitHub URL, or a local file path
+  to incorporate into the vault.
 user_invocable: true
 allowed-tools: Bash, Read, Write, Edit, Glob, Grep, Skill, Agent, mcp__plugin_github_github__*, mcp__plugin_atlassian_atlassian__*
 ---
 
-# /bedrock:teach — Ingestao de Fontes Externas no Second Brain
+# /bedrock:teach — External Source Ingestion into the Second Brain
 
 ## Plugin Paths
 
-Entity definitions e templates estao no diretorio do plugin, nao na raiz do vault.
-Use o "Base directory for this skill" informado na invocacao para resolver os paths:
+Entity definitions and templates are in the plugin directory, not at the vault root.
+Use the "Base directory for this skill" provided at invocation to resolve paths:
 
 - Entity definitions: `<base_dir>/../../entities/`
 - Templates: `<base_dir>/../../templates/{type}/_template.md`
-- CLAUDE.md do plugin: `<base_dir>/../../CLAUDE.md` (ja injetado automaticamente no contexto)
+- Plugin CLAUDE.md: `<base_dir>/../../CLAUDE.md` (already injected automatically into context)
 
-Onde `<base_dir>` e o path informado em "Base directory for this skill".
-
----
-
-## Visao Geral
-
-Esta skill recebe uma fonte externa (URL ou path local), extrai seu conteudo, identifica
-entidades relevantes para o vault, e as incorpora — criando novas ou fundindo com existentes.
-Ao final, passa a URL da fonte ao `/bedrock:preserve` que registra a proveniencia no campo `sources` de cada entidade gerada.
-
-**Voce e um agente de execucao.** Siga as fases abaixo na ordem, sem pular etapas.
+Where `<base_dir>` is the path provided in "Base directory for this skill".
 
 ---
 
-## Fase 1 — Detectar e Ler Fonte
+## Overview
 
-### 1.1 Classificar o input
+This skill receives an external source (URL or local path), extracts its content, identifies
+entities relevant to the vault, and incorporates them — creating new ones or merging with existing ones.
+At the end, it passes the source URL to `/bedrock:preserve` which registers the provenance in the `sources` field of each generated entity.
 
-O usuario fornece um argumento. Classifique-o na seguinte ordem de prioridade:
+**You are an execution agent.** Follow the phases below in order, without skipping steps.
 
-| Input | Tipo detectado | Metodo de leitura |
+---
+
+## Phase 1 — Detect and Read Source
+
+### 1.1 Classify the input
+
+The user provides an argument. Classify it in the following priority order:
+
+| Input | Detected type | Reading method |
 |---|---|---|
-| URL contendo `confluence` ou `atlassian.net` | confluence | Invocar skill `/confluence-to-markdown` passando a URL |
-| URL contendo `docs.google.com` | gdoc | Invocar skill `/gdoc-to-markdown` passando a URL |
-| URL contendo `github.com` | github-repo | Ver secao 1.2 abaixo |
-| Path local terminando em `.csv` | csv | Ver secao 1.3 abaixo |
-| Path local terminando em `.md` ou `.txt` | markdown | Use Read para ler o arquivo diretamente |
-| Nenhum match acima | manual | Perguntar ao usuario: "Nao consegui identificar o tipo da fonte. Cole o conteudo ou forneca uma URL/path valido." |
+| URL containing `confluence` or `atlassian.net` | confluence | Invoke skill `/confluence-to-markdown` passing the URL |
+| URL containing `docs.google.com` | gdoc | Invoke skill `/gdoc-to-markdown` passing the URL |
+| URL containing `github.com` | github-repo | See section 1.2 below |
+| Local path ending in `.csv` | csv | See section 1.3 below |
+| Local path ending in `.md` or `.txt` | markdown | Use Read to read the file directly |
+| No match above | manual | Ask the user: "Could not identify the source type. Paste the content or provide a valid URL/path." |
 
-Se nenhum argumento foi fornecido: perguntar ao usuario "Qual fonte deseja ingerir? Forneca uma URL (Confluence, Google Docs, GitHub) ou um path de arquivo local (.md, .csv, .txt)."
+If no argument was provided: ask the user "What source do you want to ingest? Provide a URL (Confluence, Google Docs, GitHub) or a local file path (.md, .csv, .txt)."
 
-### 1.2 Leitura de repositorio GitHub
+### 1.2 Reading a GitHub repository
 
-Para URLs do GitHub (ex: `https://github.com/acme-corp/billing-api`):
+For GitHub URLs (e.g.: `https://github.com/acme-corp/billing-api`):
 
-1. Extrair `owner/repo` da URL
-2. Usar GitHub MCP diretamente (NAO via subagent — permissoes MCP nao sao herdadas):
-   - `mcp__plugin_github_github__get_file_contents` → ler README.md do repo
-   - `mcp__plugin_github_github__list_commits` → ultimos 10 commits
-   - `mcp__plugin_github_github__list_pull_requests` → ultimos 5 PRs (state=all, sort=updated)
-3. Compilar tudo em um texto markdown unico
+1. Extract `owner/repo` from the URL
+2. Use GitHub MCP directly (NOT via subagent — MCP permissions are not inherited):
+   - `mcp__plugin_github_github__get_file_contents` → read the repo's README.md
+   - `mcp__plugin_github_github__list_commits` → last 10 commits
+   - `mcp__plugin_github_github__list_pull_requests` → last 5 PRs (state=all, sort=updated)
+3. Compile everything into a single markdown text
 
-> **Best-effort:** Se alguma chamada MCP falhar, continue com o que foi obtido. NAO bloqueie a ingestao.
+> **Best-effort:** If any MCP call fails, continue with what was obtained. Do NOT block ingestion.
 
-### 1.2.1 Extracao semantica via graphify (GitHub repos) — OBRIGATORIO
+### 1.2.1 Semantic extraction via graphify (GitHub repos) — MANDATORY
 
-Apos a leitura via MCP (1.2), rodar o pipeline graphify no repositorio local para extrair
-entidades e relacoes semanticas (funcoes, classes, conceitos, decisoes de design).
+After reading via MCP (1.2), run the graphify pipeline on the local repository to extract
+entities and semantic relationships (functions, classes, concepts, design decisions).
 
-**IMPORTANTE:** Graphify e parte OBRIGATORIA do /bedrock:teach para github-repos. NAO pular, NAO sugerir
-"rodar depois", NAO apresentar como passo opcional. A persistencia de knowledge-nodes resultantes
-tambem e obrigatoria — faz parte do fluxo do /bedrock:teach, nao e passo separado.
+**IMPORTANT:** Graphify is a MANDATORY part of /bedrock:teach for github-repos. Do NOT skip, do NOT suggest
+"run later", do NOT present as an optional step. The persistence of resulting knowledge-nodes
+is also mandatory — it is part of the /bedrock:teach flow, not a separate step.
 
-**Pre-condicoes:**
-1. Extrair `repo-name` da URL (ultimo segmento: `acme-corp/billing-api` → `billing-api`)
-2. Verificar se o repo existe localmente em `../<repo-name>/` (repos podem estar em subdiretorios como `../payments/<repo-name>/` — buscar recursivamente)
-3. Se o repo NAO existe localmente em nenhum subdiretorio de `../`: clonar via `git clone` do GitHub e prosseguir.
+**Pre-conditions:**
+1. Extract `repo-name` from the URL (last segment: `acme-corp/billing-api` → `billing-api`)
+2. Check if the repo exists locally at `../<repo-name>/` (repos may be in subdirectories like `../payments/<repo-name>/` — search recursively)
+3. If the repo does NOT exist locally in any subdirectory of `../`: clone via `git clone` from GitHub and proceed.
 
-**Se o repo existe localmente:**
+**If the repo exists locally:**
 
-1. Verificar se graphify esta instalado (invocar skill `/graphify` internamente nao e necessario — usar o pipeline Python diretamente):
+1. Check if graphify is installed (invoking the `/graphify` skill internally is not necessary — use the Python pipeline directly):
 
 ```bash
-# Detectar Python e verificar graphify
+# Detect Python and check graphify
 GRAPHIFY_BIN=$(which graphify 2>/dev/null)
 if [ -n "$GRAPHIFY_BIN" ]; then
     PYTHON=$(head -1 "$GRAPHIFY_BIN" | tr -d '#!')
@@ -101,9 +101,9 @@ mkdir -p graphify-out
 "$PYTHON" -c "import sys; open('graphify-out/.graphify_python', 'w').write(sys.executable)"
 ```
 
-Se a instalacao falhar: avisar "Graphify nao disponivel. Continuando com extracao textual." e prosseguir.
+If installation fails: warn "Graphify not available. Continuing with textual extraction." and proceed.
 
-2. **Detect:** Detectar arquivos no repositorio local.
+2. **Detect:** Detect files in the local repository.
 
 ```bash
 $(cat graphify-out/.graphify_python) -c "
@@ -115,27 +115,27 @@ print(json.dumps(result))
 " > graphify-out/.graphify_detect.json
 ```
 
-Apresentar resumo ao usuario: `Corpus: X files · ~Y words`
+Present a summary to the user: `Corpus: X files · ~Y words`
 
-3. **Copiar source para dentro do vault (resolver permissoes de subagents):**
+3. **Copy source into the vault (resolve subagent permissions):**
 
-Subagents NAO conseguem ler arquivos fora do diretorio do vault. Para que a extracao
-semantica funcione, copiar os arquivos do repo para `graphify-out/src/<repo-name>/`:
+Subagents CANNOT read files outside the vault directory. For the semantic extraction
+to work, copy the repo files to `graphify-out/src/<repo-name>/`:
 
 ```bash
-# Copiar source code para dentro do vault (subagents so leem dentro do vault)
+# Copy source code into the vault (subagents can only read inside the vault)
 rm -rf graphify-out/src/<repo-name>
 mkdir -p graphify-out/src/<repo-name>
-# Copiar apenas arquivos relevantes (excluir .git, bin, obj, node_modules)
+# Copy only relevant files (exclude .git, bin, obj, node_modules)
 rsync -a --exclude='.git' --exclude='bin' --exclude='obj' --exclude='node_modules' \
   --exclude='packages' --exclude='.vs' --exclude='TestResults' \
   <path-do-repo>/ graphify-out/src/<repo-name>/
-echo "Source copiado: $(find graphify-out/src/<repo-name> -type f | wc -l) files"
+echo "Source copied: $(find graphify-out/src/<repo-name> -type f | wc -l) files"
 ```
 
-**IMPORTANTE:** `graphify-out/` esta no `.gitignore` — os arquivos copiados nao serao commitados.
+**IMPORTANT:** `graphify-out/` is in `.gitignore` — the copied files will not be committed.
 
-Apos copiar, re-rodar detect no path copiado para que os paths nos nodes referenciem `graphify-out/src/`:
+After copying, re-run detect on the copied path so that the paths in nodes reference `graphify-out/src/`:
 ```bash
 $(cat graphify-out/.graphify_python) -c "
 import json
@@ -147,52 +147,52 @@ print(f'Detect (local copy): {result.get(\"total_files\", 0)} files')
 "
 ```
 
-4. **Extract:** Rodar extracao AST + semantica via subagents.
+4. **Extract:** Run AST + semantic extraction via subagents.
 
-**Limpeza pre-extracao (OBRIGATORIO):**
+**Pre-extraction cleanup (MANDATORY):**
 
-Antes de despachar subagents, limpar arquivos de extracao stale para evitar
-que subagents leiam dados de runs anteriores de OUTROS repos:
+Before dispatching subagents, clean stale extraction files to prevent
+subagents from reading data from previous runs of OTHER repos:
 
 ```bash
-# Limpar extracoes anteriores (NAO apagar graph.json — e o grafo central cross-repo)
+# Clean previous extractions (do NOT delete graph.json — it is the central cross-repo graph)
 rm -f graphify-out/.graphify_extract.json
 rm -f graphify-out/.graphify_extract_*.json
 rm -f graphify-out/.graphify_ast.json
-echo "Limpeza pre-extracao concluida"
+echo "Pre-extraction cleanup completed"
 ```
 
-**CRITICO — Instrucoes para subagents:**
+**CRITICAL — Instructions for subagents:**
 
-Ao despachar subagents de extracao, incluir OBRIGATORIAMENTE na prompt:
-- "Voce DEVE ler arquivos APENAS de `graphify-out/src/<repo-name>/`. NAO leia `graphify-out/graph.json` nem nenhum arquivo `.graphify_extract*.json` existente. Esta e uma extracao FRESCA."
-- "Salve o resultado em `graphify-out/.graphify_extract_<repo-name>.json`"
+When dispatching extraction subagents, MANDATORILY include in the prompt:
+- "You MUST read files ONLY from `graphify-out/src/<repo-name>/`. Do NOT read `graphify-out/graph.json` or any existing `.graphify_extract*.json` file. This is a FRESH extraction."
+- "Save the result in `graphify-out/.graphify_extract_<repo-name>.json`"
 
-Isso evita contaminacao por nodes de outros repos que existam no graph.json de runs anteriores.
+This prevents contamination by nodes from other repos that exist in the graph.json from previous runs.
 
-Usar subagents para extracao semantica (seguir o pipeline completo do /graphify skill:
-Part A AST + Part B semantica em paralelo). Todos os paths agora apontam para
-`graphify-out/src/<repo-name>/` — acessivel pelos subagents.
+Use subagents for semantic extraction (follow the complete /graphify skill pipeline:
+Part A AST + Part B semantic in parallel). All paths now point to
+`graphify-out/src/<repo-name>/` — accessible by subagents.
 
-**Output:** O resultado da extracao deve ser salvo em arquivo **repo-especifico**:
-`graphify-out/.graphify_extract_<repo-name>.json` (NAO no generico `.graphify_extract.json`).
+**Output:** The extraction result must be saved in a **repo-specific** file:
+`graphify-out/.graphify_extract_<repo-name>.json` (NOT the generic `.graphify_extract.json`).
 
-Se multiplos subagents sao usados (ex: por modulo), cada um salva em arquivo proprio
-(ex: `.graphify_extract_<repo-name>_api.json`, `.graphify_extract_<repo-name>_gateway.json`)
-e o step 5 faz o merge.
+If multiple subagents are used (e.g.: per module), each saves to its own file
+(e.g.: `.graphify_extract_<repo-name>_api.json`, `.graphify_extract_<repo-name>_gateway.json`)
+and step 5 performs the merge.
 
-**IMPORTANTE:** Se o ator ja foi processado anteriormente (verificar se `graphify-out/graph.json` existe
-e contem nos com `source_file` referenciando este repo), usar `--update` para extracao incremental:
-- Verificar cache via `graphify.cache.check_semantic_cache`
-- Extrair apenas arquivos novos/modificados
-- Isso garante que re-execucoes do /bedrock:teach no mesmo ator nao dupliquem nos
+**IMPORTANT:** If the actor was previously processed (check if `graphify-out/graph.json` exists
+and contains nodes with `source_file` referencing this repo), use `--update` for incremental extraction:
+- Check cache via `graphify.cache.check_semantic_cache`
+- Extract only new/modified files
+- This ensures that re-runs of /bedrock:teach on the same actor do not duplicate nodes
 
-5. **Build + Cluster + Analyze:** Construir grafo, clusterizar, analisar.
+5. **Build + Cluster + Analyze:** Build graph, cluster, analyze.
 
-**Merge de subagents (se multiplos arquivos):**
+**Subagent merge (if multiple files):**
 
-Se a extracao usou multiplos subagents (ex: por modulo), mergear os arquivos parciais
-antes de construir o grafo:
+If the extraction used multiple subagents (e.g.: per module), merge the partial files
+before building the graph:
 
 ```bash
 $(cat graphify-out/.graphify_python) -c "
@@ -223,7 +223,7 @@ print(f'Merged extraction: {len(all_nodes)} nodes, {len(unique_edges)} edges')
 "
 ```
 
-**Construir grafo:**
+**Build graph:**
 
 ```bash
 $(cat graphify-out/.graphify_python) -c "
@@ -234,21 +234,21 @@ from graphify.analyze import god_nodes, surprising_connections
 from graphify.export import to_json
 from pathlib import Path
 
-# Ler extracao do repo-especifico (NAO do generico .graphify_extract.json)
+# Read repo-specific extraction (NOT the generic .graphify_extract.json)
 extraction = json.loads(Path('graphify-out/.graphify_extract_<repo-name>.json').read_text())
 
-# Merge com graph.json existente (se houver)
+# Merge with existing graph.json (if it exists)
 existing_graph = Path('graphify-out/graph.json')
 if existing_graph.exists():
     existing = json.loads(existing_graph.read_text())
-    # IMPORTANTE: remover nodes do MESMO repo antes de mergear (evitar duplicatas de re-runs)
+    # IMPORTANT: remove nodes from the SAME repo before merging (avoid duplicates from re-runs)
     repo_id_prefix = '<repo-name>'.replace('-', '_')
     existing['nodes'] = [n for n in existing.get('nodes', [])
                          if not n.get('id', '').startswith(repo_id_prefix)]
     existing['edges'] = [e for e in existing.get('edges', [])
                          if not e.get('source', '').startswith(repo_id_prefix)
                          and not e.get('target', '').startswith(repo_id_prefix)]
-    # Adicionar nodes e edges novos
+    # Add new nodes and edges
     for node in extraction.get('nodes', []):
         existing.setdefault('nodes', []).append(node)
     for edge in extraction.get('edges', []):
@@ -266,52 +266,52 @@ print(f'Graph: {G.number_of_nodes()} nodes, {G.number_of_edges()} edges, {len(co
 "
 ```
 
-6. **Resultado:** Armazenar os nos extraidos para uso na Fase 3:
-   - `graphify-out/.graphify_extract_<repo-name>.json` — nos e edges desta extracao (arquivo repo-especifico)
-   - `graphify-out/graph.json` — grafo central atualizado (merge de todos os repos)
-   - Setar flag `graphify_available = true` para a Fase 3
+6. **Result:** Store the extracted nodes for use in Phase 3:
+   - `graphify-out/.graphify_extract_<repo-name>.json` — nodes and edges from this extraction (repo-specific file)
+   - `graphify-out/graph.json` — updated central graph (merge of all repos)
+   - Set flag `graphify_available = true` for Phase 3
 
-7. **Limpeza:** Apos extracao completa, remover copia local:
+7. **Cleanup:** After complete extraction, remove the local copy:
 ```bash
 rm -rf graphify-out/src/<repo-name>
 ```
 
-### 1.3 Leitura de CSV
+### 1.3 CSV reading
 
-Para arquivos `.csv`:
+For `.csv` files:
 
-1. Use Read para ler o arquivo
-2. Se o arquivo tiver mais de 200 linhas: truncar nas primeiras 200 e avisar o usuario
-3. Interpretar a primeira linha como header
-4. Tratar o CSV como texto tabular — NAO assumir schema fixo
-5. O conteudo sera analisado semanticamente na Fase 3
+1. Use Read to read the file
+2. If the file has more than 200 lines: truncate to the first 200 and warn the user
+3. Interpret the first line as a header
+4. Treat the CSV as tabular text — do NOT assume a fixed schema
+5. The content will be semantically analyzed in Phase 3
 
-### 1.4 Resultado da Fase 1
+### 1.4 Phase 1 Result
 
-Ao final desta fase, voce deve ter:
-- **conteudo**: texto markdown da fonte (pode ser longo)
-- **url_ou_path**: URL original ou path do arquivo
-- **source_type**: `confluence`, `gdoc`, `github-repo`, `csv`, `markdown`, ou `manual`
-- **graphify_available**: `true` se graphify foi executado com sucesso (1.2.1 ou 1.4.1)
+At the end of this phase, you should have:
+- **content**: markdown text from the source (may be long)
+- **url_or_path**: original URL or file path
+- **source_type**: `confluence`, `gdoc`, `github-repo`, `csv`, `markdown`, or `manual`
+- **graphify_available**: `true` if graphify was executed successfully (1.2.1 or 1.4.1)
 
-### 1.4.1 Graphify add para fontes externas (confluence, gdoc, markdown)
+### 1.4.1 Graphify add for external sources (confluence, gdoc, markdown)
 
-Para fontes NAO-github (confluence, gdoc, markdown), adicionar o conteudo ao grafo central
-via `graphify add`. Isso permite que o /bedrock:query (Part 3) faca queries cross-fonte.
+For non-GitHub sources (confluence, gdoc, markdown), add the content to the central graph
+via `graphify add`. This allows /bedrock:query (Part 3) to perform cross-source queries.
 
-**Pre-condicoes:**
-- `source_type` e `confluence`, `gdoc`, ou `markdown`
-- graphify esta instalado (verificar com `$(cat graphify-out/.graphify_python) -c "import graphify"`)
+**Pre-conditions:**
+- `source_type` is `confluence`, `gdoc`, or `markdown`
+- graphify is installed (check with `$(cat graphify-out/.graphify_python) -c "import graphify"`)
 
-**Se graphify disponivel:**
+**If graphify is available:**
 
-1. Salvar conteudo markdown em arquivo temporario:
+1. Save markdown content to a temporary file:
 ```bash
 mkdir -p graphify-out/raw
-# Salvar conteudo em graphify-out/raw/<source-slug>.md
+# Save content in graphify-out/raw/<source-slug>.md
 ```
 
-2. Rodar `graphify add`:
+2. Run `graphify add`:
 ```bash
 $(cat graphify-out/.graphify_python) -c "
 import json
@@ -322,19 +322,19 @@ from graphify.cluster import cluster, score_all
 from graphify.export import to_json
 from pathlib import Path
 
-# Detect + extract do arquivo novo
+# Detect + extract from the new file
 result = detect(Path('graphify-out/raw/<source-slug>.md'))
 files = [Path('graphify-out/raw/<source-slug>.md')]
 
-# Extracao semantica (arquivo unico — nao precisa de subagents)
-# Use Read para ler o arquivo e extraia entidades como subagent unico
-# O resultado segue o mesmo formato de .graphify_extract.json
+# Semantic extraction (single file — no subagents needed)
+# Use Read to read the file and extract entities as a single subagent
+# The result follows the same .graphify_extract.json format
 
-# Merge com graph.json existente
+# Merge with existing graph.json
 existing_graph = Path('graphify-out/graph.json')
 if existing_graph.exists():
     existing = json.loads(existing_graph.read_text())
-    # ... merge logic (mesma da 1.2.1 step 4)
+    # ... merge logic (same as 1.2.1 step 4)
 else:
     existing = extraction
 
@@ -345,25 +345,25 @@ print(f'Graph updated: {G.number_of_nodes()} nodes')
 "
 ```
 
-3. Setar `graphify_available = true`
+3. Set `graphify_available = true`
 
-**Se graphify NAO disponivel:** prosseguir sem — extracao textual existente continua funcionando.
-NAO bloquear a ingestao por falta de graphify.
+**If graphify is NOT available:** proceed without it — existing textual extraction continues to work.
+Do NOT block ingestion due to lack of graphify.
 
 ---
 
-## Fase 2 — Carregar Contexto do Vault
+## Phase 2 — Load Vault Context
 
-### 2.1 Ler entity definitions
+### 2.1 Read entity definitions
 
-Use Read para ler TODOS os arquivos de entity definitions do plugin (ver secao "Plugin Paths"):
+Use Read to read ALL entity definition files from the plugin (see "Plugin Paths" section):
 `<base_dir>/../../entities/*.md`
-Esses arquivos definem o que cada tipo de entidade e, quando criar, e como distinguir.
-Internalize essas definicoes — voce vai usa-las na Fase 3 para classificar conteudo.
+These files define what each entity type is, when to create one, and how to distinguish between them.
+Internalize these definitions — you will use them in Phase 3 to classify content.
 
-### 2.2 Listar entidades existentes
+### 2.2 List existing entities
 
-Use Glob para listar todos os arquivos em cada diretorio de entidades (excluindo `_template.md`):
+Use Glob to list all files in each entity directory (excluding `_template.md`):
 - `actors/*.md`
 - `people/*.md`
 - `teams/*.md`
@@ -373,57 +373,57 @@ Use Glob para listar todos os arquivos em cada diretorio de entidades (excluindo
 - `fleeting/*.md`
 - `fleeting/*.md`
 
-Para cada arquivo encontrado:
-- Extraia o filename sem extensao (ex: `billing-api`)
-- Use Read para extrair o campo `name` do frontmatter YAML
-- Armazene: `{filename, name, tipo}` para matching na Fase 3
+For each file found:
+- Extract the filename without extension (e.g.: `billing-api`)
+- Use Read to extract the `name` field from the YAML frontmatter
+- Store: `{filename, name, type}` for matching in Phase 3
 
-Reporte: "Fase 2: N entity definitions carregadas, M entidades existentes catalogadas."
+Report: "Phase 2: N entity definitions loaded, M existing entities cataloged."
 
 ---
 
-## Fase 3 — Analisar Conteudo e Extrair Entidades
+## Phase 3 — Analyze Content and Extract Entities
 
-### 3.1 Identificar entidades existentes mencionadas
+### 3.1 Identify existing entities mentioned
 
-Para cada entidade catalogada na Fase 2, verifique se o filename OU o name aparece no conteudo:
+For each entity cataloged in Phase 2, check if the filename OR name appears in the content:
 
-**Regras de match:**
-- Normalize para comparacao: lowercase, sem acentos, sem hifens
-- Match parcial e aceitavel para nomes compostos (ex: "billing api" match "billing-api")
-- NAO matchar substrings de 3 letras ou menos (ex: "api" NAO match "billing-api")
-- NAO matchar palavras genericas (ex: "company", "service", "system")
+**Matching rules:**
+- Normalize for comparison: lowercase, no accents, no hyphens
+- Partial matching is acceptable for compound names (e.g.: "billing api" matches "billing-api")
+- Do NOT match substrings of 3 letters or fewer (e.g.: "api" does NOT match "billing-api")
+- Do NOT match generic words (e.g.: "company", "service", "system")
 
-Para cada match, registre:
-- Tipo (actor, person, team, topic, discussion, project)
-- Filename (para wikilink)
-- Acao: `update`
-- Info extraida: trecho do conteudo onde aparece
+For each match, record:
+- Type (actor, person, team, topic, discussion, project)
+- Filename (for wikilink)
+- Action: `update`
+- Extracted info: excerpt from content where it appears
 
-### 3.1.1 Classificacao Zettelkasten do conteudo
+### 3.1.1 Zettelkasten classification of content
 
-Para cada trecho de conteudo analisado, classificar por maturidade antes de extrair entidades:
+For each content excerpt analyzed, classify by maturity before extracting entities:
 
-**Conteudo consolidado (→ permanent/bridge):**
-- Dados concretos: nomes de repositorios, nomes completos de pessoas, datas especificas, decisoes explicitas
-- Informacao auto-contida: compreensivel sem contexto externo
-- Atende criterios de completude de pelo menos 1 entity definition (ver secao "Criterio de Completude" nas entity definitions do plugin)
+**Consolidated content (-> permanent/bridge):**
+- Concrete data: repository names, full names of people, specific dates, explicit decisions
+- Self-contained information: understandable without external context
+- Meets completeness criteria of at least 1 entity definition (see "Completeness Criteria" section in the plugin's entity definitions)
 
-**Conteudo em formacao (→ fleeting):**
-- Mencoes vagas: "alguem mencionou...", "parece que...", "talvez..."
-- Fragmentos sem contexto: nomes parciais, ideias soltas, hipoteses
-- TODOs genericos sem responsavel ou prazo
-- Informacao que NAO atende criterios de completude de nenhum tipo
+**Content in formation (-> fleeting):**
+- Vague mentions: "someone mentioned...", "it seems like...", "maybe..."
+- Fragments without context: partial names, loose ideas, hypotheses
+- Generic TODOs without an owner or deadline
+- Information that does NOT meet completeness criteria of any type
 
-**Regra:** ao classificar entidades para a lista da Fase 3, incluir o campo `type: fleeting` para conteudo em formacao.
-O `/bedrock:preserve` faz a validacao final via Fase 1.3 (Classificacao Zettelkasten).
+**Rule:** when classifying entities for the Phase 3 list, include the field `type: fleeting` for content in formation.
+The `/bedrock:preserve` performs the final validation via Phase 1.3 (Zettelkasten Classification).
 
-### 3.1.2 Classificar nos do graphify (se graphify_available)
+### 3.1.2 Classify graphify nodes (if graphify_available)
 
-Se `graphify_available = true` (Fase 1.2.1 ou 1.4.1), ler `graphify-out/.graphify_extract_<repo-name>.json`
-e classificar cada no extraido pelo graphify:
+If `graphify_available = true` (Phase 1.2.1 or 1.4.1), read `graphify-out/.graphify_extract_<repo-name>.json`
+and classify each node extracted by graphify:
 
-1. **Ler os nos extraidos:**
+1. **Read the extracted nodes:**
 ```bash
 $(cat graphify-out/.graphify_python) -c "
 import json
@@ -433,222 +433,222 @@ print(json.dumps({'nodes': len(extract.get('nodes', [])), 'edges': len(extract.g
 "
 ```
 
-2. **Para cada no com `file_type: code`** (funcoes, classes, modulos, endpoints):
-   - Classificar como `type: knowledge-node`
-   - Preencher campos obrigatorios:
-     - `name`: usar `label` do no graphify
-     - `graphify_node_id`: usar `id` do no graphify
-     - `actor`: inferir a partir do `source_file` ou do repo que foi processado
-     - `node_type`: inferir a partir do contexto (function, class, module, interface, endpoint)
-     - `source_file`: usar `source_file` do no graphify
-     - `confidence`: usar `confidence` do edge mais forte conectado ao no (EXTRACTED > INFERRED > AMBIGUOUS)
-     - `description`: gerar descricao em pt-BR baseada no label e contexto
-   - Mapear edges do graphify para campo `relations` (wikilinks para outros knowledge-nodes)
-   - Adicionar na lista de entidades com `action: create` (ou `update` se `graphify_node_id` ja existe no vault)
+2. **For each node with `file_type: code`** (functions, classes, modules, endpoints):
+   - Classify as `type: knowledge-node`
+   - Fill in mandatory fields:
+     - `name`: use the graphify node's `label`
+     - `graphify_node_id`: use the graphify node's `id`
+     - `actor`: infer from `source_file` or from the repo that was processed
+     - `node_type`: infer from context (function, class, module, interface, endpoint)
+     - `source_file`: use the graphify node's `source_file`
+     - `confidence`: use the `confidence` of the strongest edge connected to the node (EXTRACTED > INFERRED > AMBIGUOUS)
+     - `description`: generate description in the vault's configured language based on the label and context
+   - Map graphify edges to the `relations` field (wikilinks to other knowledge-nodes)
+   - Add to the entity list with `action: create` (or `update` if `graphify_node_id` already exists in the vault)
 
-3. **Para cada no com `file_type: document` ou `file_type: paper`** (conceitos, decisoes):
-   - **NAO classificar automaticamente como knowledge-node**
-   - Usar entity definitions do plugin (ver secao "Plugin Paths") para classificar:
-     - Se descreve uma decisao de arquitetura ampla → `type: topic`
-     - Se descreve uma reuniao ou debate → `type: discussion`
-     - Se e um conceito em formacao → `type: fleeting`
-     - Se descreve algo especifico de um ator → `type: knowledge-node`
-   - Aplicar regras de Classificacao Zettelkasten (3.1.1)
-   - Consultar secoes "Quando criar", "Quando NAO criar", "Como distinguir" de cada entity definition
+3. **For each node with `file_type: document` or `file_type: paper`** (concepts, decisions):
+   - Do **NOT** automatically classify as knowledge-node
+   - Use the plugin's entity definitions (see "Plugin Paths" section) to classify:
+     - If it describes a broad architectural decision -> `type: topic`
+     - If it describes a meeting or debate -> `type: discussion`
+     - If it is a concept in formation -> `type: fleeting`
+     - If it describes something specific to an actor -> `type: knowledge-node`
+   - Apply Zettelkasten Classification rules (3.1.1)
+   - Consult the "When to create", "When NOT to create", "How to distinguish from other types" sections of each entity definition
 
-4. **Edges do graphify → relacoes:**
-   - Para cada edge entre nos classificados, adicionar na lista de `relations` do input estruturado
-   - Edges `EXTRACTED` → relacao certa, incluir
-   - Edges `INFERRED` → relacao provavel, incluir com nota
-   - Edges `AMBIGUOUS` → omitir (serao revistos no /bedrock:compress)
+4. **Graphify edges -> relationships:**
+   - For each edge between classified nodes, add to the `relations` list of the structured input
+   - `EXTRACTED` edges -> certain relationship, include
+   - `INFERRED` edges -> probable relationship, include with a note
+   - `AMBIGUOUS` edges -> omit (will be reviewed in /bedrock:compress)
 
-5. **Migracao automatica de ator para pasta:**
-   - Se knowledge-nodes vao ser criados para um ator que ainda e arquivo flat:
-     - Migrar `actors/<name>.md` → `actors/<name>/<name>.md` (via `git mv`)
-     - Criar `actors/<name>/nodes/`
-     - Adicionar secao "Knowledge Nodes" ao corpo do ator
+5. **Automatic actor migration to folder:**
+   - If knowledge-nodes are going to be created for an actor that is still a flat file:
+     - Migrate `actors/<name>.md` -> `actors/<name>/<name>.md` (via `git mv`)
+     - Create `actors/<name>/nodes/`
+     - Add "Knowledge Nodes" section to the actor's body
 
-6. **Filtrar nos relevantes para persistencia:**
-   - Selecionar os top ~50 nos por relevancia (god nodes, classes de servico, controllers, interfaces publicas)
-   - Criterios de filtragem: degree > media, ou label contem "Service", "Controller", "Client", "Factory", "Handler", "Mapper"
-   - Nos de teste (labels com "Tests", "Test", "Builder") sao EXCLUIDOS — nao persistir testes como knowledge-nodes
-   - Nos triviais (getters, setters, DTOs simples) sao EXCLUIDOS
-   - Os nos filtrados serao incluidos na lista de entidades da Fase 3.3 como `type: knowledge-node`
+6. **Filter relevant nodes for persistence:**
+   - Select the top ~50 nodes by relevance (god nodes, service classes, controllers, public interfaces)
+   - Filtering criteria: degree > average, or label contains "Service", "Controller", "Client", "Factory", "Handler", "Mapper"
+   - Test nodes (labels with "Tests", "Test", "Builder") are EXCLUDED — do not persist tests as knowledge-nodes
+   - Trivial nodes (getters, setters, simple DTOs) are EXCLUDED
+   - The filtered nodes will be included in the Phase 3.3 entity list as `type: knowledge-node`
 
-**IMPORTANTE:** A persistencia de knowledge-nodes e OBRIGATORIA — faz parte do fluxo do /bedrock:teach.
-NAO apresentar como "proximo passo sugerido". Os knowledge-nodes filtrados sao incluidos na
-lista de entidades para confirmacao do usuario (Fase 3.3) e delegados ao /bedrock:preserve (Fase 4)
-junto com as demais entidades.
+**IMPORTANT:** The persistence of knowledge-nodes is MANDATORY — it is part of the /bedrock:teach flow.
+Do NOT present as a "suggested next step". The filtered knowledge-nodes are included in the
+entity list for user confirmation (Phase 3.3) and delegated to /bedrock:preserve (Phase 4)
+along with the other entities.
 
-Reportar: "Graphify: N nos de codigo extraidos, M filtrados para persistencia (→ knowledge-nodes), P edges."
+Report: "Graphify: N code nodes extracted, M filtered for persistence (-> knowledge-nodes), P edges."
 
-### 3.2 Identificar entidades NOVAS a criar
+### 3.2 Identify NEW entities to create
 
-Analise o conteudo procurando trechos que descrevem algo que NAO existe no vault mas
-se encaixa numa definicao de entidade. Para cada candidato:
+Analyze the content looking for excerpts that describe something that does NOT exist in the vault but
+fits an entity definition. For each candidate:
 
-1. Consulte a secao "Quando criar" da definicao correspondente → criterios positivos
-2. Consulte a secao "Quando NAO criar" → criterios de exclusao
-3. Se ambiguo, consulte "Como distinguir de outros tipos" → desambiguacao
-4. Se o candidato passa nos criterios: registre como entidade nova
+1. Consult the "When to create" section of the corresponding definition -> positive criteria
+2. Consult the "When NOT to create" section -> exclusion criteria
+3. If ambiguous, consult "How to distinguish from other types" -> disambiguation
+4. If the candidate passes the criteria: register as a new entity
 
-Para cada entidade nova, registre:
-- Tipo (actor, person, team, topic, discussion, project)
-- Nome canonico sugerido (repo name para actors, nome completo para persons, etc.)
-- Acao: `create`
-- Info extraida: trecho do conteudo que justifica a criacao
+For each new entity, record:
+- Type (actor, person, team, topic, discussion, project)
+- Suggested canonical name (repo name for actors, full name for persons, etc.)
+- Action: `create`
+- Extracted info: excerpt from content that justifies creation
 
-### 3.3 Apresentar ao usuario para confirmacao
+### 3.3 Present to user for confirmation
 
-**OBRIGATORIO:** Antes de criar/atualizar qualquer entidade, apresente a lista completa:
+**MANDATORY:** Before creating/updating any entity, present the complete list:
 
 ```
-## Entidades detectadas
+## Detected entities
 
-| # | Tipo | Nome | Acao | Info extraida | Fonte |
+| # | Type | Name | Action | Extracted info | Source |
 |---|---|---|---|---|---|
-| 1 | actor | billing-api | update | Mencionado como dependencia do novo fluxo | textual |
-| 2 | discussion | 2026-04-04-planning-q2 | create | Ata de reuniao com decisoes sobre migracao | textual |
-| 3 | person | alice-smith | create | Mencionado como DRI do projeto X | textual |
-| 4 | knowledge-node | ProcessTransaction | create | Funcao de orquestracao do fluxo de autorizacao | graphify |
-| 5 | knowledge-node | KafkaEventPublisher | create | Publicacao de eventos Kafka | graphify |
+| 1 | actor | billing-api | update | Mentioned as dependency of the new flow | textual |
+| 2 | discussion | 2026-04-04-planning-q2 | create | Meeting minutes with decisions about migration | textual |
+| 3 | person | alice-smith | create | Mentioned as DRI of project X | textual |
+| 4 | knowledge-node | ProcessTransaction | create | Transaction authorization orchestration function | graphify |
+| 5 | knowledge-node | KafkaEventPublisher | create | Kafka event publishing | graphify |
 
-Confirma? (s/n, ou edite a lista removendo linhas indesejadas)
+Confirm? (y/n, or edit the list by removing unwanted lines)
 
-> **Nota:** Entidades com fonte "graphify" foram extraidas via analise semantica do repositorio.
-> Entidades com fonte "textual" foram extraidas via pattern matching no conteudo.
+> **Note:** Entities with source "graphify" were extracted via semantic analysis of the repository.
+> Entities with source "textual" were extracted via pattern matching on the content.
 ```
 
-- Se o usuario confirma: prossiga para Fase 4
-- Se o usuario edita: ajuste a lista conforme instrucoes
-- Se o usuario cancela: encerre com "Ingestao cancelada. Nenhuma entidade modificada."
+- If the user confirms: proceed to Phase 4
+- If the user edits: adjust the list per instructions
+- If the user cancels: end with "Ingestion canceled. No entities modified."
 
 ---
 
-## Fase 4 — Delegar Entidades ao /bedrock:preserve
+## Phase 4 — Delegate Entities to /bedrock:preserve
 
-Todas as entidades confirmadas pelo usuario (Fase 3) sao delegadas ao `/bedrock:preserve`.
-O `/bedrock:teach` NAO cria nem atualiza entidades diretamente — essa responsabilidade e do `/bedrock:preserve`.
+All entities confirmed by the user (Phase 3) are delegated to `/bedrock:preserve`.
+The `/bedrock:teach` does NOT create or update entities directly — that responsibility belongs to `/bedrock:preserve`.
 
-### 4.1 Compilar lista estruturada
+### 4.1 Compile structured list
 
-Monte a lista de entidades no formato aceito pelo `/bedrock:preserve`:
+Build the entity list in the format accepted by `/bedrock:preserve`:
 
 ```yaml
 entities:
   - type: discussion
     name: "2026-04-05-planning-q2"
     action: create
-    content: "trecho relevante do conteudo extraido na Fase 3..."
+    content: "relevant excerpt from the content extracted in Phase 3..."
     relations:
       actors: ["actor-slug-1"]
       people: ["person-slug-1"]
-    source: "<source_type da Fase 1>"
-    source_url: "<url_ou_path da Fase 1>"
-    source_type: "<source_type da Fase 1>"
+    source: "<source_type from Phase 1>"
+    source_url: "<url_or_path from Phase 1>"
+    source_type: "<source_type from Phase 1>"
   - type: actor
     name: "billing-api"
     action: update
-    content: "novo contexto extraido na Fase 3..."
-    source: "<source_type da Fase 1>"
-    source_url: "<url_ou_path da Fase 1>"
-    source_type: "<source_type da Fase 1>"
+    content: "new context extracted in Phase 3..."
+    source: "<source_type from Phase 1>"
+    source_url: "<url_or_path from Phase 1>"
+    source_type: "<source_type from Phase 1>"
 ```
 
-**Regras de compilacao:**
-- `type` e `name`: extraidos da Fase 3 (lista confirmada pelo usuario)
-- `action`: `create` ou `update` conforme identificado na Fase 3
-- `content`: trecho do conteudo da fonte que justifica a entidade
-- `relations`: inferir relacoes entre entidades da lista (se A menciona B, incluir B nas relations de A)
-- `source`: usar o `source_type` detectado na Fase 1 (confluence, gdoc, github-repo, csv, markdown, manual). Para knowledge-nodes, usar `"graphify"`
-- `source_url`: URL ou path da fonte externa (campo `url_ou_path` da Fase 1). O `/bedrock:preserve` usa este valor para popular o campo `sources` no frontmatter da entidade
-- `source_type`: tipo da fonte externa (mesmo valor de `source`). O `/bedrock:preserve` usa este valor para o campo `sources[].type`
-- `metadata`: incluir campos adicionais de frontmatter quando disponiveis (ex: `status`, `role`, `team`)
+**Compilation rules:**
+- `type` and `name`: extracted from Phase 3 (user-confirmed list)
+- `action`: `create` or `update` as identified in Phase 3
+- `content`: excerpt from the source content that justifies the entity
+- `relations`: infer relationships between entities in the list (if A mentions B, include B in A's relations)
+- `source`: use the `source_type` detected in Phase 1 (confluence, gdoc, github-repo, csv, markdown, manual). For knowledge-nodes, use `"graphify"`
+- `source_url`: URL or path of the external source (`url_or_path` field from Phase 1). The `/bedrock:preserve` uses this value to populate the `sources` field in the entity's frontmatter
+- `source_type`: type of the external source (same value as `source`). The `/bedrock:preserve` uses this value for the `sources[].type` field
+- `metadata`: include additional frontmatter fields when available (e.g.: `status`, `role`, `team`)
 
-**Regras adicionais para knowledge-nodes (fonte graphify):**
+**Additional rules for knowledge-nodes (graphify source):**
 - `type`: `knowledge-node`
-- `metadata.graphify_node_id`: id do no no graphify (ex: `billing_api_processTransaction`)
-- `metadata.actor`: wikilink do ator pai (ex: `"[[billing-api]]"`)
+- `metadata.graphify_node_id`: node id in graphify (e.g.: `billing_api_processTransaction`)
+- `metadata.actor`: wikilink of the parent actor (e.g.: `"[[billing-api]]"`)
 - `metadata.node_type`: `function`, `class`, `module`, `concept`, `decision`, `interface`, `endpoint`
-- `metadata.source_file`: caminho relativo no repo do ator
-- `metadata.confidence`: `EXTRACTED`, `INFERRED`, ou `AMBIGUOUS`
-- `relations.knowledge_nodes`: wikilinks para outros knowledge-nodes conectados via edges do graphify
+- `metadata.source_file`: relative path in the actor's repo
+- `metadata.confidence`: `EXTRACTED`, `INFERRED`, or `AMBIGUOUS`
+- `relations.knowledge_nodes`: wikilinks to other knowledge-nodes connected via graphify edges
 
-### 4.2 Invocar /bedrock:preserve
+### 4.2 Invoke /bedrock:preserve
 
-Use a tool Skill para invocar `/bedrock:preserve` passando a lista estruturada como argumento.
+Use the Skill tool to invoke `/bedrock:preserve` passing the structured list as an argument.
 
-O `/bedrock:preserve` cuida de:
-- Matching textual com entidades existentes
-- Criacao de novas entidades seguindo templates
-- Atualizacao de entidades existentes (merge/append-only)
-- Vinculacao bidirecional (wikilinks)
-- Git commit das entidades
+The `/bedrock:preserve` handles:
+- Textual matching with existing entities
+- Creating new entities following templates
+- Updating existing entities (merge/append-only)
+- Bidirectional linking (wikilinks)
+- Git commit of entities
 
-### 4.3 Aguardar resultado
+### 4.3 Wait for result
 
-O `/bedrock:preserve` retorna:
-- Lista de entidades criadas/atualizadas
-- Commit hash (se houve commit)
-- Eventuais erros ou avisos
+The `/bedrock:preserve` returns:
+- List of entities created/updated
+- Commit hash (if there was a commit)
+- Any errors or warnings
 
-Registre o resultado para uso no relatorio final (Fase 5).
+Record the result for use in the final report (Phase 5).
 
 ---
 
-## Fase 5 — Relatorio
+## Phase 5 — Report
 
-O `/bedrock:preserve` ja fez commit das entidades (incluindo o campo `sources` populado com a URL da fonte).
-O `/bedrock:teach` NAO faz commit separado — a proveniencia e registrada dentro de cada entidade pelo `/bedrock:preserve`.
+The `/bedrock:preserve` has already committed the entities (including the `sources` field populated with the source URL).
+The `/bedrock:teach` does NOT make a separate commit — provenance is recorded within each entity by `/bedrock:preserve`.
 
-Apresente ao usuario:
+Present to the user:
 
 ```
-## /bedrock:teach — Relatorio
+## /bedrock:teach — Report
 
-### Fonte ingerida
-- **Tipo:** <source_type>
+### Ingested source
+- **Type:** <source_type>
 - **URL/Path:** <url>
 
-### Entidades processadas (via /bedrock:preserve)
-| Tipo | Nome | Acao |
+### Entities processed (via /bedrock:preserve)
+| Type | Name | Action |
 |---|---|---|
 | discussion | 2026-04-04-planning-q2 | create |
 | actor | billing-api | update |
 | person | alice-smith | create |
 
-### Proveniencia
-Cada entidade acima recebeu no campo `sources` do frontmatter:
-- url: <url_ou_path>
+### Provenance
+Each entity above received in the `sources` frontmatter field:
+- url: <url_or_path>
 - type: <source_type>
-- synced_at: <data de hoje>
+- synced_at: <today's date>
 
 ### Git
-- Commit: <hash do /bedrock:preserve ou "nenhuma entidade">
-- Push: sucesso / falhou (motivo)
+- Commit: <hash from /bedrock:preserve or "no entities">
+- Push: success / failed (reason)
 
-### Sugestoes
-- [lista de entidades mencionadas no conteudo mas nao criadas, se houver]
-- [recomendacoes de re-ingestao futura, se aplicavel]
+### Suggestions
+- [list of entities mentioned in the content but not created, if any]
+- [recommendations for future re-ingestion, if applicable]
 ```
 
 ---
 
-## Regras Criticas
+## Critical Rules
 
-| Regra | Detalhe |
+| Rule | Detail |
 |---|---|
-| Confirmacao obrigatoria | SEMPRE apresentar lista de entidades ao usuario ANTES de criar/atualizar (Fase 3.3) |
-| Entity definitions sao o manual | Consultar entity definitions do plugin (ver "Plugin Paths") para classificar conteudo |
-| Delegar ao /bedrock:preserve | TODAS as entidades sao persistidas via `/bedrock:preserve` — teach NAO cria/atualiza inline |
-| Proveniencia via source_url | SEMPRE incluir `source_url` e `source_type` no input delegado ao /bedrock:preserve. O /bedrock:preserve popula o campo `sources` no frontmatter |
-| Frontmatter keys em ingles | `type`, `name`, `updated_at`, etc. Valores em pt-BR |
-| Wikilinks bare | `[[name]]`, nunca `[[dir/name]]` |
-| Wikilinks sempre kebab-case | `[[charge-service]]`, nunca `[[ChargeService]]` ou `[[chargeService]]`. Ao gerar wikilinks para knowledge-nodes, converter camelCase/PascalCase para kebab-case. Ex: `ProcessTransaction` → `[[process-transaction]]`, `KafkaEventPublisher` → `[[kafka-event-publisher]]` |
-| Append-only para people/teams/topics | NUNCA deletar conteudo existente no corpo |
-| Actors podem ser modificados | Merge livre no corpo e frontmatter |
-| Best-effort para fontes externas | Se MCP falhar, continue com o que foi obtido |
-| MCP no contexto principal | NAO usar subagents para chamadas GitHub/Atlassian MCP |
-| CSV truncado em 200 linhas | Avisar o usuario se o arquivo for maior |
-| Maximo 2 tentativas de push | Apos isso, abortar e informar |
-| Dados sensiveis | NUNCA incluir credenciais, tokens, senhas, PANs, CVVs |
+| Mandatory confirmation | ALWAYS present entity list to user BEFORE creating/updating (Phase 3.3) |
+| Entity definitions are the manual | Consult the plugin's entity definitions (see "Plugin Paths") to classify content |
+| Delegate to /bedrock:preserve | ALL entities are persisted via `/bedrock:preserve` — teach does NOT create/update inline |
+| Provenance via source_url | ALWAYS include `source_url` and `source_type` in the input delegated to /bedrock:preserve. The /bedrock:preserve populates the `sources` field in the frontmatter |
+| Frontmatter keys in English | `type`, `name`, `updated_at`, etc. Values in the vault's configured language |
+| Bare wikilinks | `[[name]]`, never `[[dir/name]]` |
+| Wikilinks always kebab-case | `[[charge-service]]`, never `[[ChargeService]]` or `[[chargeService]]`. When generating wikilinks for knowledge-nodes, convert camelCase/PascalCase to kebab-case. E.g.: `ProcessTransaction` -> `[[process-transaction]]`, `KafkaEventPublisher` -> `[[kafka-event-publisher]]` |
+| Append-only for people/teams/topics | NEVER delete existing content in the body |
+| Actors can be modified | Free merge in body and frontmatter |
+| Best-effort for external sources | If MCP fails, continue with what was obtained |
+| MCP in main context | Do NOT use subagents for GitHub/Atlassian MCP calls |
+| CSV truncated at 200 lines | Warn the user if the file is larger |
+| Maximum 2 push attempts | After that, abort and inform |
+| Sensitive data | NEVER include credentials, tokens, passwords, PANs, CVVs |

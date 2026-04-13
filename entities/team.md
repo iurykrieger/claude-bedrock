@@ -1,72 +1,72 @@
 # Entity: Team
 
-> Fonte de verdade para campos obrigatórios: `teams/_template.md`
+> Source of truth for required fields: `teams/_template.md`
 
-## O que é
+## What it is
 
-Um **team** é um squad com escopo organizacional definido, membros identificáveis, e ownership sobre um conjunto de atores. Teams são a unidade organizacional do Second Brain — representam a estrutura real de squads da organização.
+A **team** is a squad with a defined organizational scope, identifiable members, and ownership over a set of actors. Teams are the organizational unit of the Second Brain — they represent the real squad structure of the organization.
 
-Times possuem escopo de domínio (ex: "ciclo de vida de transações de cartão"), membros listados, e um conjunto de atores sob sua responsabilidade.
+Teams have a domain scope (e.g., "card transaction lifecycle"), listed members, and a set of actors under their responsibility.
 
-## Quando criar
+## When to create
 
-- O conteúdo referencia um squad/time com nome formal e pelo menos 1 membro ou 1 ator sob ownership identificável
-- O conteúdo descreve a criação de um novo squad com escopo definido
-- O conteúdo lista membros e responsabilidades de um time não catalogado
+- The content references a squad/team with a formal name and at least 1 identifiable member or 1 actor under ownership
+- The content describes the creation of a new squad with a defined scope
+- The content lists members and responsibilities of an uncatalogued team
 
-## Quando NÃO criar
+## When NOT to create
 
-- É um grupo ad-hoc montado para um projeto específico (ex: "task force de migração") — isso é um project com focal_points, não um team
-- É uma referência a um canal do Slack ou grupo de comunicação (ex: "#payments-alerts")
-- É uma menção genérica ("o pessoal do backend", "a galera de infra") — sem escopo formal, não é team
-- É uma referência a um time não-técnico sem ownership de sistemas (ex: "time de compliance jurídica", "time de RH") — o vault cobre times de tecnologia
+- It is an ad-hoc group assembled for a specific project (e.g., "migration task force") — that is a project with focal_points, not a team
+- It is a reference to a Slack channel or communication group (e.g., "#payments-alerts")
+- It is a generic mention ("the backend folks", "the infra crew") — without a formal scope, it is not a team
+- It is a reference to a non-technical team without system ownership (e.g., "legal compliance team", "HR team") — the vault covers technology teams
 
-## Como distinguir de outros tipos
+## How to distinguish from other types
 
-| Parece ser... | Mas é... | Diferença-chave |
+| Looks like... | But is... | Key difference |
 |---|---|---|
-| Team | Project | Se é um grupo temporário com deadline e deliverables, é project. Team é permanente com ownership contínuo |
-| Team | Person (plural) | Se o conteúdo diz "Carol e Bob do payments", são persons referenciando o team. O team já existe |
-| Team | Actor | Se o conteúdo diz "o payments", pode ser o team (squad-payments) ou um actor específico. Contexto define: se fala de pessoas/ownership → team; se fala de deploy/código → actor |
+| Team | Project | If it is a temporary group with a deadline and deliverables, it is a project. A team is permanent with ongoing ownership |
+| Team | Person (plural) | If the content says "Carol and Bob from payments", those are persons referencing the team. The team already exists |
+| Team | Actor | If the content says "payments", it could be the team (squad-payments) or a specific actor. Context defines: if talking about people/ownership → team; if talking about deploy/code → actor |
 
-## Campos obrigatórios (frontmatter)
+## Required fields (frontmatter)
 
-| Campo | Tipo | Descrição |
+| Field | Type | Description |
 |---|---|---|
-| `type` | string | Sempre `"team"` |
-| `name` | string | Nome do squad (ex: "Squad Payments") |
-| `scope` | string | Escopo de atuação em pt-BR |
-| `purpose` | string | Propósito/missão do time |
-| `members` | array | Wikilinks para persons: `["[[first-last]]"]` |
-| `actors` | array | Wikilinks para actors: `["[[repo-name]]"]` |
+| `type` | string | Always `"team"` |
+| `name` | string | Squad name (e.g., "Squad Payments") |
+| `scope` | string | Area of responsibility |
+| `purpose` | string | Team purpose/mission |
+| `members` | array | Wikilinks to persons: `["[[first-last]]"]` |
+| `actors` | array | Wikilinks to actors: `["[[repo-name]]"]` |
 | `updated_at` | date | YYYY-MM-DD |
-| `updated_by` | string | Quem atualizou |
+| `updated_by` | string | Who last updated |
 
-## Papel Zettelkasten
+## Zettelkasten Role
 
-**Classificação:** permanent note
-**Propósito no grafo:** Representar fatos consolidados sobre squads — escopo organizacional, membros, e ownership de sistemas.
+**Classification:** permanent note
+**Purpose in the graph:** Represent consolidated facts about squads — organizational scope, members, and system ownership.
 
-### Regras de Linking
+### Linking Rules
 
-**Links estruturais (frontmatter):** `members` (wikilinks para persons), `actors` (wikilinks para actors). Definem a composição do time — quem trabalha e quais sistemas opera.
-**Links semânticos (corpo):** Wikilinks no corpo devem ter contexto textual. Ex: "responsável pela operação e evolução do [[billing-api]] e do [[rate-limiter]]" em vez de listar links soltos. Links no corpo explicam a relação do time com seus sistemas e com outros times.
-**Relação com outros papéis:** Teams são referenciados por bridge notes (topics, discussions) e index notes (projects). Não duplicar no team o histórico de projetos — o team descreve a estrutura organizacional, o project descreve a iniciativa.
+**Structural links (frontmatter):** `members` (wikilinks to persons), `actors` (wikilinks to actors). Define the team composition — who works there and which systems it operates.
+**Semantic links (body):** Wikilinks in the body should have textual context. E.g., "responsible for the operation and evolution of [[billing-api]] and [[rate-limiter]]" instead of listing loose links. Links in the body explain the team's relationship with its systems and with other teams.
+**Relationship with other roles:** Teams are referenced by bridge notes (topics, discussions) and index notes (projects). Do not duplicate project history in the team — the team describes the organizational structure, the project describes the initiative.
 
-### Critério de Completude
+### Completeness Criteria
 
-Um team está completo quando: tem nome formal, escopo definido, pelo menos 1 membro listado, e pelo menos 1 actor sob ownership. Se apenas o nome do squad é mencionado sem membros ou atores, o conteúdo deve ir para `fleeting/` até ser consolidado.
+A team is complete when: it has a formal name, a defined scope, at least 1 listed member, and at least 1 actor under ownership. If only the squad name is mentioned without members or actors, the content should go to `fleeting/` until it is consolidated.
 
-## Exemplos
+## Examples
 
-### Isso É um team
+### This IS a team
 
-1. "O Squad Notifications é responsável por notification-service, retry-consumer e crypto-service. Tem 5 engenheiros." — Squad formal com atores e membros. É team.
+1. "Squad Notifications is responsible for notification-service, retry-consumer, and crypto-service. It has 5 engineers." — Formal squad with actors and members. It is a team.
 
-2. "Estamos criando o Squad Orders para cuidar do ciclo de vida de pedidos. Bob vai liderar." — Novo squad com escopo definido. É team.
+2. "We are creating Squad Orders to manage the order lifecycle. Bob will lead." — New squad with a defined scope. It is a team.
 
-### Isso NÃO é um team
+### This is NOT a team
 
-1. "Montamos um grupo com gente de payments e notifications para resolver o incidente." — Grupo ad-hoc/temporário. Pode ser uma discussion ou topic, não team.
+1. "We assembled a group with people from payments and notifications to resolve the incident." — Ad-hoc/temporary group. It could be a discussion or topic, not a team.
 
-2. "O time de RH ajustou o benefício de vale-refeição." — Time não-técnico sem ownership de sistemas. Fora do escopo do vault.
+2. "The HR team adjusted the meal voucher benefit." — Non-technical team without system ownership. Outside the vault's scope.

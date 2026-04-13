@@ -1,107 +1,107 @@
 ---
 name: sync
 description: >
-  Re-sincroniza o vault com fontes externas. No modo default, varre o campo `sources`
-  de todas as entidades, deduplica URLs, obtem conteudo atualizado de cada fonte
-  (Confluence, GDocs, GitHub, Markdown), faz diff incremental e delega escrita ao
-  /bedrock:preserve. Com --people, varre repositorios dos atores via GitHub API e
-  identifica contribuidores ativos. Com --github, detecta atividade relevante em
-  repositorios e correlaciona PRs com topics/projects via matching semantico LLM.
-  Use quando: "bedrock sync", "bedrock-sync", "/bedrock:sync", "sincronizar",
-  "atualizar sources", "sync people", "sync github".
+  Re-synchronizes the vault with external sources. In default mode, scans the `sources`
+  field of all entities, deduplicates URLs, fetches updated content from each source
+  (Confluence, GDocs, GitHub, Markdown), performs incremental diff and delegates writing to
+  /bedrock:preserve. With --people, scans actor repositories via GitHub API and
+  identifies active contributors. With --github, detects relevant activity in
+  repositories and correlates PRs with topics/projects via LLM semantic matching.
+  Use when: "bedrock sync", "bedrock-sync", "/bedrock:sync", "synchronize",
+  "update sources", "sync people", "sync github".
 user_invocable: true
 allowed-tools: Bash, Read, Write, Edit, Glob, Grep, Skill, Agent, mcp__plugin_github_github__*, mcp__plugin_atlassian_atlassian__*
 ---
 
-# /bedrock:sync — Sincronizacao do Vault
+# /bedrock:sync — Vault Synchronization
 
 ## Plugin Paths
 
-Entity definitions e templates estao no diretorio do plugin, nao na raiz do vault.
-Use o "Base directory for this skill" informado na invocacao para resolver os paths:
+Entity definitions and templates are in the plugin directory, not in the vault root.
+Use the "Base directory for this skill" provided at invocation to resolve paths:
 
 - Entity definitions: `<base_dir>/../../entities/`
 - Templates: `<base_dir>/../../templates/{type}/_template.md`
-- CLAUDE.md do plugin: `<base_dir>/../../CLAUDE.md` (ja injetado automaticamente no contexto)
+- Plugin CLAUDE.md: `<base_dir>/../../CLAUDE.md` (already injected automatically into context)
 
-Onde `<base_dir>` e o path informado em "Base directory for this skill".
+Where `<base_dir>` is the path provided in "Base directory for this skill".
 
 ---
 
-## Visao Geral
+## Overview
 
-Esta skill sincroniza o vault com fontes externas. Opera em tres modos:
+This skill synchronizes the vault with external sources. It operates in three modes:
 
-| Modo | Flag | Descricao |
+| Mode | Flag | Description |
 |---|---|---|
-| **Sources (default)** | _(nenhuma)_ | Re-sincroniza entidades com campo `sources` populado |
-| **People** | `--people` | Varre repositorios dos atores e identifica contribuidores ativos |
-| **GitHub** | `--github` | Detecta atividade em repos e correlaciona PRs com topics/projects |
+| **Sources (default)** | _(none)_ | Re-synchronizes entities with a populated `sources` field |
+| **People** | `--people` | Scans actor repositories and identifies active contributors |
+| **GitHub** | `--github` | Detects activity in repos and correlates PRs with topics/projects |
 
 ---
 
-## Roteamento
+## Routing
 
-Analise o argumento passado pelo usuario:
+Analyze the argument passed by the user:
 
-1. Se argumento contem `--people` → ir para **Modo: Sync People** (abaixo)
-2. Se argumento contem `--github` → ir para **Modo: Sync GitHub** (abaixo)
-3. Caso contrario → ir para **Modo: Sync Sources (default)** (abaixo)
+1. If argument contains `--people` → go to **Mode: Sync People** (below)
+2. If argument contains `--github` → go to **Mode: Sync GitHub** (below)
+3. Otherwise → go to **Mode: Sync Sources (default)** (below)
 
-> **Nota:** Se nenhum argumento for passado, ou o argumento nao contiver flags reconhecidas,
-> executar o modo default (Sync Sources).
-
----
----
-
-
-# Modo: Sync Sources (default)
-
-
-
-
-## Visao Geral
-
-Esta skill varre o campo `sources` de todas as entidades do vault, deduplica por URL,
-obtem conteudo atualizado de cada fonte externa, compara com as entidades ja existentes
-no vault (diff incremental), e delega todas as mudancas ao `/bedrock:preserve` para escrita centralizada.
-
-O `/bedrock:sync` **NAO escreve entidades diretamente** — toda escrita de entidades passa pelo `/bedrock:preserve`.
-Apos re-sync, o `/bedrock:preserve` atualiza `synced_at` no campo `sources` das entidades afetadas.
-
-O `/bedrock:sync` **NAO ingere fontes novas** — para isso, use `/bedrock:teach`.
-
-**Voce e um agente de execucao.** Siga as fases abaixo na ordem, sem pular etapas.
+> **Note:** If no argument is passed, or the argument does not contain recognized flags,
+> execute the default mode (Sync Sources).
 
 ---
+---
 
-## Fase 0 — Sincronizar o Vault
+
+# Mode: Sync Sources (default)
+
+
+
+
+## Overview
+
+This skill scans the `sources` field of all vault entities, deduplicates by URL,
+fetches updated content from each external source, compares with existing entities
+in the vault (incremental diff), and delegates all changes to `/bedrock:preserve` for centralized writing.
+
+`/bedrock:sync` **does NOT write entities directly** — all entity writing goes through `/bedrock:preserve`.
+After re-sync, `/bedrock:preserve` updates `synced_at` in the `sources` field of affected entities.
+
+`/bedrock:sync` **does NOT ingest new sources** — for that, use `/bedrock:teach`.
+
+**You are an execution agent.** Follow the phases below in order, without skipping steps.
+
+---
+
+## Phase 0 — Synchronize the Vault
 
 Execute:
 ```bash
 git pull --rebase origin main
 ```
 
-Se o pull falhar:
-- Sem remote configurado: avisar "Nenhum remote configurado. Trabalhando localmente." e prosseguir.
-- Conflito no pull: `git rebase --abort` e avisar o usuario. NAO prosseguir sem resolver.
-- Caso contrario: prosseguir.
+If the pull fails:
+- No remote configured: warn "No remote configured. Working locally." and proceed.
+- Pull conflict: `git rebase --abort` and warn the user. Do NOT proceed without resolving.
+- Otherwise: proceed.
 
 ---
 
-## Fase 1 — Coletar Sources Sincronizaveis
+## Phase 1 — Collect Syncable Sources
 
-A proveniencia esta registrada no campo `sources` do frontmatter de cada entidade.
-Varra todas as entidades para coletar URLs unicas.
+Provenance is recorded in the `sources` field of each entity's frontmatter.
+Scan all entities to collect unique URLs.
 
-1. Use Grep para encontrar entidades com campo `sources` nao-vazio:
+1. Use Grep to find entities with a non-empty `sources` field:
    ```
-   Grep pattern "^sources:" nos diretorios: actors/, people/, teams/, topics/, discussions/, projects/, fleeting/
+   Grep pattern "^sources:" in directories: actors/, people/, teams/, topics/, discussions/, projects/, fleeting/
    ```
-2. Para cada arquivo encontrado, use Read para extrair o campo `sources` do frontmatter YAML.
-   Cada entry tem: `{url, type, synced_at}`
-3. **Construir mapa URL → entidades:**
-   Deduplicar por URL. Para cada URL unica, registrar todas as entidades que a referenciam:
+2. For each file found, use Read to extract the `sources` field from the YAML frontmatter.
+   Each entry has: `{url, type, synced_at}`
+3. **Build URL → entities map:**
+   Deduplicate by URL. For each unique URL, record all entities that reference it:
    ```
    {
      "https://mycompany.atlassian.net/...": {
@@ -116,77 +116,77 @@ Varra todas as entidades para coletar URLs unicas.
      }
    }
    ```
-4. **Filtrar sources sincronizaveis:**
-   - Manter apenas URLs com `type` in (`confluence`, `gdoc`, `github-repo`, `markdown`)
-   - Ignorar URLs com `type` = `csv` ou `manual` (logar: "URL X ignorada — tipo nao sincronizavel")
-5. Armazene a lista de URLs sincronizaveis com seus mapas de entidades
+4. **Filter syncable sources:**
+   - Keep only URLs with `type` in (`confluence`, `gdoc`, `github-repo`, `markdown`)
+   - Ignore URLs with `type` = `csv` or `manual` (log: "URL X ignored — non-syncable type")
+5. Store the list of syncable URLs with their entity maps
 
-Reporte: "Fase 1: N entidades com sources, M URLs unicas encontradas, K sincronizaveis, J ignoradas (tipo nao sincronizavel)."
+Report: "Phase 1: N entities with sources, M unique URLs found, K syncable, J ignored (non-syncable type)."
 
 ---
 
-## Fase 2 — Re-leitura de Fontes
+## Phase 2 — Re-read Sources
 
-Para cada source sincronizavel, obter conteudo atualizado:
+For each syncable source, fetch updated content:
 
 ### 2.1 Confluence
 
-Para sources com `source_type: confluence`:
+For sources with `source_type: confluence`:
 
-1. Invocar skill `/confluence-to-markdown` passando a URL da source
-2. O retorno e o conteudo da pagina em formato markdown
+1. Invoke skill `/confluence-to-markdown` passing the source URL
+2. The return is the page content in markdown format
 
 ### 2.2 Google Docs
 
-Para sources com `source_type: gdoc`:
+For sources with `source_type: gdoc`:
 
-1. Invocar skill `/gdoc-to-markdown` passando a URL da source
-2. O retorno e o conteudo do documento em formato markdown
+1. Invoke skill `/gdoc-to-markdown` passing the source URL
+2. The return is the document content in markdown format
 
-### 2.3 Repositorio GitHub
+### 2.3 GitHub Repository
 
-Para sources com `source_type: github-repo`:
+For sources with `source_type: github-repo`:
 
-1. Extrair `owner/repo` da URL (segmentos de path apos `github.com/`)
-2. Usar GitHub MCP diretamente (NAO via subagent — permissoes MCP nao sao herdadas):
-   - `mcp__plugin_github_github__get_file_contents` → ler README.md do repo
-   - `mcp__plugin_github_github__list_commits` → ultimos 10 commits
-   - `mcp__plugin_github_github__list_pull_requests` → ultimos 5 PRs (state=all, sort=updated)
-3. Compilar tudo em um texto markdown unico
+1. Extract `owner/repo` from the URL (path segments after `github.com/`)
+2. Use GitHub MCP directly (NOT via subagent — MCP permissions are not inherited):
+   - `mcp__plugin_github_github__get_file_contents` → read the repo's README.md
+   - `mcp__plugin_github_github__list_commits` → last 10 commits
+   - `mcp__plugin_github_github__list_pull_requests` → last 5 PRs (state=all, sort=updated)
+3. Compile everything into a single markdown text
 
-> **Best-effort:** Se alguma chamada MCP falhar, continue com o que foi obtido. NAO bloqueie o sync.
+> **Best-effort:** If any MCP call fails, continue with what was obtained. Do NOT block the sync.
 
-### 2.4 Markdown local
+### 2.4 Local Markdown
 
-Para sources com `source_type: markdown`:
+For sources with `source_type: markdown`:
 
-1. Extrair o path do campo `url`
-2. Use Read para ler o arquivo diretamente
-3. Se o arquivo nao existir: logar e pular
+1. Extract the path from the `url` field
+2. Use Read to read the file directly
+3. If the file does not exist: log and skip
 
-### 2.5 Tratamento de erros
+### 2.5 Error handling
 
-- Se a leitura de uma source falhar (MCP indisponivel, URL quebrada, arquivo inexistente):
-  - Logar o erro: "Source X falhou — motivo"
-  - Continuar com as demais sources
-  - NAO abortar a execucao inteira por uma source
+- If reading a source fails (MCP unavailable, broken URL, missing file):
+  - Log the error: "Source X failed — reason"
+  - Continue with remaining sources
+  - Do NOT abort the entire execution for one source
 
-Reporte: "Fase 2: N sources lidas com sucesso, M falharam (listar)."
+Report: "Phase 2: N sources read successfully, M failed (list)."
 
 ---
 
-## Fase 3 — Diff Incremental + Extracao de Entidades
+## Phase 3 — Incremental Diff + Entity Extraction
 
-### 3.1 Carregar entity definitions
+### 3.1 Load entity definitions
 
-Use Read para ler TODOS os arquivos de entity definitions do plugin (ver secao "Plugin Paths"):
+Use Read to read ALL entity definition files from the plugin (see "Plugin Paths" section):
 `<base_dir>/../../entities/*.md`
-Esses arquivos definem o que cada tipo de entidade e, quando criar, e como distinguir.
-Internalize essas definicoes — voce vai usa-las para classificar conteudo.
+These files define what each entity type is, when to create, and how to distinguish them.
+Internalize these definitions — you will use them to classify content.
 
-### 3.2 Catalogar entidades existentes
+### 3.2 Catalog existing entities
 
-Use Glob para listar todos os arquivos em cada diretorio de entidades (excluindo `_template.md`):
+Use Glob to list all files in each entity directory (excluding `_template.md`):
 - `actors/*.md`
 - `people/*.md`
 - `teams/*.md`
@@ -195,92 +195,92 @@ Use Glob para listar todos os arquivos em cada diretorio de entidades (excluindo
 - `projects/*.md`
 - `fleeting/*.md`
 
-Para cada arquivo encontrado:
-- Extraia o filename sem extensao (ex: `billing-api`)
-- Use Read para extrair o campo `name` (ou `title`) e `aliases` do frontmatter YAML
-- Armazene: `{filename, name, aliases, tipo}` para matching
+For each file found:
+- Extract the filename without extension (e.g.: `billing-api`)
+- Use Read to extract the `name` (or `title`) and `aliases` fields from the YAML frontmatter
+- Store: `{filename, name, aliases, type}` for matching
 
-### 3.3 Analisar conteudo e detectar mudancas
+### 3.3 Analyze content and detect changes
 
-Para cada source lida com sucesso na Fase 2:
+For each source successfully read in Phase 2:
 
-1. **Identificar entidades mencionadas no conteudo atualizado:**
-   - Para cada entidade catalogada na Fase 3.2, verificar se o filename, name ou alias aparece no conteudo
-   - Regras de match:
-     - Normalize para comparacao: lowercase, sem acentos, sem hifens
-     - Match parcial aceitavel para nomes compostos (ex: "billing api" match "billing-api")
-     - NAO matchar substrings de 3 letras ou menos (ex: "api" NAO match "billing-api")
-     - NAO matchar palavras genericas (ex: "company", "service", "system")
+1. **Identify entities mentioned in the updated content:**
+   - For each entity cataloged in Phase 3.2, check if the filename, name, or alias appears in the content
+   - Match rules:
+     - Normalize for comparison: lowercase, no accents, no hyphens
+     - Partial match acceptable for compound names (e.g.: "billing api" matches "billing-api")
+     - Do NOT match substrings of 3 letters or fewer (e.g.: "api" does NOT match "billing-api")
+     - Do NOT match generic words (e.g.: "company", "service", "system")
 
-2. **Comparar com `entities_generated` da source:**
-   - Entidade no conteudo E ja no vault → candidata a `update` (se ha info nova no conteudo)
-   - Entidade no conteudo mas NAO no vault → candidata a `create`
-   - Entidade no `entities_generated` mas NAO no conteudo atualizado → **manter** (nao deletar)
+2. **Compare with the source's `entities_generated`:**
+   - Entity in content AND already in vault → candidate for `update` (if there is new info in the content)
+   - Entity in content but NOT in vault → candidate for `create`
+   - Entity in `entities_generated` but NOT in updated content → **keep** (do not delete)
 
-3. **Classificar entidades novas:**
-   - Para candidatas a `create`, consultar as entity definitions:
-     - Secao "Quando criar" → criterios positivos
-     - Secao "Quando NAO criar" → criterios de exclusao
-     - Secao "Como distinguir de outros tipos" → desambiguacao
+3. **Classify new entities:**
+   - For `create` candidates, consult the entity definitions:
+     - "When to create" section → positive criteria
+     - "When NOT to create" section → exclusion criteria
+     - "How to distinguish from other types" section → disambiguation
 
-   > **Projetos:** `project` e um tipo valido na extracao. Ao classificar entidades novas,
-   > preste atencao especial a sinais de iniciativas com escopo fechado (deadline, deliverables,
-   > focal points). Consulte `entities/project.md` para criterios de criacao. Um trecho que
-   > menciona migracao com deadline e responsavel provavelmente e um project, nao um topic.
+   > **Projects:** `project` is a valid type in extraction. When classifying new entities,
+   > pay special attention to signals of initiatives with closed scope (deadline, deliverables,
+   > focal points). Consult `entities/project.md` for creation criteria. An excerpt that
+   > mentions migration with a deadline and responsible person is probably a project, not a topic.
 
-4. **Registrar** para cada entidade detectada:
-   - Tipo (actor, person, team, topic, discussion, project)
-   - Nome canonico (filename ou slug sugerido)
-   - Acao: `create` ou `update`
-   - Info extraida: trecho do conteudo onde aparece
-   - Source de origem: slug da source
+4. **Record** for each detected entity:
+   - Type (actor, person, team, topic, discussion, project)
+   - Canonical name (filename or suggested slug)
+   - Action: `create` or `update`
+   - Extracted info: excerpt of the content where it appears
+   - Source of origin: source slug
 
-Reporte: "Fase 3: N entidades detectadas (P creates, Q updates) em M sources."
+Report: "Phase 3: N entities detected (P creates, Q updates) across M sources."
 
 ---
 
-## Fase 4 — Confirmacao Consolidada
+## Phase 4 — Consolidated Confirmation
 
-**OBRIGATORIO:** Antes de criar/atualizar qualquer entidade, apresente uma lista UNICA
-com todas as mudancas de TODAS as sources:
+**REQUIRED:** Before creating/updating any entity, present a SINGLE list
+with all changes from ALL sources:
 
 ```
-## Sync — Proposta de mudancas
+## Sync — Proposed Changes
 
-| # | Source | Tipo | Nome | Acao | Info |
+| # | Source | Type | Name | Action | Info |
 |---|---|---|---|---|---|
-| 1 | roadmap-26q1 | topic | 2026-04-feature-x | create | Novo topico mencionado |
-| 2 | eventos-cobranca | actor | webhook-receiver | update | Descricao atualizada |
+| 1 | roadmap-26q1 | topic | 2026-04-feature-x | create | New topic mentioned |
+| 2 | eventos-cobranca | actor | webhook-receiver | update | Description updated |
 | ... | ... | ... | ... | ... | ... |
 
-Total: N creates, M updates em P sources.
-Confirma? (sim/nao/ajustar)
+Total: N creates, M updates across P sources.
+Confirm? (yes/no/adjust)
 ```
 
-- **sim**: prosseguir para Fase 5
-- **nao**: abortar com "Sync cancelado. Nenhuma entidade modificada."
-- **ajustar**: perguntar o que ajustar, modificar lista, reapresentar
+- **yes**: proceed to Phase 5
+- **no**: abort with "Sync cancelled. No entities modified."
+- **adjust**: ask what to adjust, modify list, re-present
 
-**Se nenhuma mudanca detectada em nenhuma source:**
-- Reportar: "Nenhuma mudanca detectada em nenhuma source. Vault ja esta atualizado."
-- Pular para Fase 6 (atualizar `last_synced` mesmo assim)
+**If no changes detected in any source:**
+- Report: "No changes detected in any source. Vault is already up to date."
+- Skip to Phase 6 (update `last_synced` anyway)
 
-**NAO prossiga sem confirmacao explicita do usuario.**
+**Do NOT proceed without explicit user confirmation.**
 
 ---
 
-## Fase 5 — Delegar ao /bedrock:preserve
+## Phase 5 — Delegate to /bedrock:preserve
 
-### 5.1 Compilar lista estruturada
+### 5.1 Compile structured list
 
-Monte a lista de entidades no formato aceito pelo `/bedrock:preserve`:
+Build the entity list in the format accepted by `/bedrock:preserve`:
 
 ```yaml
 entities:
   - type: topic
     name: "2026-04-feature-x"
     action: create
-    content: "trecho relevante do conteudo extraido na Fase 3..."
+    content: "relevant excerpt from content extracted in Phase 3..."
     relations:
       actors: ["actor-slug-1"]
       people: ["person-slug-1"]
@@ -288,641 +288,641 @@ entities:
   - type: actor
     name: "webhook-receiver"
     action: update
-    content: "novo contexto extraido na Fase 3..."
+    content: "new context extracted in Phase 3..."
     source: "github-repo"
 ```
 
-**Regras de compilacao:**
-- `type` e `name`: extraidos da Fase 3
-- `action`: `create` ou `update` conforme identificado
-- `content`: trecho do conteudo da fonte que justifica a entidade
-- `relations`: inferir relacoes entre entidades da lista (se A menciona B, incluir B nas relations de A)
-- `source`: usar o `source_type` da source de origem
+**Compilation rules:**
+- `type` and `name`: extracted from Phase 3
+- `action`: `create` or `update` as identified
+- `content`: excerpt of the source content that justifies the entity
+- `relations`: infer relationships between entities in the list (if A mentions B, include B in A's relations)
+- `source`: use the `source_type` of the originating source
 
-### 5.2 Invocar /bedrock:preserve
+### 5.2 Invoke /bedrock:preserve
 
-Use a tool Skill para invocar `/bedrock:preserve` passando a lista estruturada como argumento.
+Use the Skill tool to invoke `/bedrock:preserve` passing the structured list as argument.
 
-O `/bedrock:preserve` cuida de:
-- Matching textual com entidades existentes
-- Criacao de novas entidades seguindo templates
-- Atualizacao de entidades existentes (merge/append-only)
-- Vinculacao bidirecional (wikilinks)
-- Git commit das entidades
+`/bedrock:preserve` handles:
+- Textual matching with existing entities
+- Creation of new entities following templates
+- Updating existing entities (merge/append-only)
+- Bidirectional linking (wikilinks)
+- Git commit of entities
 
-### 5.3 Aguardar resultado
+### 5.3 Await result
 
-O `/bedrock:preserve` retorna:
-- Lista de entidades criadas/atualizadas
-- Commit hash (se houve commit)
-- Eventuais erros ou avisos
+`/bedrock:preserve` returns:
+- List of created/updated entities
+- Commit hash (if there was a commit)
+- Any errors or warnings
 
-Registre o resultado para uso no relatorio final (Fase 7).
-
----
-
-## Fase 6 — Atualizar `synced_at` nas Entidades
-
-Apos re-sync de cada URL, o `/bedrock:preserve` ja atualizou as entidades com novo conteudo.
-Adicionalmente, para cada URL processada com sucesso, passar `source_url` e `source_type`
-ao `/bedrock:preserve` para que ele atualize `synced_at` no campo `sources` de cada entidade mapeada.
-
-O mapa URL → entidades (construido na Fase 1) indica quais entidades precisam ter
-`synced_at` atualizado para cada URL re-sincronizada.
-
-> **Nota:** O `/bedrock:preserve` ja faz o commit das entidades. O `/bedrock:sync` NAO faz commit separado.
+Record the result for use in the final report (Phase 7).
 
 ---
 
-## Fase 7 — Relatorio
+## Phase 6 — Update synced_at in Entities
 
-Apresente ao usuario:
+After re-sync of each URL, `/bedrock:preserve` has already updated the entities with new content.
+Additionally, for each URL processed successfully, pass `source_url` and `source_type`
+to `/bedrock:preserve` so it updates `synced_at` in the `sources` field of each mapped entity.
+
+The URL → entities map (built in Phase 1) indicates which entities need
+`synced_at` updated for each re-synced URL.
+
+> **Note:** `/bedrock:preserve` already handles the entity commit. `/bedrock:sync` does NOT make a separate commit.
+
+---
+
+## Phase 7 — Report
+
+Present to the user:
 
 ```
-## Relatorio
+## Report
 
-| Metrica | Valor |
+| Metric | Value |
 |---|---|
-| Sources encontradas | N |
-| Sources sincronizadas | N |
-| Sources ignoradas (tipo) | N |
-| Sources com erro | N |
-| Entidades criadas | N |
-| Entidades atualizadas | N |
+| Sources found | N |
+| Sources synchronized | N |
+| Sources ignored (type) | N |
+| Sources with error | N |
+| Entities created | N |
+| Entities updated | N |
 
-### Por source
-| Source | Tipo | Entidades | Status |
+### Per source
+| Source | Type | Entities | Status |
 |---|---|---|---|
 | roadmap-26q1 | confluence | 3 creates, 2 updates | ✅ |
 | acme-corp-billing-api | github-repo | 0 creates, 1 update | ✅ |
-| manual-notes | manual | — | ⏭️ ignorada |
-| fonte-quebrada | confluence | — | ❌ erro (motivo) |
+| manual-notes | manual | — | ⏭️ ignored |
+| broken-source | confluence | — | ❌ error (reason) |
 
 ### Git
-- Commit (entidades): <hash do /bedrock:preserve ou "nenhuma entidade">
-- Commit (sources): vault: syncs N sources [fonte: sync]
-- Push: ✅ sucesso / ❌ falhou (motivo)
+- Commit (entities): <hash from /bedrock:preserve or "no entities">
+- Commit (sources): vault: syncs N sources [source: sync]
+- Push: ✅ success / ❌ failed (reason)
 
-### Sugestoes
-- [sources com erro que podem ser corrigidas]
-- [entidades mencionadas no conteudo mas nao criadas, se houver]
+### Suggestions
+- [sources with errors that can be fixed]
+- [entities mentioned in content but not created, if any]
 ```
 
 ---
 
-## Regras Criticas
+## Critical Rules
 
-| # | Regra |
+| # | Rule |
 |---|---|
-| 1 | **NUNCA escrever entidades diretamente** — toda escrita de entidades passa pelo `/bedrock:preserve` |
-| 2 | **NUNCA criar sources** — o `/bedrock:sync` so processa URLs ja registradas no campo `sources` das entidades |
-| 3 | **NUNCA deletar entidades** — entidades ausentes no conteudo atualizado sao mantidas |
-| 4 | **SEMPRE confirmar** proposta consolidada com usuario antes de executar (Fase 4) |
-| 5 | **Best-effort para fontes externas** — nunca bloquear por MCP indisponivel ou URL quebrada |
-| 6 | **MCP no contexto principal** — NAO usar subagents para chamadas GitHub/Atlassian MCP |
-| 7 | **Sources csv e manual sao ignoradas** — tipos estaticos sem URL para re-buscar |
-| 8 | **Maximo 2 tentativas de push** — apos isso, abortar e informar |
-| 9 | **Dados sensiveis** — NUNCA incluir credenciais, tokens, senhas, PANs, CVVs |
-| 10 | **Frontmatter keys em ingles**, values em pt-BR |
-| 11 | **Wikilinks bare** — `[[name]]`, nunca `[[dir/name]]` |
+| 1 | **NEVER write entities directly** — all entity writing goes through `/bedrock:preserve` |
+| 2 | **NEVER create sources** — `/bedrock:sync` only processes URLs already registered in entities' `sources` field |
+| 3 | **NEVER delete entities** — entities absent from updated content are kept |
+| 4 | **ALWAYS confirm** consolidated proposal with user before executing (Phase 4) |
+| 5 | **Best-effort for external sources** — never block due to unavailable MCP or broken URL |
+| 6 | **MCP in main context** — do NOT use subagents for GitHub/Atlassian MCP calls |
+| 7 | **csv and manual sources are ignored** — static types with no URL to re-fetch |
+| 8 | **Maximum 2 push attempts** — after that, abort and inform |
+| 9 | **Sensitive data** — NEVER include credentials, tokens, passwords, PANs, CVVs |
+| 10 | **Frontmatter keys in English**, values in the vault's configured language |
+| 11 | **Bare wikilinks** — `[[name]]`, never `[[dir/name]]` |
 
 ---
 ---
 
-# Modo: Sync People (--people)
+# Mode: Sync People (--people)
 
 
 
 
-Skill que popula `people/` a partir de commits recentes dos repositórios listados em `actors/`.
+Skill that populates `people/` from recent commits in repositories listed in `actors/`.
 
-**Você é um agente de execução.** Siga as fases abaixo na ordem, sem pular etapas.
-Não faça git commit/push. Não atualize `topics/` nem `actors/`. Não leia CLAUDE.md dos repositórios.
-
----
-
-## Fase 1 — Coleta de atores
-
-1. Use Glob para listar todos os arquivos `actors/*.md`
-2. Exclua `actors/_template.md`
-3. Para cada arquivo, use Read para extrair do frontmatter YAML:
-   - `repositorio` — URL do GitHub (ex: `https://github.com/acme-corp/billing-api/`)
-   - `time` — wikilink do squad (ex: `[[squad-payments]]`)
-   - `nome` — nome canônico do ator (ex: `billing-api`)
-4. Parsear `owner/repo` da URL: extrair os dois segmentos de path após `github.com/`
-5. **Pular** atores sem campo `repositorio`, com URL vazia, ou com URL que não contenha `github.com`
-6. Armazene a lista de atores válidos: `{nome, owner, repo, time_wikilink, time_slug}`
-   - `time_slug`: extraído do wikilink, ex: `[[squad-payments]]` → `squad-payments`
-
-Ao final desta fase, reporte: "Fase 1: N atores encontrados, M com repositório válido, K pulados."
+**You are an execution agent.** Follow the phases below in order, without skipping steps.
+Do not make git commit/push. Do not update `topics/` or `actors/`. Do not read CLAUDE.md from repositories.
 
 ---
 
-## Fase 2 — Coleta de commits
+## Phase 1 — Actor collection
 
-Para cada ator da lista (em paralelo quando possível):
+1. Use Glob to list all files `actors/*.md`
+2. Exclude `actors/_template.md`
+3. For each file, use Read to extract from the YAML frontmatter:
+   - `repository` — GitHub URL (e.g.: `https://github.com/acme-corp/billing-api/`)
+   - `team` — squad wikilink (e.g.: `[[squad-payments]]`)
+   - `name` — canonical name of the actor (e.g.: `billing-api`)
+4. Parse `owner/repo` from the URL: extract the two path segments after `github.com/`
+5. **Skip** actors without a `repository` field, with an empty URL, or with a URL that does not contain `github.com`
+6. Store the list of valid actors: `{name, owner, repo, team_wikilink, team_slug}`
+   - `team_slug`: extracted from the wikilink, e.g.: `[[squad-payments]]` → `squad-payments`
 
-1. Calcule a data de 30 dias atrás no formato ISO 8601 (ex: `2026-03-04T00:00:00Z`)
+At the end of this phase, report: "Phase 1: N actors found, M with valid repository, K skipped."
+
+---
+
+## Phase 2 — Commit collection
+
+For each actor in the list (in parallel when possible):
+
+1. Calculate the date 30 days ago in ISO 8601 format (e.g.: `2026-03-04T00:00:00Z`)
 2. Execute via Bash:
    ```
-   gh api "repos/{owner}/{repo}/commits?since={data_30_dias}&per_page=100" 2>/dev/null
+   gh api "repos/{owner}/{repo}/commits?since={date_30_days}&per_page=100" 2>/dev/null
    ```
-3. Se o comando falhar (404, 403, erro de rede): **logar e pular** — não falhar a execução
-4. Para cada commit no resultado JSON, extrair:
-   - `author.login` — login do GitHub (pode ser `null` se commit via email sem conta vinculada)
-   - `commit.author.name` — display name do autor
-5. **Filtrar bots:** ignorar commits onde:
-   - `author.login` é `null`
-   - `author.login` contém `[bot]`
-   - `author.login` (case-insensitive) é exatamente: `dependabot`, `renovate`, `github-actions`, `snyk-bot`, `codecov`, `sonarcloud`, `renovate-bot`, `depfu`
-6. Armazene os commits válidos associados ao ator
+3. If the command fails (404, 403, network error): **log and skip** — do not fail the execution
+4. For each commit in the JSON result, extract:
+   - `author.login` — GitHub login (may be `null` if commit via email without linked account)
+   - `commit.author.name` — author's display name
+5. **Filter bots:** ignore commits where:
+   - `author.login` is `null`
+   - `author.login` contains `[bot]`
+   - `author.login` (case-insensitive) is exactly: `dependabot`, `renovate`, `github-actions`, `snyk-bot`, `codecov`, `sonarcloud`, `renovate-bot`, `depfu`
+6. Store the valid commits associated with the actor
 
-Ao final desta fase, reporte: "Fase 2: N repositórios acessados, M com commits, K inacessíveis (listar). Total de L commits de P contribuidores únicos."
-
----
-
-## Fase 3 — Agregação
-
-1. Agrupe todos os commits por `author.login` (lowercase)
-2. Para cada pessoa única, construa:
-   - `github`: login em lowercase
-   - `nome`: `commit.author.name` do commit mais recente (fallback: login se nome vazio)
-   - `pontos_focais`: lista de nomes canônicos de atores onde a pessoa tem commits (sem duplicatas)
-   - `time_counts`: contagem de commits por squad (ex: `{squad-payments: 15, squad-notifications: 3}`)
-   - `time`: squad com mais commits; em caso de empate, primeiro alfabeticamente
-   - `filename`: derivado de `nome` → lowercase, sem acentos (normalizar NFD e remover combining marks), espaços→hífens, caracteres especiais removidos, kebab-case
-     - Ex: `Alice Smith` → `alice-smith.md`
-     - Ex: `José María` → `jose-maria.md`
-     - Fallback: se nome não disponível, usar login como filename
-
-3. **Detecção de duplicatas por filename:**
-   - Se dois contribuidores (logins diferentes) gerarem o mesmo filename: appendar `-2`, `-3`, etc. ao segundo
-   - Se um arquivo `people/{filename}` já existir com `github` diferente: tratar como pessoa diferente, appendar sufixo
-
-Ao final desta fase, reporte: "Fase 3: N contribuidores únicos identificados. Distribuição por squad: [lista]."
+At the end of this phase, report: "Phase 2: N repositories accessed, M with commits, K inaccessible (list). Total of L commits from P unique contributors."
 
 ---
 
-## Fase 4 — Escrita de pessoas
+## Phase 3 — Aggregation
 
-Para cada pessoa:
+1. Group all commits by `author.login` (lowercase)
+2. For each unique person, build:
+   - `github`: login in lowercase
+   - `name`: `commit.author.name` from the most recent commit (fallback: login if name is empty)
+   - `focal_points`: list of canonical actor names where the person has commits (no duplicates)
+   - `team_counts`: commit count by squad (e.g.: `{squad-payments: 15, squad-notifications: 3}`)
+   - `team`: squad with most commits; in case of tie, first alphabetically
+   - `filename`: derived from `name` → lowercase, no accents (normalize NFD and remove combining marks), spaces→hyphens, special characters removed, kebab-case
+     - E.g.: `Alice Smith` → `alice-smith.md`
+     - E.g.: `José María` → `jose-maria.md`
+     - Fallback: if name not available, use login as filename
 
-### Se `people/{filename}` NÃO existe — CRIAR:
+3. **Duplicate detection by filename:**
+   - If two contributors (different logins) generate the same filename: append `-2`, `-3`, etc. to the second
+   - If a file `people/{filename}` already exists with a different `github`: treat as different person, append suffix
 
-Use Write para criar o arquivo com este conteúdo exato (substitua os placeholders):
+At the end of this phase, report: "Phase 3: N unique contributors identified. Distribution by squad: [list]."
+
+---
+
+## Phase 4 — Write people
+
+For each person:
+
+### If `people/{filename}` does NOT exist — CREATE:
+
+Use Write to create the file with this exact content (replace the placeholders):
 
 ```markdown
 ---
-tipo: pessoa
-nome: "{display_name}"
-cargo: ""
-time: "[[{time_slug}]]"
-pontos_focais: [{pontos_focais_yaml}]
+type: person
+name: "{display_name}"
+role: ""
+team: "[[{team_slug}]]"
+focal_points: [{focal_points_yaml}]
 github: "{github_login}"
 jira: ""
-atualizado_em: {data_hoje_YYYY-MM-DD}
-atualizado_por: "sync-people"
-tags: [pessoa]
+updated_at: {today_date_YYYY-MM-DD}
+updated_by: "sync-people"
+tags: [type/person]
 ---
 
 # {Display Name}
 
-> Contribuidor(a) ativo(a) identificado(a) via commits nos últimos 30 dias.
+> Active contributor identified via commits in the last 30 days.
 
-## Time
+## Team
 
-Membro de [[{time_slug}]].
+Member of [[{team_slug}]].
 
-## Pontos Focais
+## Focal Points
 
-{lista_pontos_focais}
+{focal_points_list}
 
-## Assuntos Ativos
+## Active Topics
 
-_Nenhum assunto vinculado ainda._
+_No topics linked yet._
 ```
 
-Onde:
-- `{pontos_focais_yaml}` = array YAML de wikilinks, ex: `["[[billing-api]]", "[[notification-service]]"]`
-- `{lista_pontos_focais}` = lista markdown, ex:
+Where:
+- `{focal_points_yaml}` = YAML array of wikilinks, e.g.: `["[[billing-api]]", "[[notification-service]]"]`
+- `{focal_points_list}` = markdown list, e.g.:
   ```
-  - [[billing-api]] — commits recentes
-  - [[notification-service]] — commits recentes
+  - [[billing-api]] — recent commits
+  - [[notification-service]] — recent commits
   ```
-- `{data_hoje_YYYY-MM-DD}` = data de hoje no formato `YYYY-MM-DD`
+- `{today_date_YYYY-MM-DD}` = today's date in `YYYY-MM-DD` format
 
-### Se `people/{filename}` JÁ existe — ATUALIZAR:
+### If `people/{filename}` ALREADY exists — UPDATE:
 
-1. Use Read para ler o arquivo existente
-2. **Merge `pontos_focais`:** adicionar novos atores ao array YAML existente, sem remover os que já estão lá
-3. **Atualizar `time`:** sobrescrever com o novo cálculo (squad com mais commits)
-4. **Atualizar `atualizado_em`:** data de hoje
-5. **Atualizar `atualizado_por`:** `"sync-people"`
-6. Atualizar a seção "Pontos Focais" no corpo do markdown para refletir a lista mergeada
-7. Use Edit para aplicar as mudanças (não reescrever o arquivo inteiro — preservar conteúdo manual)
+1. Use Read to read the existing file
+2. **Merge focal_points:** add new actors to the existing YAML array, without removing those already there
+3. **Update team:** overwrite with the new calculation (squad with most commits)
+4. **Update updated_at:** today's date
+5. **Update updated_by:** `"sync-people"`
+6. Update the "Focal Points" section in the markdown body to reflect the merged list
+7. Use Edit to apply the changes (do not rewrite the entire file — preserve manual content)
 
-**Identificação por login:** Antes de criar um arquivo novo, use Grep para buscar `github: "{login}"` em `people/*.md`. Se encontrar, atualize esse arquivo em vez de criar um novo (mesmo que o filename não bata).
+**Identification by login:** Before creating a new file, use Grep to search for `github: "{login}"` in `people/*.md`. If found, update that file instead of creating a new one (even if the filename does not match).
 
-Ao final desta fase, reporte: "Fase 4: N pessoas criadas, M atualizadas."
+At the end of this phase, report: "Phase 4: N people created, M updated."
 
 ---
 
-## Fase 5 — Atualização de times
+## Phase 5 — Update teams
 
-Para cada squad que recebeu novas pessoas:
+For each squad that received new people:
 
-1. Use Read para ler `teams/{time_slug}.md`
-2. Extraia o array `membros` do frontmatter YAML
-3. Para cada pessoa do squad: adicione `"[[{pessoa_filename_sem_ext}]]"` ao array se não existir
-4. Atualize `atualizado_em` e `atualizado_por: "sync-people"` no frontmatter
-5. Use Edit para aplicar as mudanças no frontmatter
+1. Use Read to read `teams/{team_slug}.md`
+2. Extract the `members` array from the YAML frontmatter
+3. For each person in the squad: add `"[[{person_filename_without_ext}]]"` to the array if it does not exist
+4. Update `updated_at` and `updated_by: "sync-people"` in the frontmatter
+5. Use Edit to apply the changes to the frontmatter
 
-**Não altere** nenhuma outra seção do arquivo de time.
+**Do not modify** any other section of the team file.
 
-Ao final desta fase, reporte: "Fase 5: N times atualizados. [lista de squads → quantidade de membros adicionados]."
+At the end of this phase, report: "Phase 5: N teams updated. [list of squads → number of members added]."
 
 ---
 
-## Fase 6 — Relatório final
+## Phase 6 — Final report
 
-Imprima um resumo consolidado:
+Print a consolidated summary:
 
 ```
-## Sync People — Relatório
+## Sync People — Report
 
-| Métrica | Valor |
+| Metric | Value |
 |---|---|
-| Atores varridos | N |
-| Repositórios acessados | N |
-| Repositórios inacessíveis | N |
-| Commits analisados | N |
-| Contribuidores encontrados | N |
-| Pessoas criadas | N |
-| Pessoas atualizadas | N |
-| Times atualizados | N |
+| Actors scanned | N |
+| Repositories accessed | N |
+| Inaccessible repositories | N |
+| Commits analyzed | N |
+| Contributors found | N |
+| People created | N |
+| People updated | N |
+| Teams updated | N |
 
-### Pessoas por squad
+### People by squad
 
-| Squad | Pessoas |
+| Squad | People |
 |---|---|
 | squad-payments | alice, bob |
 | squad-notifications | carol |
 | ... | ... |
 
-### Repositórios inacessíveis
+### Inaccessible repositories
 
-- owner/repo — erro (se houver)
+- owner/repo — error (if any)
 ```
 
 ---
 
-## Regras gerais
+## General rules
 
-- **Idioma:** pt-BR para conteúdo, termos técnicos em inglês
-- **Filenames:** kebab-case, sem acentos, lowercase
-- **Wikilinks:** sem path — `[[nome]]`, nunca `[[people/nome]]`
-- **Frontmatter:** YAML válido, aspas duplas para strings com caracteres especiais
-- **Idempotência:** identificar pessoas por `github` login, não por filename
-- **Erros:** logar e continuar — nunca falhar a execução inteira por um repo ou pessoa
-- **Sem git:** não faça commit, push, ou qualquer operação git
-- **Sem assuntos:** não crie/atualize arquivos em `topics/`
-- **Sem atores:** não modifique arquivos em `actors/`
+- **Language:** Use the vault's configured language for content, technical terms in English
+- **Filenames:** kebab-case, no accents, lowercase
+- **Wikilinks:** no path — `[[name]]`, never `[[people/name]]`
+- **Frontmatter:** valid YAML, double quotes for strings with special characters
+- **Idempotency:** identify people by `github` login, not by filename
+- **Errors:** log and continue — never fail the entire execution for one repo or person
+- **No git:** do not commit, push, or perform any git operations
+- **No topics:** do not create/update files in `topics/`
+- **No actors:** do not modify files in `actors/`
 
 ---
 ---
 
-# Modo: Sync GitHub (--github)
+# Mode: Sync GitHub (--github)
 
 
 
 
-## Visao Geral
+## Overview
 
-Este e um **agente autonomo** projetado para rodar em background sem interacao humana.
-Ele percorre todos os actors com `status: active` e campo `repository` preenchido,
-busca PRs recentes via GitHub MCP, filtra ruido, usa matching semantico LLM para correlacionar
-PRs com topics/projects existentes no vault, e delega atualizacoes ao `/bedrock:preserve`.
+This is an **autonomous agent** designed to run in background without human interaction.
+It traverses all actors with `status: active` and a populated `repository` field,
+fetches recent PRs via GitHub MCP, filters noise, uses LLM semantic matching to correlate
+PRs with existing topics/projects in the vault, and delegates updates to `/bedrock:preserve`.
 
-**Modo de operacao: autonomo.**
-- NAO pede confirmacao — processa e escreve automaticamente
-- Seguranca garantida por: (1) apenas correlacoes de ALTA confianca geram atualizacoes,
-  (2) topics/projects recebem notas informativas (append), nunca sobrescrita de status,
-  (3) correlacoes de media confianca sao registradas no relatorio para revisao humana
-- Gera relatorio em `fleeting/` ao final de cada execucao
+**Operating mode: autonomous.**
+- Does NOT ask for confirmation — processes and writes automatically
+- Safety guaranteed by: (1) only HIGH confidence correlations generate updates,
+  (2) topics/projects receive informational notes (append), never status overwrite,
+  (3) medium confidence correlations are recorded in the report for human review
+- Generates a report in `fleeting/` at the end of each execution
 
-**Para execucao recorrente:**
+**For recurring execution:**
 - Via `/loop`: `/loop 6h /bedrock:sync --github`
-- Via `/schedule`: configurar cron com este skill
+- Via `/schedule`: configure cron with this skill
 
-O `/bedrock:sync --github` **NAO escreve entidades diretamente** — toda escrita de entidades passa pelo `/bedrock:preserve`.
-Excecao: campos de watermark (`last_synced_at`, `last_synced_sha`) no frontmatter dos actors sao escritos
-diretamente via Edit (nao sao entidades novas, sao metadados de sync).
+`/bedrock:sync --github` **does NOT write entities directly** — all entity writing goes through `/bedrock:preserve`.
+Exception: watermark fields (`last_synced_at`, `last_synced_sha`) in actor frontmatter are written
+directly via Edit (they are not new entities, they are sync metadata).
 
-O `/bedrock:sync --github` **NAO cria novos topics ou projects** — apenas atualiza existentes.
+`/bedrock:sync --github` **does NOT create new topics or projects** — it only updates existing ones.
 
-**Voce e um agente de execucao autonomo.** Siga as fases abaixo na ordem, sem pular etapas.
-NAO peca confirmacao ao usuario em nenhuma fase.
+**You are an autonomous execution agent.** Follow the phases below in order, without skipping steps.
+Do NOT ask for user confirmation in any phase.
 
 ---
 
-## Fase 0 — Sincronizar o Vault
+## Phase 0 — Synchronize the Vault
 
 Execute:
 ```bash
 git pull --rebase origin main
 ```
 
-Se o pull falhar:
-- Sem remote configurado: logar "Nenhum remote configurado. Trabalhando localmente." e prosseguir.
-- Conflito no pull: `git rebase --abort`, logar o erro e **ABORTAR** a execucao inteira.
-  Registrar no relatorio: "Abortado — conflito git no pull inicial."
-- Caso contrario: prosseguir.
+If the pull fails:
+- No remote configured: log "No remote configured. Working locally." and proceed.
+- Pull conflict: `git rebase --abort`, log the error and **ABORT** the entire execution.
+  Record in the report: "Aborted — git conflict on initial pull."
+- Otherwise: proceed.
 
 ---
 
-## Fase 1 — Coletar Actors Sincronizaveis
+## Phase 1 — Collect Syncable Actors
 
-1. Use Glob para listar todos os arquivos `actors/*.md`
-2. Exclua `actors/_template.md`
-3. Para cada arquivo, use Read para extrair do frontmatter YAML:
-   - `status` — status do actor
-   - `repository` — URL do repositorio GitHub
-   - `name` — nome do actor
-   - `last_synced_at` — data do ultimo sync GitHub (pode nao existir)
-   - `last_synced_sha` — SHA do ultimo sync (pode nao existir)
-4. **Filtrar actors sincronizaveis:**
-   - Manter apenas actors com `status: active` (ou `in-development`)
-   - Manter apenas actors com campo `repository` preenchido e contendo `github.com`
-   - Ignorar actors com `status: deprecated` (logar: "Actor X ignorado — deprecated")
-   - Ignorar actors sem `repository` ou com URL invalida (logar: "Actor X ignorado — sem repositorio GitHub")
-5. Para cada actor sincronizavel, extrair `owner/repo` da URL:
-   - Parsear a URL: `https://github.com/<owner>/<repo>/` → `owner`, `repo`
-   - Remover trailing slashes e `.git` suffix se presente
-6. Armazene a lista de actors sincronizaveis com: `{filename, name, owner, repo, last_synced_at, last_synced_sha}`
+1. Use Glob to list all files `actors/*.md`
+2. Exclude `actors/_template.md`
+3. For each file, use Read to extract from the YAML frontmatter:
+   - `status` — actor status
+   - `repository` — GitHub repository URL
+   - `name` — actor name
+   - `last_synced_at` — date of last GitHub sync (may not exist)
+   - `last_synced_sha` — SHA of last sync (may not exist)
+4. **Filter syncable actors:**
+   - Keep only actors with `status: active` (or `in-development`)
+   - Keep only actors with a populated `repository` field containing `github.com`
+   - Ignore actors with `status: deprecated` (log: "Actor X ignored — deprecated")
+   - Ignore actors without `repository` or with an invalid URL (log: "Actor X ignored — no GitHub repository")
+5. For each syncable actor, extract `owner/repo` from the URL:
+   - Parse the URL: `https://github.com/<owner>/<repo>/` → `owner`, `repo`
+   - Remove trailing slashes and `.git` suffix if present
+6. Store the list of syncable actors with: `{filename, name, owner, repo, last_synced_at, last_synced_sha}`
 
-Logar: "Fase 1: N actors encontrados, M sincronizaveis, K ignorados (deprecated/sem repo)."
+Log: "Phase 1: N actors found, M syncable, K ignored (deprecated/no repo)."
 
 ---
 
-## Fase 2 — Fetch PRs via GitHub MCP
+## Phase 2 — Fetch PRs via GitHub MCP
 
-Para cada actor sincronizavel, buscar PRs recentes:
+For each syncable actor, fetch recent PRs:
 
-1. Usar GitHub MCP diretamente (NAO via Agent tool — permissoes MCP nao sao herdadas por subagents):
-   - `mcp__plugin_github_github__list_pull_requests` com parametros:
-     - `owner`: owner do repo
+1. Use GitHub MCP directly (NOT via Agent tool — MCP permissions are not inherited by subagents):
+   - `mcp__plugin_github_github__list_pull_requests` with parameters:
+     - `owner`: repo owner
      - `repo`: repo name
      - `state`: "all" (open, merged, closed)
      - `sort`: "updated"
      - `per_page`: 20
-2. **Filtrar por watermark:**
-   - Se o actor tem `last_synced_at`: manter apenas PRs com `updated_at` >= `last_synced_at`
-   - Se o actor NAO tem `last_synced_at`: manter apenas PRs dos ultimos 30 dias
-3. Registrar para cada PR:
-   - `number`, `title`, `body` (descricao), `state` (open/closed), `merged` (bool)
-   - `user.login` (autor)
+2. **Filter by watermark:**
+   - If the actor has `last_synced_at`: keep only PRs with `updated_at` >= `last_synced_at`
+   - If the actor does NOT have `last_synced_at`: keep only PRs from the last 30 days
+3. Record for each PR:
+   - `number`, `title`, `body` (description), `state` (open/closed), `merged` (bool)
+   - `user.login` (author)
    - `updated_at`, `created_at`
-   - `head.sha` (ultimo commit SHA)
+   - `head.sha` (latest commit SHA)
 
-> **Best-effort:** Se a chamada MCP falhar para um actor (rate limit, repo privado, URL invalida):
-> - Logar o erro: "Actor X falhou — motivo"
-> - Continuar com os demais actors
-> - NAO abortar a execucao inteira por um actor
+> **Best-effort:** If the MCP call fails for an actor (rate limit, private repo, invalid URL):
+> - Log the error: "Actor X failed — reason"
+> - Continue with the remaining actors
+> - Do NOT abort the entire execution for one actor
 
-> **Skip rapido:** Se nenhuma PR foi retornada ou todas as PRs sao anteriores ao watermark,
-> logar "Actor X — sem atividade relevante" e pular para o proximo actor.
+> **Quick skip:** If no PRs were returned or all PRs are older than the watermark,
+> log "Actor X — no relevant activity" and skip to the next actor.
 
-Logar: "Fase 2: N actors consultados, M com PRs relevantes, K sem atividade, J com erro."
-
----
-
-## Fase 3 — Filtrar Ruido
-
-Para cada PR coletada na Fase 2, aplicar filtros de ruido:
-
-### 3.1 Filtro por autor
-Remover PRs de bots e ferramentas automatizadas:
-- Autor contem `[bot]` ou `bot` no login (ex: `dependabot[bot]`, `renovate[bot]`, `github-actions[bot]`)
-- Autor e `dependabot`, `renovate`, `snyk-bot`, `greenkeeper`
-
-### 3.2 Filtro por titulo
-Remover PRs com titulos indicando mudancas automaticas ou irrelevantes:
-- Titulo comeca com: `Bump `, `chore(deps)`, `build(deps)`, `Update dependency`
-- Titulo contem: `version bump`, `dependency update`, `auto-merge`
-- Titulo e apenas um numero de versao (ex: `v1.2.3`, `1.2.3`)
-
-### 3.3 Registrar resultado
-Para cada actor, manter lista de PRs relevantes (pos-filtro).
-Se todas as PRs de um actor foram filtradas: logar "Actor X — todas PRs filtradas (ruido)" e pular.
-
-Logar: "Fase 3: N PRs totais, M relevantes apos filtro, K filtradas como ruido."
+Log: "Phase 2: N actors queried, M with relevant PRs, K without activity, J with errors."
 
 ---
 
-## Fase 4 — Matching Semantico LLM
+## Phase 3 — Filter Noise
 
-### 4.1 Carregar catalogo de topics e projects
+For each PR collected in Phase 2, apply noise filters:
 
-Use Glob + Read para coletar:
+### 3.1 Filter by author
+Remove PRs from bots and automated tools:
+- Author contains `[bot]` or `bot` in login (e.g.: `dependabot[bot]`, `renovate[bot]`, `github-actions[bot]`)
+- Author is `dependabot`, `renovate`, `snyk-bot`, `greenkeeper`
 
-**Topics (`topics/*.md`, excluindo `_template.md`):**
-- `filename` (sem extensao)
+### 3.2 Filter by title
+Remove PRs with titles indicating automatic or irrelevant changes:
+- Title starts with: `Bump `, `chore(deps)`, `build(deps)`, `Update dependency`
+- Title contains: `version bump`, `dependency update`, `auto-merge`
+- Title is just a version number (e.g.: `v1.2.3`, `1.2.3`)
+
+### 3.3 Record result
+For each actor, maintain a list of relevant PRs (post-filter).
+If all PRs from an actor were filtered: log "Actor X — all PRs filtered (noise)" and skip.
+
+Log: "Phase 3: N total PRs, M relevant after filter, K filtered as noise."
+
+---
+
+## Phase 4 — LLM Semantic Matching
+
+### 4.1 Load topics and projects catalog
+
+Use Glob + Read to collect:
+
+**Topics (`topics/*.md`, excluding `_template.md`):**
+- `filename` (without extension)
 - `title`
 - `aliases`
 - `status` (open, in-progress, completed, cancelled)
-- `actors` (lista de wikilinks)
+- `actors` (list of wikilinks)
 - `objective`
 - `category`
 
-**Projects (`projects/*.md`, excluindo `_template.md`):**
-- `filename` (sem extensao)
+**Projects (`projects/*.md`, excluding `_template.md`):**
+- `filename` (without extension)
 - `name`
 - `aliases`
 - `status` (planning, active, blocked, completed)
-- `related_actors` (lista de wikilinks)
+- `related_actors` (list of wikilinks)
 - `blockers`
-- `action_items` (lista com description, status)
+- `action_items` (list with description, status)
 - `progress`
 
-Armazene como catalogo para matching.
+Store as catalog for matching.
 
-### 4.2 Preparar batch de matching
+### 4.2 Prepare matching batch
 
-Para cada actor com PRs relevantes, monte um bloco:
+For each actor with relevant PRs, build a block:
 
 ```
 Actor: <actor-name> (<owner>/<repo>)
-PRs relevantes:
-- PR #<number>: "<title>" (state: <open|closed|merged>, autor: <login>, data: <date>)
-  Descricao: <primeiros 200 chars do body>
+Relevant PRs:
+- PR #<number>: "<title>" (state: <open|closed|merged>, author: <login>, date: <date>)
+  Description: <first 200 chars of body>
 - PR #<number>: ...
 ```
 
-### 4.3 Executar matching semantico
+### 4.3 Execute semantic matching
 
-Com o catalogo de topics/projects e o batch de PRs, analise semanticamente:
+With the topics/projects catalog and the PR batch, analyze semantically:
 
-Para cada PR relevante, determine:
+For each relevant PR, determine:
 
-1. **Correlacao com topic/project:** A PR se relaciona com algum topic ou project existente?
-   - Considere: titulo da PR, descricao, actor de origem, aliases dos topics/projects
-   - Match por: tema (deprecacao, feature, bugfix), sistema mencionado, objetivo alinhado
-   - NAO matchar genericamente — exija relacao semantica clara
+1. **Correlation with topic/project:** Does the PR relate to an existing topic or project?
+   - Consider: PR title, description, originating actor, aliases of topics/projects
+   - Match by: theme (deprecation, feature, bugfix), mentioned system, aligned objective
+   - Do NOT match generically — require clear semantic relationship
 
-2. **Implicacao de status:** Se ha correlacao, a PR implica mudanca de status?
-   - PR mergeada em actor listado num topic "open" → sugere status "in-progress" ou "completed"
-   - PR mergeada que resolve um blocker de project → sugere remocao do blocker
-   - PR aberta para feature de topic "blocked" → sugere status "in-progress"
-   - PR fechada sem merge → sem implicacao de status
+2. **Status implication:** If there is a correlation, does the PR imply a status change?
+   - Merged PR in an actor listed in an "open" topic → suggests status "in-progress" or "completed"
+   - Merged PR that resolves a project blocker → suggests blocker removal
+   - Open PR for a feature in a "blocked" topic → suggests status "in-progress"
+   - Closed PR without merge → no status implication
 
-3. **Classificacao da mudanca:**
-   - `status_hint` — status sugerido (ex: "in-progress", "completed")
-   - `evidence` — descricao da evidencia (ex: "PR #42 mergeada implementa feature X do topic Y")
-   - `confidence` — alta, media, baixa
-   - `entity_type` — "topic" ou "project"
-   - `entity_name` — filename do topic/project
+3. **Change classification:**
+   - `status_hint` — suggested status (e.g.: "in-progress", "completed")
+   - `evidence` — evidence description (e.g.: "PR #42 merged implements feature X of topic Y")
+   - `confidence` — high, medium, low
+   - `entity_type` — "topic" or "project"
+   - `entity_name` — topic/project filename
 
-**Regras de matching:**
-- Priorize matches de alta confianca (titulo da PR menciona explicitamente o topic/projeto)
-- Descarte matches de baixa confianca (correlacao vaga, apenas por dominio)
-- Se nenhuma PR de um actor tem correlacao: registrar "sem correlacao" e prosseguir
-- NAO criar novos topics/projects — apenas correlacionar com existentes
+**Matching rules:**
+- Prioritize high confidence matches (PR title explicitly mentions the topic/project)
+- Discard low confidence matches (vague correlation, only by domain)
+- If no PRs from an actor have correlation: record "no correlation" and proceed
+- Do NOT create new topics/projects — only correlate with existing ones
 
-### 4.4 Classificar resultados por nivel de acao
+### 4.4 Classify results by action level
 
-Separar correlacoes em dois grupos:
+Separate correlations into two groups:
 
-**ALTA confianca → acao automatica:**
-- Serao processadas automaticamente na Fase 5 (sem confirmacao humana)
-- Criterio: titulo da PR menciona explicitamente o topic/projeto, OU a PR esta em actor
-  listado no frontmatter `actors`/`related_actors` do topic/project E o tema da PR
-  alinha com o `objective` do topic ou `progress`/`action_items` do project
+**HIGH confidence → automatic action:**
+- Will be processed automatically in Phase 5 (without human confirmation)
+- Criteria: PR title explicitly mentions the topic/project, OR the PR is in an actor
+  listed in the `actors`/`related_actors` frontmatter of the topic/project AND the PR theme
+  aligns with the topic's `objective` or the project's `progress`/`action_items`
 
-**MEDIA confianca → apenas relatorio:**
-- NAO serao processadas automaticamente
-- Serao registradas no relatorio final (Fase 7) para revisao humana
-- Criterio: correlacao semantica plausivel mas sem evidencia explicita
+**MEDIUM confidence → report only:**
+- Will NOT be processed automatically
+- Will be recorded in the final report (Phase 7) for human review
+- Criteria: plausible semantic correlation but without explicit evidence
 
-Logar: "Fase 4: N correlacoes (P alta confianca → acao, Q media confianca → relatorio). R actors com atividade sem correlacao."
+Log: "Phase 4: N correlations (P high confidence → action, Q medium confidence → report). R actors with activity without correlation."
 
 ---
 
-## Fase 5 — Delegar ao /bedrock:preserve e Atualizar Actors
+## Phase 5 — Delegate to /bedrock:preserve and Update Actors
 
-### 5.1 Compilar lista para /bedrock:preserve
+### 5.1 Compile list for /bedrock:preserve
 
-Monte a lista de entidades no formato aceito pelo `/bedrock:preserve`.
-**Incluir APENAS correlacoes de ALTA confianca + atividade de actors.**
+Build the entity list in the format accepted by `/bedrock:preserve`.
+**Include ONLY HIGH confidence correlations + actor activity.**
 
-**Para topics com correlacao ALTA:**
+**For topics with HIGH correlation:**
 ```yaml
 - type: topic
-  name: "filename-do-topic"
+  name: "topic-filename"
   action: update
   content: |
-    ## Atividade GitHub (sync-github YYYY-MM-DD)
+    ## GitHub Activity (sync-github YYYY-MM-DD)
 
-    | PR | Repo | Status | Evidencia |
+    | PR | Repo | Status | Evidence |
     |---|---|---|---|
-    | #42 | billing-api | merged | Implementa feature X |
+    | #42 | billing-api | merged | Implements feature X |
 
-    > [!info] Status sugerido: in-progress
-    > Baseado em PR #42 mergeada em billing-api que implementa feature X.
-    > Detectado automaticamente por sync-github@agent.
+    > [!info] Suggested status: in-progress
+    > Based on PR #42 merged in billing-api that implements feature X.
+    > Automatically detected by sync-github@agent.
   source: "github"
 ```
 
-**Para projects com correlacao ALTA:**
+**For projects with HIGH correlation:**
 ```yaml
 - type: project
-  name: "filename-do-project"
+  name: "project-filename"
   action: update
   content: |
-    ## Atividade GitHub (sync-github YYYY-MM-DD)
+    ## GitHub Activity (sync-github YYYY-MM-DD)
 
-    | PR | Repo | Status | Evidencia |
+    | PR | Repo | Status | Evidence |
     |---|---|---|---|
-    | #15 | orders-api | merged | Resolve blocker Y |
+    | #15 | orders-api | merged | Resolves blocker Y |
 
-    > [!info] Status sugerido: active
-    > Baseado em PR #15 mergeada em orders-api que resolve blocker Y.
-    > O status do projeto reflete uma decisao de gestao — revise esta sugestao.
-    > Detectado automaticamente por sync-github@agent.
+    > [!info] Suggested status: active
+    > Based on PR #15 merged in orders-api that resolves blocker Y.
+    > Project status reflects a management decision — review this suggestion.
+    > Automatically detected by sync-github@agent.
   source: "github"
 ```
 
-**Para actors com atividade relevante (todos, nao apenas com correlacao):**
+**For actors with relevant activity (all, not just those with correlation):**
 ```yaml
 - type: actor
   name: "actor-name"
   action: update
   content: |
-    ## Atividade Recente (sync-github YYYY-MM-DD)
+    ## Recent Activity (sync-github YYYY-MM-DD)
 
-    | PR | Titulo | Status | Autor | Data |
+    | PR | Title | Status | Author | Date |
     |---|---|---|---|---|
     | #42 | Feature X | merged | alice | 2026-04-10 |
-    | #34 | Refatoracao Y | open | bob | 2026-04-09 |
+    | #34 | Refactoring Y | open | bob | 2026-04-09 |
   source: "github"
 ```
 
-**Regras de compilacao:**
-- Conteudo para topics/projects: append-only. Adicionar secao "Atividade GitHub" com callout `[!info]` sugerindo status. NUNCA sobrescrever o campo `status` diretamente.
-- Conteudo para actors: merge-ok. A secao "Atividade Recente" substitui a versao anterior (se existir).
-- `source: "github"` para todas as entidades
-- Wikilinks bare: `[[actor-name]]`, nunca `[[actors/actor-name]]`
+**Compilation rules:**
+- Content for topics/projects: append-only. Add "GitHub Activity" section with `[!info]` callout suggesting status. NEVER overwrite the `status` field directly.
+- Content for actors: merge-ok. The "Recent Activity" section replaces the previous version (if it exists).
+- `source: "github"` for all entities
+- Bare wikilinks: `[[actor-name]]`, never `[[actors/actor-name]]`
 
-### 5.2 Invocar /bedrock:preserve
+### 5.2 Invoke /bedrock:preserve
 
-Use a tool Skill para invocar `/bedrock:preserve` passando a lista estruturada como argumento.
+Use the Skill tool to invoke `/bedrock:preserve` passing the structured list as argument.
 
-> **IMPORTANTE para execucao em background:** Ao invocar `/bedrock:preserve`, inclua na
-> instrucao que o `/bedrock:preserve` tambem deve operar sem confirmacao humana.
-> Adicione ao prompt: "Modo autonomo — nao pedir confirmacao, processar diretamente."
+> **IMPORTANT for background execution:** When invoking `/bedrock:preserve`, include in the
+> instruction that `/bedrock:preserve` must also operate without human confirmation.
+> Add to the prompt: "Autonomous mode — do not ask for confirmation, process directly."
 
-O `/bedrock:preserve` cuida de:
-- Matching textual com entidades existentes
-- Atualizacao de entidades existentes (merge/append-only)
-- Vinculacao bidirecional (wikilinks)
-- Git commit das entidades
+`/bedrock:preserve` handles:
+- Textual matching with existing entities
+- Updating existing entities (merge/append-only)
+- Bidirectional linking (wikilinks)
+- Git commit of entities
 
-### 5.3 Atualizar watermarks dos actors
+### 5.3 Update actor watermarks
 
-Apos o `/bedrock:preserve` completar, atualize o frontmatter de CADA actor processado (com ou sem correlacao):
+After `/bedrock:preserve` completes, update the frontmatter of EACH processed actor (with or without correlation):
 
-1. Use Read para ler o arquivo do actor
-2. Use Edit para atualizar no frontmatter:
-   - `last_synced_at`: data de hoje (YYYY-MM-DD)
-   - `last_synced_sha`: SHA do commit mais recente da PR mais recente (ou manter anterior se nenhuma PR)
-   - `updated_at`: data de hoje
+1. Use Read to read the actor file
+2. Use Edit to update in the frontmatter:
+   - `last_synced_at`: today's date (YYYY-MM-DD)
+   - `last_synced_sha`: SHA of the most recent commit from the most recent PR (or keep previous if no PRs)
+   - `updated_at`: today's date
    - `updated_by`: `"sync-github@agent"`
-3. Se os campos `last_synced_at` e `last_synced_sha` nao existem: adiciona-los ao frontmatter (antes de `updated_at`)
+3. If the fields `last_synced_at` and `last_synced_sha` do not exist: add them to the frontmatter (before `updated_at`)
 
-### 5.4 Git commit dos watermarks
+### 5.4 Git commit of watermarks
 
 ```bash
 git add actors/
-git diff --cached --quiet && echo "Nada para commitar" && exit 0
-git commit -m "vault(source): syncs github activity for N actors [fonte: github]"
+git diff --cached --quiet && echo "Nothing to commit" && exit 0
+git commit -m "vault(source): syncs github activity for N actors [source: github]"
 git push origin main
 ```
 
-**Se push falhar (conflito):**
+**If push fails (conflict):**
 ```bash
 git pull --rebase origin main
 git push origin main
 ```
 
-**Se falhar 2x:** Logar o erro e continuar para o relatorio.
-**Se nao ha remote:** Commit local e logar.
+**If fails 2x:** Log the error and continue to the report.
+**If no remote:** Local commit and log.
 
 ---
 
-## Fase 6 — Gerar Relatorio
+## Phase 6 — Generate Report
 
-Gerar um relatorio completo da execucao e salvar como fleeting note.
+Generate a complete execution report and save as a fleeting note.
 
-### 6.1 Montar conteudo do relatorio
+### 6.1 Build report content
 
 ```markdown
 ---
@@ -937,120 +937,120 @@ tags: [type/fleeting, status/raw]
 
 # Sync GitHub — YYYY-MM-DD
 
-> Relatorio automatico gerado por sync-github@agent.
+> Automatic report generated by sync-github@agent.
 
-## Resumo
+## Summary
 
-| Metrica | Valor |
+| Metric | Value |
 |---|---|
-| Actors encontrados | N |
-| Actors sincronizados | N |
-| Actors ignorados (deprecated/sem repo) | N |
-| Actors com erro (MCP) | N |
-| PRs coletadas | N |
-| PRs relevantes (pos-filtro) | N |
-| PRs filtradas (ruido) | N |
-| Correlacoes alta confianca (processadas) | N |
-| Correlacoes media confianca (para revisao) | N |
-| Actors com atividade (sem correlacao) | N |
+| Actors found | N |
+| Actors synchronized | N |
+| Actors ignored (deprecated/no repo) | N |
+| Actors with error (MCP) | N |
+| PRs collected | N |
+| Relevant PRs (post-filter) | N |
+| PRs filtered (noise) | N |
+| High confidence correlations (processed) | N |
+| Medium confidence correlations (for review) | N |
+| Actors with activity (no correlation) | N |
 
-## Correlacoes Processadas (Alta Confianca)
+## Processed Correlations (High Confidence)
 
-| Actor | PR | Entidade | Tipo | Status Sugerido | Evidencia |
+| Actor | PR | Entity | Type | Suggested Status | Evidence |
 |---|---|---|---|---|---|
-| [[billing-api]] | #42 | [[2026-04-feature-x]] | topic | in-progress | PR implementa feature X |
+| [[billing-api]] | #42 | [[2026-04-feature-x]] | topic | in-progress | PR implements feature X |
 | ... | ... | ... | ... | ... | ... |
 
-## Correlacoes para Revisao Humana (Media Confianca)
+## Correlations for Human Review (Medium Confidence)
 
-> [!todo] Revisar correlacoes abaixo
-> Estas correlacoes foram detectadas com confianca media. Revise e aplique manualmente se corretas.
+> [!todo] Review correlations below
+> These correlations were detected with medium confidence. Review and apply manually if correct.
 
-| Actor | PR | Entidade | Tipo | Status Sugerido | Evidencia |
+| Actor | PR | Entity | Type | Suggested Status | Evidence |
 |---|---|---|---|---|---|
-| [[notification-service]] | #33 | [[2026-04-bugfix-timeout-notifications]] | topic | in-progress | PR titulo menciona timeout |
+| [[notification-service]] | #33 | [[2026-04-bugfix-timeout-notifications]] | topic | in-progress | PR title mentions timeout |
 | ... | ... | ... | ... | ... | ... |
 
-## Atividade por Actor
+## Activity by Actor
 
-| Actor | PRs Relevantes | Resumo |
+| Actor | Relevant PRs | Summary |
 |---|---|---|
-| [[billing-api]] | #42 merged, #43 open | Feature X concluida, refatoracao Y em progresso |
-| [[notification-service]] | #33 merged | Fix de timeout |
+| [[billing-api]] | #42 merged, #43 open | Feature X completed, refactoring Y in progress |
+| [[notification-service]] | #33 merged | Timeout fix |
 | ... | ... | ... |
 
-## Actors Atualizados (Watermark)
+## Updated Actors (Watermark)
 
 | Actor | last_synced_at | last_synced_sha |
 |---|---|---|
 | [[billing-api]] | YYYY-MM-DD | abc1234 |
 | ... | ... | ... |
 
-## Erros
+## Errors
 
-| Actor | Erro |
+| Actor | Error |
 |---|---|
 | actor-x | MCP timeout |
 | ... | ... |
 
 ## Git
 
-- Commit (entidades): <hash do /bedrock:preserve ou "nenhuma entidade">
-- Commit (watermarks): vault(source): syncs github activity [fonte: github]
-- Push: sucesso / falhou (motivo)
+- Commit (entities): <hash from /bedrock:preserve or "no entities">
+- Commit (watermarks): vault(source): syncs github activity [source: github]
+- Push: success / failed (reason)
 ```
 
-### 6.2 Salvar relatorio
+### 6.2 Save report
 
-Salvar o relatorio em `fleeting/YYYY-MM-DD-sync-github.md`.
+Save the report to `fleeting/YYYY-MM-DD-sync-github.md`.
 
-Se o arquivo ja existir (execucao duplicada no mesmo dia): sobrescrever com dados mais recentes.
+If the file already exists (duplicate execution on the same day): overwrite with most recent data.
 
-### 6.3 Git commit do relatorio
+### 6.3 Git commit of report
 
 ```bash
 git add fleeting/
-git diff --cached --quiet && echo "Nada para commitar" && exit 0
-git commit -m "vault(nota): cria relatorio sync-github YYYY-MM-DD [fonte: github]"
+git diff --cached --quiet && echo "Nothing to commit" && exit 0
+git commit -m "vault(note): creates sync-github-report YYYY-MM-DD [source: github]"
 git push origin main
 ```
 
-**Se push falhar:** rebase + retry (max 2x).
+**If push fails:** rebase + retry (max 2x).
 
 ---
 
-## Fase 7 — Finalizar
+## Phase 7 — Finalize
 
-Logar mensagem final:
+Log final message:
 
 ```
-sync-github@agent finalizado.
-- Actors processados: N
-- Correlacoes processadas (alta): N
-- Correlacoes para revisao (media): N
-- Relatorio: fleeting/YYYY-MM-DD-sync-github.md
+sync-github@agent completed.
+- Actors processed: N
+- Correlations processed (high): N
+- Correlations for review (medium): N
+- Report: fleeting/YYYY-MM-DD-sync-github.md
 ```
 
-**A execucao termina aqui.** O agente nao espera resposta do usuario.
+**Execution ends here.** The agent does not wait for user response.
 
 ---
 
-## Regras Criticas
+## Critical Rules
 
-| # | Regra |
+| # | Rule |
 |---|---|
-| 1 | **MODO AUTONOMO** — NAO pedir confirmacao ao usuario em nenhuma fase |
-| 2 | **NUNCA escrever entidades diretamente** — toda escrita de topics/projects/actors passa pelo `/bedrock:preserve` |
-| 3 | **NUNCA criar novos topics ou projects** — apenas atualizar existentes |
-| 4 | **NUNCA sobrescrever status** de topics/projects — apenas adicionar nota com sugestao via callout `[!info]` |
-| 5 | **Apenas ALTA confianca gera acao** — correlacoes de media confianca vao apenas para o relatorio |
-| 6 | **Best-effort para GitHub MCP** — nunca bloquear por rate limit ou repo inacessivel |
-| 7 | **MCP no contexto principal** — NAO usar Agent tool para chamadas GitHub MCP |
-| 8 | **Filtrar ruido antes do matching** — dependabot, version bumps, bots |
-| 9 | **Matching semantico conservador** — descartar correlacoes de baixa confianca |
-| 10 | **Maximo 2 tentativas de push** — apos isso, logar e continuar |
-| 11 | **Dados sensiveis** — NUNCA incluir credenciais, tokens, senhas, PANs, CVVs |
-| 12 | **Frontmatter keys em ingles**, values em pt-BR |
-| 13 | **Wikilinks bare** — `[[name]]`, nunca `[[dir/name]]` |
-| 14 | **Append-only para topics** — adicionar informacao, nunca deletar conteudo existente |
-| 15 | **Relatorio sempre gerado** — mesmo se nenhuma correlacao, gerar relatorio em `fleeting/` |
+| 1 | **AUTONOMOUS MODE** — do NOT ask for user confirmation in any phase |
+| 2 | **NEVER write entities directly** — all writing of topics/projects/actors goes through `/bedrock:preserve` |
+| 3 | **NEVER create new topics or projects** — only update existing ones |
+| 4 | **NEVER overwrite status** of topics/projects — only add a note with suggestion via `[!info]` callout |
+| 5 | **Only HIGH confidence generates action** — medium confidence correlations go only to the report |
+| 6 | **Best-effort for GitHub MCP** — never block due to rate limit or inaccessible repo |
+| 7 | **MCP in main context** — do NOT use Agent tool for GitHub MCP calls |
+| 8 | **Filter noise before matching** — dependabot, version bumps, bots |
+| 9 | **Conservative semantic matching** — discard low confidence correlations |
+| 10 | **Maximum 2 push attempts** — after that, log and continue |
+| 11 | **Sensitive data** — NEVER include credentials, tokens, passwords, PANs, CVVs |
+| 12 | **Frontmatter keys in English**, values in the vault's configured language |
+| 13 | **Bare wikilinks** — `[[name]]`, never `[[dir/name]]` |
+| 14 | **Append-only for topics** — add information, never delete existing content |
+| 15 | **Report always generated** — even if no correlations, generate report in `fleeting/` |

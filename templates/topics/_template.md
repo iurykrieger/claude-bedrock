@@ -1,7 +1,7 @@
 ---
 type: topic
 title: ""
-aliases: []  # ["Short Title"] — min 1 alias (ex: ["Deprecacao Probe"])
+aliases: []  # ["Short Title"] — min 1 alias (e.g., ["Deprecation Probe"])
 category: ""  # bugfix | troubleshooting | rfc | incident | feature | deprecation | compliance
 status: ""  # open | in-progress | completed | cancelled
 people: ["[[first-last]]"]
@@ -11,19 +11,19 @@ created_at: YYYY-MM-DD
 sources: []  # [{url: "https://...", type: "confluence|gdoc|github-repo|csv|markdown|manual", synced_at: YYYY-MM-DD}]
 updated_at: YYYY-MM-DD
 updated_by: ""
-tags: [type/topic]  # + status/{open,in-progress,completed,cancelled} + category/{deprecation,bugfix,...} + domain/* opcional
+tags: [type/topic]  # + status/{open,in-progress,completed,cancelled} + category/{deprecation,bugfix,...} + domain/* optional
 ---
 
-<!-- Papel Zettelkasten: bridge note -->
-<!-- Links no corpo explicam PORQUE permanentes se relacionam: "a deprecacao do [[legacy-gateway]] esta bloqueada porque clientes do sistema legado dependem da tokenizacao do [[billing-api]]" -->
+<!-- Zettelkasten role: bridge note -->
+<!-- Links in the body explain WHY permanents relate: "the deprecation of [[legacy-gateway]] is blocked because clients of the legacy system depend on the tokenization of [[billing-api]]" -->
 
 # Topic Title
 
 > Brief description of the topic's objective.
 
-<!-- Callout obrigatorio para topics de deprecacao: -->
+<!-- Mandatory callout for deprecation topics: -->
 <!-- > [!warning] Deprecated -->
-<!-- > Descricao do plano de descontinuacao e sistemas afetados. -->
+<!-- > Description of the deprecation plan and affected systems. -->
 
 ## Context
 

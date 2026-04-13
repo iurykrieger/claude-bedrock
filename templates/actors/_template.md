@@ -12,26 +12,26 @@ criticality: ""  # very-high | high | medium | low
 pci: false
 known_issues: []
 sources: []  # [{url: "https://...", type: "confluence|gdoc|github-repo|csv|markdown|manual", synced_at: YYYY-MM-DD}]
-last_synced_at: ""  # YYYY-MM-DD — ultimo sync via /sync-github (opcional)
-last_synced_sha: ""  # SHA do ultimo commit sincronizado (opcional)
+last_synced_at: ""  # YYYY-MM-DD — last sync via /sync-github (optional)
+last_synced_sha: ""  # SHA of last synced commit (optional)
 updated_at: YYYY-MM-DD
 updated_by: ""
 tags: [type/actor]  # + status/{active,deprecated,in-development} + domain/{payments,finance,notifications,checkout,orders,integrations,compliance,core,data,infra,marketplace,internal-tools,platform,security} + scope/{pci,sox,lgpd,hipaa,gdpr,soc2}
 ---
 
-<!-- Papel Zettelkasten: permanent note -->
-<!-- Links no corpo devem ter contexto: "recebe autorizacoes do [[payment-gateway]] via gRPC" -->
+<!-- Zettelkasten role: permanent note -->
+<!-- Links in the body must have context: "receives authorizations from [[payment-gateway]] via gRPC" -->
 
 # Actor Name
 
 > Brief description of the system's function.
 
-<!-- Callouts obrigatorios — descomente quando aplicavel: -->
+<!-- Mandatory callouts — uncomment when applicable: -->
 <!-- > [!warning] Deprecated -->
-<!-- > Este sistema esta em processo de descontinuacao. Substituto: [[replacement]]. -->
+<!-- > This system is being deprecated. Replacement: [[replacement]]. -->
 
 <!-- > [!danger] PCI Scope -->
-<!-- > Este sistema esta no escopo PCI DSS. Nunca logar dados de cartao (PAN, CVV, tracks, EMV). -->
+<!-- > This system is in PCI DSS scope. Never log card data (PAN, CVV, tracks, EMV). -->
 
 ## Details
 

@@ -1,12 +1,12 @@
-# Campo: sources (proveniencia)
+# Field: sources (provenance)
 
-> Documentacao do campo `sources` no frontmatter das entidades.
+> Documentation for the `sources` field in entity frontmatter.
 
-## O que e
+## What it is
 
-O campo `sources` e um array no frontmatter de qualquer entidade que registra de onde vieram as informacoes — uma pagina do Confluence, um Google Doc, um CSV, um repositorio GitHub. NAO e um tipo de entidade; e metadata de rastreabilidade embutida na propria entidade.
+The `sources` field is an array in the frontmatter of any entity that records where the information came from — a Confluence page, a Google Doc, a CSV, a GitHub repository. It is NOT an entity type; it is traceability metadata embedded in the entity itself.
 
-O campo permite re-ingestao: ao registrar a URL/path e a data da ultima sincronizacao, o `/sync` sabe quais fontes estao desatualizadas e podem ser reconsultadas.
+The field enables re-ingestion: by recording the URL/path and the date of the last sync, `/sync` knows which sources are outdated and can be re-queried.
 
 ## Schema
 
@@ -20,53 +20,53 @@ sources:
     synced_at: 2026-04-10
 ```
 
-| Campo | Tipo | Obrigatorio | Descricao |
+| Field | Type | Required | Description |
 |---|---|---|---|
-| `url` | string | sim | URL ou path local da fonte |
-| `type` | string | sim | `confluence`, `gdoc`, `github-repo`, `csv`, `markdown`, `manual` |
-| `synced_at` | date | sim | YYYY-MM-DD da ultima sincronizacao |
+| `url` | string | yes | URL or local path of the source |
+| `type` | string | yes | `confluence`, `gdoc`, `github-repo`, `csv`, `markdown`, `manual` |
+| `synced_at` | date | yes | YYYY-MM-DD of the last sync |
 
-## Regras de merge
+## Merge rules
 
-- **Append-only:** novas sources sao adicionadas, nunca removidas
-- **Dedup por URL:** se a URL ja existe na lista, atualizar `synced_at` (nao duplicar a entry)
-- **Ordem:** mais recente primeiro (por `synced_at`)
+- **Append-only:** new sources are added, never removed
+- **Dedup by URL:** if the URL already exists in the list, update `synced_at` (do not duplicate the entry)
+- **Order:** most recent first (by `synced_at`)
 
-## Quando popular
+## When to populate
 
-- Uma fonte externa foi ingerida via `/teach` e o conteudo gerou ou atualizou esta entidade
-- O `/sync` re-sincronizou uma fonte e atualizou `synced_at`
-- O usuario quer registrar manualmente a proveniencia de uma entidade
+- An external source was ingested via `/teach` and the content created or updated this entity
+- `/sync` re-synchronized a source and updated `synced_at`
+- The user wants to manually record the provenance of an entity
 
-## Quando NAO popular
+## When NOT to populate
 
-- O conteudo foi digitado diretamente pelo usuario sem referencia a documento externo — nao ha fonte para registrar
-- A fonte e a memoria da sessao do agente — isso e implicito, nao precisa de registro
-- A fonte e um commit ou PR do GitHub — isso ja e rastreado pelo git history
+- The content was typed directly by the user without reference to an external document — there is no source to record
+- The source is the agent's session memory — that is implicit, no record needed
+- The source is a GitHub commit or PR — that is already tracked by git history
 
-## Como o /sync usa o campo
+## How /sync uses this field
 
-1. Varre todas as entidades do vault extraindo o campo `sources`
-2. Deduplica por URL (uma URL pode aparecer em multiplas entidades)
-3. Para cada URL unica com tipo sincronizavel (`confluence`, `gdoc`, `github-repo`, `markdown`):
-   - Re-busca o conteudo atualizado
-   - Compara com entidades existentes (diff incremental)
-   - Atualiza `synced_at` em todas as entidades que referenciam aquela URL
+1. Scans all vault entities extracting the `sources` field
+2. Deduplicates by URL (a URL may appear in multiple entities)
+3. For each unique URL with a syncable type (`confluence`, `gdoc`, `github-repo`, `markdown`):
+   - Re-fetches the updated content
+   - Compares with existing entities (incremental diff)
+   - Updates `synced_at` in all entities that reference that URL
 
-## Relacao com campo `source` (singular)
+## Relationship with the `source` field (singular)
 
-Discussions e fleeting notes possuem um campo `source` (string singular) que indica o contexto de captura: `session`, `meeting-notes`, `teach`, `manual`. Este campo tem semantica diferente:
+Discussions and fleeting notes have a `source` field (singular string) that indicates the capture context: `session`, `meeting-notes`, `teach`, `manual`. This field has different semantics:
 
-| Campo | Tipo | Semantica | Exemplo |
+| Field | Type | Semantics | Example |
 |---|---|---|---|
-| `source` (singular) | string | Como a entidade foi capturada | `"meeting-notes"` |
-| `sources` (plural) | array | De onde vieram os dados externos | `[{url: "...", type: "confluence", synced_at: "..."}]` |
+| `source` (singular) | string | How the entity was captured | `"meeting-notes"` |
+| `sources` (plural) | array | Where the external data came from | `[{url: "...", type: "confluence", synced_at: "..."}]` |
 
-Ambos podem coexistir na mesma entidade. Sao independentes.
+Both can coexist in the same entity. They are independent.
 
-## Exemplos
+## Examples
 
-### Entidade com source unica
+### Entity with a single source
 
 ```yaml
 sources:
@@ -75,7 +75,7 @@ sources:
     synced_at: 2026-04-09
 ```
 
-### Entidade com multiplas sources
+### Entity with multiple sources
 
 ```yaml
 sources:
@@ -87,7 +87,7 @@ sources:
     synced_at: 2026-04-05
 ```
 
-### Entidade sem source externa
+### Entity without an external source
 
 ```yaml
 sources: []

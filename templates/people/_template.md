@@ -5,39 +5,39 @@ aliases: []  # ["Full Name Capitalized", "Nickname"] — min 1 alias
 role: ""
 team: "[[squad-name]]"
 focal_points: []
-email: ""  # email corporativo completo (ex: alice.smith@company.com)
-github: ""  # opcional — login do GitHub, quando aplicável
-slack: ""  # opcional — arroba do Slack (ex: @alice.smith)
+email: ""  # full corporate email (e.g.: alice.smith@company.com)
+github: ""  # optional — GitHub login, when applicable
+slack: ""  # optional — Slack handle (e.g.: @alice.smith)
 jira: ""
 sources: []  # [{url: "https://...", type: "confluence|gdoc|github-repo|csv|markdown|manual", synced_at: YYYY-MM-DD}]
 updated_at: YYYY-MM-DD
 updated_by: ""
-tags: [type/person]  # + domain/* opcional
+tags: [type/person]  # + domain/* optional
 ---
 
-<!-- Papel Zettelkasten: permanent note -->
-<!-- Links no corpo devem ter contexto: "lidera a migracao do [[legacy-gateway]] para [[billing-api]]" -->
+<!-- Zettelkasten role: permanent note -->
+<!-- Links in the body must have context: "leads the migration of [[legacy-gateway]] to [[billing-api]]" -->
 
-<!-- Filename convention: prefixo do email corporativo, pontos → hífens.
-     Ex: alice.smith@company.com → alice-smith.md
-     Quando email desconhecido: first-last.md baseado no nome completo. -->
+<!-- Filename convention: corporate email prefix, dots → hyphens.
+     E.g.: alice.smith@company.com → alice-smith.md
+     When email is unknown: first-last.md based on full name. -->
 
 # First Last
 
-> Breve descrição (2-3 linhas) sobre a atribuição atual da pessoa na organização — cargo, área de atuação, e contexto relevante.
+> Brief description (2-3 lines) about the person's current role in the organization — position, area of expertise, and relevant context.
 
-## Time
+## Team
 
-Membro de [[squad-name]].
+Member of [[squad-name]].
 
-## Pontos Focais
+## Focal Points
 
-- [[repo-name]] — contexto de envolvimento
-- [[repo-name]] — contexto de envolvimento
+- [[repo-name]] — context of involvement
+- [[repo-name]] — context of involvement
 
-## Assuntos Ativos
+## Active Topics
 
-- [[YYYY-MM-type-slug]] — breve descrição
+- [[YYYY-MM-type-slug]] — brief description
 
 ---
 
@@ -48,7 +48,7 @@ Membro de [[squad-name]].
 | From | To | Field |
 |---|---|---|
 | Person → Team | `[[squad-name]]` | `team` in frontmatter |
-| Person → Actor | `[[repo-name]]` | "Pontos Focais" section |
-| Person → Topic | `[[YYYY-MM-type-slug]]` | "Assuntos Ativos" section |
+| Person → Actor | `[[repo-name]]` | "Focal Points" section |
+| Person → Topic | `[[YYYY-MM-type-slug]]` | "Active Topics" section |
 | Team → Person | `[[first-last]]` | `members` in Team frontmatter |
 | Topic → Person | `[[first-last]]` | `people` in Topic frontmatter |

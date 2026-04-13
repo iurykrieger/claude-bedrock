@@ -77,12 +77,12 @@ The `entities/` directory contains semantic definitions for each entity type —
 
 All vault content follows these conventions (enforced via the plugin's CLAUDE.md):
 
-- **Language:** Portuguese (pt-BR), technical terms in English
-- **Frontmatter:** Keys in English, values in pt-BR
+- **Language:** English (en-US) by default (configurable via `/bedrock:setup`), technical terms in English
+- **Frontmatter:** Keys in English, values in the vault's configured language
 - **Wikilinks:** Bare names only (`[[name]]`, never `[[dir/name]]`)
 - **Tags:** Hierarchical (`type/actor`, `status/active`, `domain/payments`)
 - **Aliases:** Minimum 1 per entity
-- **Git:** Trunk-based, commit convention `vault(<type>): <verb> <name> [fonte: <source>]`
+- **Git:** Trunk-based, commit convention `vault(<type>): <verb> <name> [source: <origin>]`
 
 See [CLAUDE.md](CLAUDE.md) for the complete set of rules.
 

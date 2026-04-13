@@ -1,14 +1,14 @@
 ---
 type: project
 name: ""
-aliases: []  # ["SIGLA", "Short Name"] — min 1 alias (ex: ["V2 Migration"])
+aliases: []  # ["Acronym", "Short Name"] — min 1 alias (e.g., ["V2 Migration"])
 description: ""
 status: ""  # planning | active | blocked | completed
 deadline: ""
 progress: ""
 blockers: []
 action_items:
-  - description: "Descricao do item de acao"
+  - description: "Action item description"
     status: "todo"  # todo | in_progress | done | blocked
     deadline: "YYYY-MM-DD"
     owner: "[[first-last]]"
@@ -19,11 +19,11 @@ related_teams: ["[[squad-name]]"]
 sources: []  # [{url: "https://...", type: "confluence|gdoc|github-repo|csv|markdown|manual", synced_at: YYYY-MM-DD}]
 updated_at: YYYY-MM-DD
 updated_by: ""
-tags: [type/project]  # + status/{planning,active,blocked,completed} + domain/* opcional
+tags: [type/project]  # + status/{planning,active,blocked,completed} + domain/* optional
 ---
 
-<!-- Papel Zettelkasten: index note -->
-<!-- Links no corpo apontam para onde o conhecimento esta: "progresso documentado em [[2026-06-deprecation-legacy-gateway]]" — curadoria, nao repeticao -->
+<!-- Zettelkasten role: index note -->
+<!-- Links in the body point to where the knowledge lives: "progress documented in [[2026-06-deprecation-legacy-gateway]]" — curation, not repetition -->
 
 # Project Name
 
@@ -41,24 +41,24 @@ Description of the project, its motivation, and expected outcomes.
 | Deadline | YYYY-MM-DD |
 | Progress | description of current progress |
 
-> **Convencao:** O status do projeto reflete uma decisao de gestao. Os action items abaixo ajudam a inferir o estado real, mas nao derivam o status automaticamente. Exemplos: se todos os items estao `done`, o projeto provavelmente esta `completed`; se algum item esta `blocked`, considere atualizar o status do projeto para `blocked`.
+> **Convention:** The project status reflects a management decision. The action items below help infer the actual state, but do not derive the status automatically. Examples: if all items are `done`, the project is likely `completed`; if any item is `blocked`, consider updating the project status to `blocked`.
 
 ## Action Items
 
-| Item | Status | Prazo | Responsavel |
+| Item | Status | Deadline | Owner |
 |---|---|---|---|
-| Descricao do item | todo | YYYY-MM-DD | [[first-last]] |
+| Item description | todo | YYYY-MM-DD | [[first-last]] |
 
-> Os action items sao definidos no frontmatter (campo `action_items`) para permitir queries Dataview. A tabela acima eh uma visualizacao para legibilidade.
+> Action items are defined in the frontmatter (`action_items` field) to enable Dataview queries. The table above is a visualization for readability.
 
-**Query Dataview — items pendentes deste projeto:**
+**Dataview query — pending items for this project:**
 
 ```dataview
 TABLE WITHOUT ID
   item.description AS "Item",
   item.status AS "Status",
-  item.deadline AS "Prazo",
-  item.owner AS "Responsavel"
+  item.deadline AS "Deadline",
+  item.owner AS "Owner"
 FROM "projects"
 WHERE file.name = this.file.name
 FLATTEN action_items AS item

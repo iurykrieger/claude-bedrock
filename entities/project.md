@@ -1,77 +1,77 @@
 # Entity: Project
 
-> Fonte de verdade para campos obrigatórios: `projects/_template.md`
+> Source of truth for required fields: `projects/_template.md`
 
-## O que é
+## What it is
 
-Um **project** é uma iniciativa com escopo fechado, deadline (real ou estimada), deliverables concretos, e focal points responsáveis. Projects agregam múltiplos atores, pessoas, e topics sob um objetivo comum. São o "hub" de uma iniciativa no Second Brain.
+A **project** is an initiative with a closed scope, a deadline (real or estimated), concrete deliverables, and responsible focal points. Projects aggregate multiple actors, people, and topics under a common objective. They are the "hub" of an initiative in the Second Brain.
 
-Projects têm status (planning → active → blocked → completed), progresso rastreável, e bloqueios explícitos. Diferem de topics por serem mais concretos e orientados a entrega.
+Projects have status (planning → active → blocked → completed), trackable progress, and explicit blockers. They differ from topics by being more concrete and delivery-oriented.
 
-## Quando criar
+## When to create
 
-- O conteúdo descreve uma iniciativa com objetivo, escopo, e pelo menos 1 responsável (focal point)
-- O conteúdo menciona uma migração, rewrite, ou construção de sistema novo com timeline
-- O conteúdo define deliverables e marcos de um esforço cross-team
+- The content describes an initiative with an objective, scope, and at least 1 responsible person (focal point)
+- The content mentions a migration, rewrite, or construction of a new system with a timeline
+- The content defines deliverables and milestones of a cross-team effort
 
-## Quando NÃO criar
+## When NOT to create
 
-- É um assunto/tema sem deadline ou deliverables concretos — isso é um topic
-- É uma conversa/reunião — isso é uma discussion (que pode referenciar um project)
-- É uma tarefa isolada de 1 pessoa em 1 ator — isso é trabalho operacional, não project
-- É a operação contínua de um sistema — isso é o próprio actor
+- It is a subject/theme without a deadline or concrete deliverables — that is a topic
+- It is a conversation/meeting — that is a discussion (which may reference a project)
+- It is an isolated task by 1 person on 1 actor — that is operational work, not a project
+- It is the ongoing operation of a system — that is the actor itself
 
-## Como distinguir de outros tipos
+## How to distinguish from other types
 
-| Parece ser... | Mas é... | Diferença-chave |
+| Looks like... | But is... | Key difference |
 |---|---|---|
-| Project | Topic | Topic é um assunto aberto (ex: "deprecação de serviços legados"). Project é uma iniciativa fechada (ex: "migrar legacy-gateway para billing-api até Q3"). Topic pode existir sem deadline; project sempre tem (mesmo que estimada) |
-| Project | Actor | Se o resultado final é um sistema novo, ele começa como project e vira actor quando tiver repo e deploy. Ex: "projeto de criação do health-checker" → depois vira actor `health-checker` |
-| Project | Discussion | Discussion é evento pontual. Project é esforço contínuo com progresso. Uma discussion pode criar ou atualizar um project |
+| Project | Topic | A topic is an open subject (e.g., "deprecation of legacy services"). A project is a closed initiative (e.g., "migrate legacy-gateway to billing-api by Q3"). A topic can exist without a deadline; a project always has one (even if estimated) |
+| Project | Actor | If the end result is a new system, it starts as a project and becomes an actor once it has a repo and deploy. E.g., "project to create health-checker" → later becomes actor `health-checker` |
+| Project | Discussion | A discussion is a one-time event. A project is an ongoing effort with progress. A discussion can create or update a project |
 
-## Campos obrigatórios (frontmatter)
+## Required fields (frontmatter)
 
-| Campo | Tipo | Descrição |
+| Field | Type | Description |
 |---|---|---|
-| `type` | string | Sempre `"project"` |
-| `name` | string | Nome do projeto |
-| `description` | string | Descrição em pt-BR |
+| `type` | string | Always `"project"` |
+| `name` | string | Project name |
+| `description` | string | Description |
 | `status` | string | `planning`, `active`, `blocked`, `completed` |
-| `deadline` | string | Data limite ou vazio |
-| `progress` | string | Descrição do progresso atual |
-| `blockers` | array | Lista de bloqueios |
-| `focal_points` | array | Wikilinks para persons: `["[[first-last]]"]` |
-| `related_topics` | array | Wikilinks para topics |
-| `related_actors` | array | Wikilinks para actors |
-| `related_teams` | array | Wikilinks para teams |
+| `deadline` | string | Deadline date or empty |
+| `progress` | string | Description of current progress |
+| `blockers` | array | List of blockers |
+| `focal_points` | array | Wikilinks to persons: `["[[first-last]]"]` |
+| `related_topics` | array | Wikilinks to topics |
+| `related_actors` | array | Wikilinks to actors |
+| `related_teams` | array | Wikilinks to teams |
 | `updated_at` | date | YYYY-MM-DD |
-| `updated_by` | string | Quem atualizou |
+| `updated_by` | string | Who last updated |
 
-## Papel Zettelkasten
+## Zettelkasten Role
 
-**Classificação:** index note
-**Propósito no grafo:** Organizar caminhos de leitura — agregar bridges (topics, discussions) e permanentes (actors, people, teams) sob um objetivo comum, funcionando como Map of Content (MOC) temático.
+**Classification:** index note
+**Purpose in the graph:** Organize reading paths — aggregate bridges (topics, discussions) and permanents (actors, people, teams) under a common objective, functioning as a thematic Map of Content (MOC).
 
-### Regras de Linking
+### Linking Rules
 
-**Links estruturais (frontmatter):** `focal_points` (wikilinks para persons), `related_topics`, `related_actors`, `related_teams` (wikilinks). Definem quais entidades compõem esta iniciativa.
-**Links semânticos (corpo):** Links no corpo devem apontar para onde o conhecimento está, sem repetir conteúdo. Ex: "o progresso da migração está documentado em [[2026-06-deprecation-legacy-gateway]]" em vez de replicar o histórico aqui. O corpo do project é curadoria — direciona o leitor para as notas certas.
-**Relação com outros papéis:** Projects não contêm conhecimento próprio — apontam para bridges (topics que detalham os assuntos) e permanentes (actors e people envolvidos). Se um project está explicando algo em detalhe, esse detalhe deveria estar num topic.
+**Structural links (frontmatter):** `focal_points` (wikilinks to persons), `related_topics`, `related_actors`, `related_teams` (wikilinks). Define which entities compose this initiative.
+**Semantic links (body):** Links in the body should point to where the knowledge lives, without repeating content. E.g., "the migration progress is documented in [[2026-06-deprecation-legacy-gateway]]" instead of replicating the history here. The project body is curation — it directs the reader to the right notes.
+**Relationship with other roles:** Projects do not contain their own knowledge — they point to bridges (topics that detail the subjects) and permanents (actors and people involved). If a project is explaining something in detail, that detail should be in a topic.
 
-### Critério de Completude
+### Completeness Criteria
 
-Um project está completo quando: tem objetivo, pelo menos 1 focal point, e referências para topics ou actors relacionados. Se é apenas uma ideia de iniciativa sem responsável ou escopo concreto, o conteúdo deve ir para `fleeting/` até ser definido.
+A project is complete when: it has an objective, at least 1 focal point, and references to related topics or actors. If it is just an idea for an initiative without a responsible person or concrete scope, the content should go to `fleeting/` until it is defined.
 
-## Exemplos
+## Examples
 
-### Isso É um project
+### This IS a project
 
-1. "Migração do legacy-gateway para billing-api: deadline Q3/2026. Responsável: Bob. Bloqueio: clientes do sistema legado que ainda usam o legacy-gateway." — Iniciativa com deadline, responsável, bloqueio. É project.
+1. "Migration from legacy-gateway to billing-api: deadline Q3/2026. Responsible: Bob. Blocker: legacy system clients that still use the legacy-gateway." — Initiative with deadline, responsible person, blocker. It is a project.
 
-2. "V2 Orders API: estamos construindo a nova API de pedidos. Squad Orders lidera, previsão de go-live em maio. Envolve orders-api, billing engine, integration engine." — Esforço de construção com timeline e múltiplos atores. É project.
+2. "V2 Orders API: we are building the new orders API. Squad Orders leads, go-live forecast in May. Involves orders-api, billing engine, integration engine." — Construction effort with timeline and multiple actors. It is a project.
 
-### Isso NÃO é um project
+### This is NOT a project
 
-1. "A gente precisa melhorar a observabilidade dos serviços Go." — Assunto aberto sem deadline nem deliverable concreto. É topic.
+1. "We need to improve observability of the Go services." — Open subject without a deadline or concrete deliverable. It is a topic.
 
-2. "Corrigir o bug de timeout no notification-service até sexta." — Tarefa pontual de 1 pessoa. Não é project.
+2. "Fix the timeout bug in notification-service by Friday." — One-off task by 1 person. It is not a project.

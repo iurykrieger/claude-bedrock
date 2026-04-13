@@ -1,116 +1,116 @@
 # Entity: Fleeting
 
-> Fonte de verdade para campos obrigatórios: `fleeting/_template.md`
+> Source of truth for required fields: `fleeting/_template.md`
 
-## O que é
+## What it is
 
-Uma **fleeting note** é uma captura de informação bruta — ideias, conceitos nascendo, menções vagas, fragmentos sem contexto completo. Fleeting notes são o inbox do vault: recebem conteúdo que ainda não atingiu o limiar de nota permanente ou bridge.
+A **fleeting note** is a capture of raw information — ideas, emerging concepts, vague mentions, fragments without full context. Fleeting notes are the vault's inbox: they receive content that has not yet reached the threshold of a permanent or bridge note.
 
-Fleeting notes são **temporárias por design**. Devem ser promovidas (→ permanent ou bridge) ou arquivadas dentro de um período razoável. Não são lixo — são informação em maturação.
+Fleeting notes are **temporary by design**. They should be promoted (to permanent or bridge) or archived within a reasonable period. They are not garbage — they are information in the process of maturing.
 
-## Papel Zettelkasten
+## Zettelkasten Role
 
-**Classificação:** fleeting note
-**Propósito no grafo:** Capturar informação em formação que ainda não é consolidada o suficiente para ser uma nota permanente ou bridge.
+**Classification:** fleeting note
+**Purpose in the graph:** Capture information in formation that is not yet consolidated enough to be a permanent or bridge note.
 
-### Regras de Linking
+### Linking Rules
 
-**Links estruturais (frontmatter):** `source` (wikilink para a source de onde veio, ou `"session"` se capturada diretamente), `promoted_to` (wikilink para nota destino quando promovida).
-**Links semânticos (corpo):** Links no corpo são exploratórios — podem referenciar permanentes ou bridges existentes que parecem relacionados, mas sem a obrigação de contexto textual completo. Fleeting notes são rascunhos; a exigência de linking semântico se aplica quando promovidas.
-**Relação com outros papéis:** Fleeting notes referenciam permanentes e bridges existentes como "pistas" de conexão. Quando promovidas, o conteúdo migra para uma permanent (actor, person, team) ou bridge (topic, discussion) seguindo as regras de linking daquele tipo.
+**Structural links (frontmatter):** `source` (wikilink to the source it came from, or `"session"` if captured directly), `promoted_to` (wikilink to the destination note when promoted).
+**Semantic links (body):** Links in the body are exploratory — they may reference existing permanents or bridges that seem related, but without the obligation of full textual context. Fleeting notes are drafts; the semantic linking requirement applies when they are promoted.
+**Relationship with other roles:** Fleeting notes reference existing permanents and bridges as connection "clues". When promoted, the content migrates to a permanent (actor, person, team) or bridge (topic, discussion) following the linking rules of that type.
 
-### Critério de Completude
+### Completeness Criteria
 
-Fleeting notes **não precisam** estar completas — esse é o ponto. Elas existem justamente para capturar informação incompleta. O critério relevante é o de **promoção** (ver abaixo).
+Fleeting notes **do not need** to be complete — that is the point. They exist precisely to capture incomplete information. The relevant criterion is **promotion** (see below).
 
-## Quando criar
+## When to create
 
-- O conteúdo ingerido pelo `/teach` contém ideias, menções ou fragmentos que não atendem os critérios de completude de nenhum tipo permanente ou bridge
-- O conteúdo menciona algo potencialmente útil mas sem dados suficientes para criar uma entidade (ex: "alguém mencionou um novo serviço de tokenização" — sem nome, repo, ou time)
-- O conteúdo captura uma hipótese, sugestão, ou rascunho de ideia que precisa ser lapidado
-- O `/preserve` recebe conteúdo que não passa nos critérios de completude de nenhum tipo
+- Content ingested by `/teach` contains ideas, mentions, or fragments that do not meet the completeness criteria of any permanent or bridge type
+- The content mentions something potentially useful but without enough data to create an entity (e.g., "someone mentioned a new tokenization service" — no name, repo, or team)
+- The content captures a hypothesis, suggestion, or draft idea that needs refinement
+- `/preserve` receives content that does not pass the completeness criteria of any type
 
-## Quando NÃO criar
+## When NOT to create
 
-- O conteúdo já tem dados suficientes para criar uma entidade permanente ou bridge — criar diretamente no tipo correto
-- O conteúdo é irrelevante para o vault (ruído, conversa casual, informação off-topic)
-- O conteúdo é uma duplicata de algo já capturado em outra fleeting note ou entidade existente
+- The content already has enough data to create a permanent or bridge entity — create directly in the correct type
+- The content is irrelevant to the vault (noise, casual conversation, off-topic information)
+- The content is a duplicate of something already captured in another fleeting note or existing entity
 
-## Como distinguir de outros tipos
+## How to distinguish from other types
 
-| Parece ser... | Mas é... | Diferença-chave |
+| Looks like... | But is... | Key difference |
 |---|---|---|
-| Fleeting | Actor | Se tem repo, deploy, e time — é actor. Se só "alguém mencionou um serviço novo" sem detalhes, é fleeting |
-| Fleeting | Person | Se tem nome completo e time — é person. Se só "um engenheiro do payments", é fleeting |
-| Fleeting | Topic | Se tem objetivo claro e actors afetados — é topic. Se é "talvez a gente precise deprecar X", é fleeting |
-| Fleeting | Discussion | Se tem data, participantes, e decisões — é discussion. Se é "parece que houve uma reunião sobre Y", é fleeting |
+| Fleeting | Actor | If it has a repo, deployment, and team — it is an actor. If only "someone mentioned a new service" without details, it is fleeting |
+| Fleeting | Person | If it has a full name and team — it is a person. If only "an engineer from payments", it is fleeting |
+| Fleeting | Topic | If it has a clear objective and affected actors — it is a topic. If it is "maybe we need to deprecate X", it is fleeting |
+| Fleeting | Discussion | If it has a date, participants, and decisions — it is a discussion. If it is "it seems there was a meeting about Y", it is fleeting |
 
-## Critérios de Promoção
+## Promotion Criteria
 
-Uma fleeting note deve ser promovida a permanent ou bridge quando **qualquer** dos 3 critérios for atendido:
+A fleeting note should be promoted to permanent or bridge when **any** of the 3 criteria is met:
 
-### 1. Massa crítica
+### 1. Critical mass
 
-A fleeting note acumula informação suficiente para ser auto-contida:
-- Mais de 3 parágrafos com fontes verificáveis
-- Dados concretos (nomes, datas, números, repositórios)
-- Contexto suficiente para atender os critérios de completude do tipo destino
+The fleeting note accumulates enough information to be self-contained:
+- More than 3 paragraphs with verifiable sources
+- Concrete data (names, dates, numbers, repositories)
+- Sufficient context to meet the completeness criteria of the destination type
 
-### 2. Corroboração
+### 2. Corroboration
 
-A informação da fleeting note é confirmada ou complementada por uma nota permanente existente:
-- Uma nova ingestão via `/teach` traz dados que validam ou expandem a fleeting
-- Uma permanent existente é atualizada com informação que confirma o conteúdo da fleeting
-- Duas ou mais fleeting notes sobre o mesmo assunto são consolidáveis numa nota permanente
+The information in the fleeting note is confirmed or supplemented by an existing permanent note:
+- A new ingestion via `/teach` brings data that validates or expands the fleeting
+- An existing permanent is updated with information that confirms the fleeting's content
+- Two or more fleeting notes about the same subject can be consolidated into a permanent note
 
-### 3. Relevância ativa
+### 3. Active relevance
 
-O `/bedrock` referencia a fleeting note em resposta a uma query, sinalizando que a informação é útil:
-- O conteúdo da fleeting é citado como resposta a uma pergunta do usuário
-- A fleeting contribui para o entendimento de um assunto ativo no vault
-- Neste caso, o `/bedrock` sinaliza a oportunidade de promoção
+`/bedrock` references the fleeting note in response to a query, signaling that the information is useful:
+- The fleeting's content is cited as an answer to a user question
+- The fleeting contributes to the understanding of an active subject in the vault
+- In this case, `/bedrock` signals the promotion opportunity
 
-## Pipeline de promoção
+## Promotion Pipeline
 
-1. **Detecção** — `/preserve`, `/teach`, ou `/bedrock` identifica que um critério de promoção foi atingido
-2. **Sinalização** — O skill sinaliza com callout: `> [!info] Promoção sugerida: esta nota pode ser promovida a <tipo>`
-3. **Promoção** — O `/preserve` é invocado para criar a entidade destino, migrando o conteúdo relevante
-4. **Atualização** — A fleeting note recebe `status: promoted` e `promoted_to: [[nota-destino]]`
+1. **Detection** — `/preserve`, `/teach`, or `/bedrock` identifies that a promotion criterion has been met
+2. **Signaling** — The skill signals with a callout: `> [!info] Suggested promotion: this note can be promoted to <type>`
+3. **Promotion** — `/preserve` is invoked to create the destination entity, migrating the relevant content
+4. **Update** — The fleeting note receives `status: promoted` and `promoted_to: [[destination-note]]`
 
-## Campos obrigatórios (frontmatter)
+## Required fields (frontmatter)
 
-| Campo | Tipo | Descrição |
+| Field | Type | Description |
 |---|---|---|
-| `type` | string | Sempre `"fleeting"` |
-| `title` | string | Título descritivo curto |
-| `source` | wikilink/string | `"[[source-name]]"` ou `"session"` |
-| `captured_at` | date | YYYY-MM-DD da captura |
+| `type` | string | Always `"fleeting"` |
+| `title` | string | Short descriptive title |
+| `source` | wikilink/string | `"[[source-name]]"` or `"session"` |
+| `captured_at` | date | YYYY-MM-DD of capture |
 | `status` | string | `raw`, `reviewing`, `promoted`, `archived` |
-| `promoted_to` | wikilink/string | `"[[nota-destino]]"` ou `""` (vazio até promoção) |
+| `promoted_to` | wikilink/string | `"[[destination-note]]"` or `""` (empty until promotion) |
 | `updated_at` | date | YYYY-MM-DD |
-| `updated_by` | string | Quem atualizou |
+| `updated_by` | string | Who updated it |
 
-## Status possíveis
+## Possible statuses
 
-| Status | Descrição |
+| Status | Description |
 |---|---|
-| `raw` | Recém-capturada, sem revisão |
-| `reviewing` | Em análise — alguém ou algum skill está avaliando para promoção |
-| `promoted` | Promovida — conteúdo migrou para nota permanente/bridge (ver `promoted_to`) |
-| `archived` | Arquivada — conteúdo não era relevante ou ficou obsoleto |
+| `raw` | Newly captured, not yet reviewed |
+| `reviewing` | Under analysis — someone or some skill is evaluating for promotion |
+| `promoted` | Promoted — content migrated to a permanent/bridge note (see `promoted_to`) |
+| `archived` | Archived — content was not relevant or became obsolete |
 
-## Exemplos
+## Examples
 
-### Isso É uma fleeting note
+### This IS a fleeting note
 
-1. "Alguém mencionou um novo serviço de tokenização que vai substituir o legacy-gateway, mas não sei o nome nem o repo." — Informação útil mas incompleta. É fleeting até ter dados concretos.
+1. "Someone mentioned a new tokenization service that will replace the legacy-gateway, but I don't know the name or the repo." — Useful but incomplete information. It is fleeting until it has concrete data.
 
-2. "Parece que o squad Notifications está pensando em migrar o crypto-service para Rust. Precisa confirmar." — Hipótese sem confirmação. É fleeting até ser validada.
+2. "It seems the Notifications squad is thinking about migrating crypto-service to Rust. Needs confirmation." — Unconfirmed hypothesis. It is fleeting until validated.
 
-3. "Em alguma reunião falaram sobre mudar o provedor de SMS para notificações. Não sei quando nem quem estava." — Fragmento sem data, participantes, ou decisão. É fleeting.
+3. "In some meeting they talked about changing the SMS provider for notifications. I don't know when or who was there." — Fragment without date, participants, or decision. It is fleeting.
 
-### Isso NÃO é uma fleeting note
+### This is NOT a fleeting note
 
-1. "O health-checker é um serviço Go que substitui o MonitorAPI. Repo: acme-corp/health-checker. Squad Orders é responsável." — Dados concretos suficientes para ser actor.
+1. "The health-checker is a Go service that replaces MonitorAPI. Repo: acme-corp/health-checker. Squad Orders is responsible." — Enough concrete data to be an actor.
 
-2. "Reunião de planning (01/04/2026): Alice, Bob, Carol. Decisão: priorizar migração legacy-gateway." — Dados completos para ser discussion.
+2. "Planning meeting (04/01/2026): Alice, Bob, Carol. Decision: prioritize legacy-gateway migration." — Complete data for a discussion.
