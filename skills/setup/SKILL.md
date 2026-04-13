@@ -1,0 +1,913 @@
+---
+name: setup
+description: >
+  Initialize any folder as a Bedrock-powered Obsidian vault. Creates entity directories,
+  copies templates, configures language and domain taxonomy, scaffolds connected example
+  entities, and checks dependencies.
+  Use when: "bedrock setup", "bedrock-setup", "/bedrock:setup", "initialize vault",
+  "setup vault", "create vault", "bootstrap vault", or when a user wants to start
+  a new Second Brain with Bedrock.
+user_invocable: true
+allowed-tools: Bash, Read, Write, Glob, Grep
+---
+
+# /bedrock:setup — Vault Initialization
+
+## Plugin Paths
+
+Templates and entity definitions are in the plugin directory, not in the vault root.
+Use the "Base directory for this skill" provided at invocation to resolve paths:
+
+- Entity definitions: `<base_dir>/../../entities/`
+- Templates: `<base_dir>/../../templates/{type}/_template.md`
+- Plugin CLAUDE.md: `<base_dir>/../../CLAUDE.md` (auto-injected into context)
+
+Where `<base_dir>` is the path shown in "Base directory for this skill".
+
+---
+
+## Overview
+
+This skill bootstraps any folder into a fully functional Bedrock-powered Obsidian vault
+through an interactive guided flow. It creates directories, copies templates, configures
+the vault, scaffolds example entities with bidirectional wikilinks, checks dependencies,
+and guides the user through next steps.
+
+**You are a setup agent.** Follow the phases below in order. Do not skip steps.
+
+---
+
+## Phase 0 — Idempotency Check
+
+Check if the vault is already initialized:
+
+```bash
+ls .bedrock/config.json 2>/dev/null
+```
+
+**If `.bedrock/config.json` exists:**
+
+1. Read and display the current configuration:
+   ```
+   This vault is already initialized:
+   - Language: <language>
+   - Preset: <preset>
+   - Domains: <domains>
+   - Initialized at: <date>
+   ```
+
+2. Ask the user:
+   > "This vault is already initialized. What would you like to do?"
+   > 1. **Reconfigure** — Update language, domains, and regenerate vault CLAUDE.md (directories and entities are NOT touched)
+   > 2. **Skip** — Exit with no changes
+
+   - **Reconfigure**: proceed to Phase 1, but set `RECONFIGURE_MODE = true`. In Phase 3, skip directory creation (3.1), template copying (3.2), and example entity generation (3.5).
+   - **Skip**: exit with "No changes made. Vault is already initialized."
+
+**If `.bedrock/config.json` does NOT exist:** proceed to Phase 1 with `RECONFIGURE_MODE = false`.
+
+---
+
+## Phase 1 — Language and Dependencies
+
+### 1.1 Language Selection
+
+Ask the user:
+
+> "What language should vault content be written in?"
+> 1. **English (en-US)** *(default)*
+> 2. **Portuguese (pt-BR)**
+> 3. **Spanish (es)**
+> 4. **Other** — specify a locale code (e.g., `fr-FR`, `de-DE`, `ja-JP`)
+>
+> Press Enter for default (en-US).
+
+Store the selected language as `VAULT_LANGUAGE`. This determines:
+- The language of example entity content
+- The language directive in the vault CLAUDE.md
+- The language instruction for all future skill output in this vault
+
+### 1.2 Dependency Check
+
+Check for external tools and skills that enhance the Bedrock experience.
+Use Glob to probe known installation paths. **Never block initialization.**
+
+**Dependencies to check:**
+
+| Dependency | Check method | What it unlocks |
+|---|---|---|
+| graphify | Glob: `~/.claude/skills/graphify/SKILL.md` | Semantic code extraction for GitHub repos via `/bedrock:teach`. Extracts functions, classes, and relationships into knowledge-nodes. |
+| confluence-to-markdown | Glob: `~/.claude/skills/confluence-to-markdown/SKILL.md` | Confluence page ingestion via `/bedrock:teach`. Converts Confluence pages to markdown for entity extraction. |
+| gdoc-to-markdown | Glob: `~/.claude/skills/gdoc-to-markdown/SKILL.md` | Google Docs ingestion via `/bedrock:teach`. Converts Google Docs to markdown for entity extraction. |
+
+**Report format:**
+
+```
+## Dependency Check
+
+| Dependency | Status | What it unlocks |
+|---|---|---|
+| graphify | installed / NOT FOUND | Semantic code extraction for GitHub repos |
+| confluence-to-markdown | installed / NOT FOUND | Confluence page ingestion |
+| gdoc-to-markdown | installed / NOT FOUND | Google Docs ingestion |
+```
+
+For each missing dependency, include:
+
+```
+> graphify is not installed. To install:
+> Run the graphify skill setup, or check https://github.com/iurykrieger/graphify for instructions.
+>
+> This is optional — your vault will work without it. You can install it later.
+```
+
+> **Note:** Detection may not find skills installed via non-standard paths.
+> If a dependency is reported as missing but you know it is installed, you can safely ignore the warning.
+
+**Proceed regardless of results.** Never block initialization for missing dependencies.
+
+---
+
+## Phase 2 — Vault Objective
+
+### 2.1 Present Presets
+
+Ask the user:
+
+> "What is the primary purpose of this vault?"
+>
+> 1. **Engineering team** — Track services, APIs, teams, and technical decisions
+> 2. **Product management** — Track features, research, projects, and analytics
+> 3. **Company wiki** — Centralized knowledge base across departments
+> 4. **Personal second brain** — Personal knowledge management and learning
+> 5. **Open source project** — Track contributors, issues, architecture, and community
+> 6. **Custom** — Define your own domains and focus
+
+### 2.2 Resolve Preset
+
+Based on the user's selection, resolve the preset configuration from this lookup table:
+
+```yaml
+presets:
+  engineering:
+    label: "Engineering team"
+    domains: [backend, frontend, infra, data, platform, security]
+    description: "Engineering team knowledge base for tracking services, APIs, technical decisions, and team operations"
+    team_name: "platform-team"
+    team_aliases: ["Platform", "Platform Team"]
+    team_scope: "Core platform services and infrastructure"
+    team_purpose: "Maintain and evolve the platform layer"
+    people:
+      - slug: "alice-chen"
+        name: "Alice Chen"
+        aliases: ["Alice Chen", "Alice"]
+        role: "Tech Lead"
+        email: "alice.chen@company.com"
+        focal_points: ["billing-api"]
+      - slug: "bob-santos"
+        name: "Bob Santos"
+        aliases: ["Bob Santos", "Bob"]
+        role: "Backend Engineer"
+        email: "bob.santos@company.com"
+        focal_points: []
+    actor_slug: "billing-api"
+    actor_name: "billing-api"
+    actor_aliases: ["Billing API", "Billing Service"]
+    actor_category: "api"
+    actor_description: "REST API for billing operations — invoices, payments, and subscriptions"
+    actor_stack: "Go · Gin · PostgreSQL · Kafka"
+    actor_status: "active"
+    actor_criticality: "high"
+    topic_slug: "2026-04-feature-api-migration"
+    topic_title: "API v2 Migration"
+    topic_aliases: ["API Migration", "v2 Migration"]
+    topic_category: "feature"
+    topic_objective: "Migrate billing API from v1 to v2 with improved performance and new endpoints"
+    project_slug: "platform-modernization"
+    project_name: "Platform Modernization"
+    project_aliases: ["Platform Modernization", "PlatMod"]
+    project_description: "Modernize the platform layer with new APIs, improved observability, and reduced technical debt"
+
+  product:
+    label: "Product management"
+    domains: [product, design, research, analytics, growth]
+    description: "Product management knowledge base for tracking features, user research, projects, and product analytics"
+    team_name: "product-team"
+    team_aliases: ["Product", "Product Team"]
+    team_scope: "Product strategy, discovery, and delivery"
+    team_purpose: "Drive product roadmap and user experience"
+    people:
+      - slug: "carol-kim"
+        name: "Carol Kim"
+        aliases: ["Carol Kim", "Carol"]
+        role: "Product Manager"
+        email: "carol.kim@company.com"
+        focal_points: ["analytics-dashboard"]
+      - slug: "david-mueller"
+        name: "David Mueller"
+        aliases: ["David Mueller", "David"]
+        role: "UX Researcher"
+        email: "david.mueller@company.com"
+        focal_points: []
+    actor_slug: "analytics-dashboard"
+    actor_name: "analytics-dashboard"
+    actor_aliases: ["Analytics Dashboard", "Dashboard"]
+    actor_category: "api"
+    actor_description: "Web dashboard for product analytics — funnels, cohorts, and feature adoption tracking"
+    actor_stack: "TypeScript · Next.js · PostgreSQL · ClickHouse"
+    actor_status: "active"
+    actor_criticality: "medium"
+    topic_slug: "2026-04-feature-user-research-q1"
+    topic_title: "Q1 User Research Findings"
+    topic_aliases: ["User Research Q1", "Q1 Research"]
+    topic_category: "feature"
+    topic_objective: "Synthesize Q1 user research findings into actionable product decisions"
+    project_slug: "product-launch-v2"
+    project_name: "Product Launch v2"
+    project_aliases: ["Product Launch v2", "PLv2"]
+    project_description: "Launch the redesigned product experience with improved onboarding and analytics"
+
+  company-wiki:
+    label: "Company wiki"
+    domains: [engineering, product, operations, finance, hr, legal]
+    description: "Company-wide knowledge base for cross-department collaboration and institutional memory"
+    team_name: "operations-team"
+    team_aliases: ["Operations", "Operations Team"]
+    team_scope: "Cross-functional operations and internal tooling"
+    team_purpose: "Ensure smooth operations and knowledge sharing across departments"
+    people:
+      - slug: "emma-silva"
+        name: "Emma Silva"
+        aliases: ["Emma Silva", "Emma"]
+        role: "Operations Lead"
+        email: "emma.silva@company.com"
+        focal_points: ["internal-portal"]
+      - slug: "frank-weber"
+        name: "Frank Weber"
+        aliases: ["Frank Weber", "Frank"]
+        role: "Knowledge Manager"
+        email: "frank.weber@company.com"
+        focal_points: []
+    actor_slug: "internal-portal"
+    actor_name: "internal-portal"
+    actor_aliases: ["Internal Portal", "Company Portal"]
+    actor_category: "monolith"
+    actor_description: "Internal web portal for employee self-service — HR, IT requests, and knowledge base access"
+    actor_stack: "Python · Django · PostgreSQL · Redis"
+    actor_status: "active"
+    actor_criticality: "medium"
+    topic_slug: "2026-04-feature-onboarding-process"
+    topic_title: "New Employee Onboarding Process"
+    topic_aliases: ["Onboarding Process", "New Hire Onboarding"]
+    topic_category: "feature"
+    topic_objective: "Standardize the onboarding process for new employees across all departments"
+    project_slug: "knowledge-base-rollout"
+    project_name: "Knowledge Base Rollout"
+    project_aliases: ["KB Rollout", "Knowledge Base Rollout"]
+    project_description: "Roll out the structured knowledge base across all departments with Bedrock automation"
+
+  personal:
+    label: "Personal second brain"
+    domains: [learning, career, projects, ideas, health, finance]
+    description: "Personal knowledge management vault for learning, projects, ideas, and life organization"
+    team_name: null  # No team for personal vault
+    people:
+      - slug: "me"
+        name: "Me"
+        aliases: ["Me"]
+        role: "Owner"
+        email: ""
+        focal_points: ["reading-tracker"]
+    actor_slug: "reading-tracker"
+    actor_name: "reading-tracker"
+    actor_aliases: ["Reading Tracker", "Book Tracker"]
+    actor_category: "monolith"
+    actor_description: "Personal tool for tracking books, articles, and learning resources"
+    actor_stack: "Markdown · Obsidian · Dataview"
+    actor_status: "active"
+    actor_criticality: "low"
+    topic_slug: "2026-04-feature-learning-rust"
+    topic_title: "Learning Rust"
+    topic_aliases: ["Learning Rust", "Rust Journey"]
+    topic_category: "feature"
+    topic_objective: "Track progress and notes while learning the Rust programming language"
+    project_slug: "side-project-alpha"
+    project_name: "Side Project Alpha"
+    project_aliases: ["Side Project Alpha", "SPA"]
+    project_description: "Build a personal side project to apply new skills and explore interesting technology"
+
+  open-source:
+    label: "Open source project"
+    domains: [core, docs, community, ci-cd, integrations]
+    description: "Open source project knowledge base for tracking architecture, contributors, issues, and community"
+    team_name: "core-maintainers"
+    team_aliases: ["Core Maintainers", "Maintainers"]
+    team_scope: "Core library development and release management"
+    team_purpose: "Maintain the core library and coordinate community contributions"
+    people:
+      - slug: "alice-chen"
+        name: "Alice Chen"
+        aliases: ["Alice Chen", "Alice"]
+        role: "Lead Maintainer"
+        email: "alice.chen@project.org"
+        focal_points: ["my-oss-lib"]
+      - slug: "bob-santos"
+        name: "Bob Santos"
+        aliases: ["Bob Santos", "Bob"]
+        role: "Core Contributor"
+        email: "bob.santos@project.org"
+        focal_points: []
+    actor_slug: "my-oss-lib"
+    actor_name: "my-oss-lib"
+    actor_aliases: ["My OSS Lib", "The Library"]
+    actor_category: "monolith"
+    actor_description: "Core open source library — the main project repository"
+    actor_stack: "TypeScript · Node.js · Jest · GitHub Actions"
+    actor_status: "active"
+    actor_criticality: "very-high"
+    topic_slug: "2026-04-feature-v2-migration"
+    topic_title: "v2 Migration Guide"
+    topic_aliases: ["v2 Migration", "Migration Guide"]
+    topic_category: "feature"
+    topic_objective: "Plan and document the migration path from v1 to v2 for all users"
+    project_slug: "v2-roadmap"
+    project_name: "v2 Roadmap"
+    project_aliases: ["v2 Roadmap", "Version 2"]
+    project_description: "Roadmap for the v2 release — breaking changes, new features, and migration tooling"
+```
+
+### 2.3 Custom Preset
+
+If the user selects **Custom**:
+
+1. Ask: "What is the purpose of this vault? (1-2 sentences)"
+   - Store as `description`
+
+2. Ask: "List 3-6 domain tags for your vault (comma-separated). These will be used as `domain/*` tags."
+   - Example: "backend, frontend, mobile, data, devops"
+   - Store as `domains`
+
+3. Ask: "Would you like me to generate example entities, or skip them?"
+   - If generate: ask for a team name, 2 people names, an actor name (or use generic defaults: `example-team`, `alice-example`, `bob-example`, `example-service`, `example-topic`, `example-project`)
+   - If skip: set `SKIP_EXAMPLES = true`
+
+Build a custom preset object following the same structure as the named presets.
+For fields not provided by the user, use sensible generic defaults.
+
+---
+
+## Phase 3 — Scaffold
+
+### 3.1 Create Entity Directories
+
+> **Skip if `RECONFIGURE_MODE = true`.**
+
+Create all 7 entity directories:
+
+```bash
+mkdir -p actors people teams topics discussions projects fleeting
+```
+
+If any directory already exists, this is a no-op (safe).
+
+### 3.2 Copy Templates
+
+> **Skip if `RECONFIGURE_MODE = true`.**
+
+For each entity type, read the template from the plugin and write it to the vault:
+
+| Source (plugin) | Destination (vault) |
+|---|---|
+| `<base_dir>/../../templates/actors/_template.md` | `actors/_template.md` |
+| `<base_dir>/../../templates/people/_template.md` | `people/_template.md` |
+| `<base_dir>/../../templates/teams/_template.md` | `teams/_template.md` |
+| `<base_dir>/../../templates/topics/_template.md` | `topics/_template.md` |
+| `<base_dir>/../../templates/discussions/_template.md` | `discussions/_template.md` |
+| `<base_dir>/../../templates/projects/_template.md` | `projects/_template.md` |
+| `<base_dir>/../../templates/fleeting/_template.md` | `fleeting/_template.md` |
+
+For each template:
+1. Use Read to read the source file from the plugin directory
+2. Use Write to write it to the vault directory
+
+**Copy templates verbatim.** Do not translate or modify them.
+
+If a `_template.md` already exists in the destination, **overwrite it** — templates should
+always match the latest plugin version.
+
+> **Fallback:** If a template file cannot be read (path resolution fails), report:
+> "Could not copy template for `<type>`. You can manually copy it from the plugin's
+> `templates/<type>/_template.md` directory."
+
+### 3.3 Create `.bedrock/config.json`
+
+Create the `.bedrock/` directory and write the configuration:
+
+```bash
+mkdir -p .bedrock
+```
+
+Write `.bedrock/config.json` with this schema:
+
+```json
+{
+  "version": "1.0.0",
+  "language": "<VAULT_LANGUAGE>",
+  "preset": "<selected preset name>",
+  "domains": ["<domain1>", "<domain2>", "..."],
+  "initialized_at": "<today's date YYYY-MM-DD>",
+  "initialized_by": "init@agent"
+}
+```
+
+**Field definitions:**
+- `version`: Always `"1.0.0"` — schema version for future migrations
+- `language`: The language code from Phase 1 (e.g., `"en-US"`, `"pt-BR"`)
+- `preset`: The selected preset name (e.g., `"engineering"`, `"personal"`, `"custom"`)
+- `domains`: Array of domain strings resolved from the preset
+- `initialized_at`: Today's date in `YYYY-MM-DD` format
+- `initialized_by`: Always `"init@agent"`
+
+### 3.4 Generate Vault CLAUDE.md
+
+Write a `CLAUDE.md` file at the vault root with content tailored to the selected preset and language.
+
+**IMPORTANT:** This file describes THIS SPECIFIC VAULT — its purpose, language, and conventions.
+It does NOT duplicate the plugin's CLAUDE.md (which covers writing rules, entity types, tags, git workflow, and zettelkasten principles — all auto-loaded by Claude Code when the plugin is active).
+
+**Template for vault CLAUDE.md:**
+
+```markdown
+# <Vault Name> — CLAUDE.md
+
+> This vault is powered by the [Bedrock plugin](https://github.com/iurykrieger/claude-bedrock).
+> Plugin-level instructions (entity types, writing rules, tags, git workflow) are loaded automatically.
+> This file describes what is specific to THIS vault.
+
+## Purpose
+
+<vault description from preset>
+
+## Language
+
+All content in this vault is written in **<language name> (<locale code>)**.
+When creating or updating entities, use <language name> for all text content.
+Frontmatter keys remain in English. Technical terms in English are acceptable.
+
+## Domains
+
+This vault uses the following domain tags:
+
+<list of domain/* tags>
+
+When creating entities, use `domain/<name>` tags from this list.
+New domains can be added as the vault grows.
+
+## Quick Reference
+
+| Action | Skill |
+|---|---|
+| Search and query the vault | `/bedrock:query` |
+| Ingest external sources (Confluence, Google Docs, GitHub) | `/bedrock:teach` |
+| Create or update entities manually | `/bedrock:preserve` |
+| Deduplicate and check vault health | `/bedrock:compress` |
+| Re-sync entities with external sources | `/bedrock:sync` |
+```
+
+**Adaptation rules:**
+- `<Vault Name>`: Derive from the preset label or use the folder name. For custom presets, use the user's stated purpose.
+- `<vault description>`: Use the preset's `description` field.
+- `<language name>`: Full language name (e.g., "English", "Portuguese", "Spanish").
+- `<locale code>`: The `VAULT_LANGUAGE` value (e.g., `en-US`, `pt-BR`).
+- `<list of domain/* tags>`: Format as a markdown list: `- domain/backend`, `- domain/frontend`, etc.
+
+**Write all CLAUDE.md content in the selected `VAULT_LANGUAGE`.**
+If the language is pt-BR, write sections headers and descriptions in Portuguese.
+If en-US, write in English. Etc.
+
+### 3.5 Create Example Entities
+
+> **Skip if `RECONFIGURE_MODE = true` or `SKIP_EXAMPLES = true`.**
+
+Using the resolved preset data from Phase 2, create connected example entities.
+**Write all entity content in the selected `VAULT_LANGUAGE`.**
+
+The entities form a mini-graph where every wikilink has a matching backlink.
+
+#### 3.5.1 Determine Entity Set
+
+**For all presets except `personal`:** Create 6 entities:
+1. Team: `teams/<team_name>.md`
+2. Person 1: `people/<person1_slug>.md`
+3. Person 2: `people/<person2_slug>.md`
+4. Actor: `actors/<actor_slug>.md`
+5. Topic: `topics/<topic_slug>.md`
+6. Project: `projects/<project_slug>.md`
+
+**For `personal` preset:** Create 4 entities (no team):
+1. Person: `people/<person_slug>.md`
+2. Actor: `actors/<actor_slug>.md`
+3. Topic: `topics/<topic_slug>.md`
+4. Project: `projects/<project_slug>.md`
+
+#### 3.5.2 Create Team Entity
+
+> **Skip for `personal` preset.**
+
+Read the team template from `<base_dir>/../../templates/teams/_template.md` as structural reference.
+
+Write `teams/<team_name>.md`:
+
+```markdown
+---
+type: team
+name: "<team_name>"
+aliases: <team_aliases as YAML array>
+scope: "<team_scope>"
+purpose: "<team_purpose>"
+members: ["[[<person1_slug>]]", "[[<person2_slug>]]"]
+actors: ["[[<actor_slug>]]"]
+jira_board: ""
+confluence_space: ""
+sources: []
+updated_at: <today YYYY-MM-DD>
+updated_by: "init@agent"
+tags: [type/team, domain/<first_domain>]
+---
+
+# <team display name>
+
+> <team_scope>. <team_purpose>.
+
+## Members
+
+| Person | Role |
+|---|---|
+| [[<person1_slug>]] | <person1_role> |
+| [[<person2_slug>]] | <person2_role> |
+
+## Actors under Ownership
+
+| Actor | Category | Status |
+|---|---|---|
+| [[<actor_slug>]] | <actor_category> | <actor_status> |
+
+## Responsibilities
+
+- <responsibility derived from team_scope>
+- <responsibility derived from team_purpose>
+```
+
+#### 3.5.3 Create Person Entities
+
+Read the person template from `<base_dir>/../../templates/people/_template.md` as structural reference.
+
+**For each person in the preset's `people` array**, write `people/<person_slug>.md`:
+
+```markdown
+---
+type: person
+name: "<person_name>"
+aliases: <person_aliases as YAML array>
+role: "<person_role>"
+team: "[[<team_name>]]"
+focal_points: <person_focal_points as wikilink array, e.g. ["[[billing-api]]"]>
+email: "<person_email>"
+github: ""
+slack: ""
+jira: ""
+sources: []
+updated_at: <today YYYY-MM-DD>
+updated_by: "init@agent"
+tags: [type/person, domain/<first_domain>]
+---
+
+# <person_name>
+
+> <person_role> on [[<team_name>]]. <brief context about their focus>.
+
+## Time
+
+Member of [[<team_name>]].
+
+## Pontos Focais
+
+<for each focal_point:>
+- [[<focal_point>]] — <brief involvement context>
+
+## Assuntos Ativos
+
+- [[<topic_slug>]] — <brief description>
+
+## Projects
+
+- [[<project_slug>]] — <brief description>
+```
+
+**For `personal` preset:** Omit the `team` field (set to `""`), omit the `Time` section, and write only 1 person entity.
+
+#### 3.5.4 Create Actor Entity
+
+Read the actor template from `<base_dir>/../../templates/actors/_template.md` as structural reference.
+
+Write `actors/<actor_slug>.md`:
+
+```markdown
+---
+type: actor
+name: "<actor_name>"
+aliases: <actor_aliases as YAML array>
+category: "<actor_category>"
+description: "<actor_description>"
+repository: ""
+stack: "<actor_stack>"
+status: "<actor_status>"
+team: "[[<team_name>]]"
+criticality: "<actor_criticality>"
+pci: false
+known_issues: []
+sources: []
+last_synced_at: ""
+last_synced_sha: ""
+updated_at: <today YYYY-MM-DD>
+updated_by: "init@agent"
+tags: [type/actor, status/<actor_status>, domain/<first_domain>]
+---
+
+# <actor display name>
+
+> <actor_description>.
+
+## Details
+
+| Field | Value |
+|---|---|
+| Repository | — |
+| Stack | <actor_stack> |
+| Status | <actor_status> |
+| Criticality | <actor_criticality> |
+| PCI | no |
+| Team | [[<team_name>]] |
+
+## Dependencies
+
+- No dependencies documented yet.
+
+## Related Topics
+
+- [[<topic_slug>]] — <brief description>
+
+## Related Projects
+
+- [[<project_slug>]] — <brief description>
+```
+
+**For `personal` preset:** Set `team` to `""` and omit the Team row from the Details table.
+
+#### 3.5.5 Create Topic Entity
+
+Read the topic template from `<base_dir>/../../templates/topics/_template.md` as structural reference.
+
+Write `topics/<topic_slug>.md`:
+
+```markdown
+---
+type: topic
+title: "<topic_title>"
+aliases: <topic_aliases as YAML array>
+category: "<topic_category>"
+status: "open"
+people: ["[[<person1_slug>]]"]
+actors: ["[[<actor_slug>]]"]
+objective: "<topic_objective>"
+created_at: <today YYYY-MM-DD>
+sources: []
+updated_at: <today YYYY-MM-DD>
+updated_by: "init@agent"
+tags: [type/topic, status/open, category/<topic_category>, domain/<first_domain>]
+---
+
+# <topic_title>
+
+> <topic_objective>.
+
+## Context
+
+This topic was created as an example during vault initialization. Replace this content
+with real context about the topic's background and motivation.
+
+## People Involved
+
+| Person | Role |
+|---|---|
+| [[<person1_slug>]] | focal point |
+
+## Actors Involved
+
+| Actor | Relation |
+|---|---|
+| [[<actor_slug>]] | affected system |
+
+## History
+
+| Date | Event |
+|---|---|
+| <today YYYY-MM-DD> | Topic created during vault initialization |
+
+## Decisions
+
+- No decisions recorded yet.
+
+## Next Steps
+
+- [ ] Replace this example content with real information
+- [ ] Link to related topics and discussions
+
+## Related Projects
+
+- [[<project_slug>]] — <brief description>
+```
+
+#### 3.5.6 Create Project Entity
+
+Read the project template from `<base_dir>/../../templates/projects/_template.md` as structural reference.
+
+Write `projects/<project_slug>.md`:
+
+```markdown
+---
+type: project
+name: "<project_name>"
+aliases: <project_aliases as YAML array>
+description: "<project_description>"
+status: "planning"
+deadline: ""
+progress: "Vault initialized — project tracking setup complete"
+blockers: []
+action_items:
+  - description: "Replace example content with real project data"
+    status: "todo"
+    deadline: ""
+    owner: "[[<person1_slug>]]"
+focal_points: ["[[<person1_slug>]]"]
+related_topics: ["[[<topic_slug>]]"]
+related_actors: ["[[<actor_slug>]]"]
+related_teams: ["[[<team_name>]]"]
+sources: []
+updated_at: <today YYYY-MM-DD>
+updated_by: "init@agent"
+tags: [type/project, status/planning, domain/<first_domain>]
+---
+
+# <project_name>
+
+> <project_description>.
+
+## Overview
+
+This project was created as an example during vault initialization. Replace this content
+with the real project description, motivation, and expected outcomes.
+
+## Status
+
+| Field | Value |
+|---|---|
+| Status | planning |
+| Deadline | — |
+| Progress | Vault initialized — project tracking setup complete |
+
+## Action Items
+
+| Item | Status | Deadline | Owner |
+|---|---|---|---|
+| Replace example content with real project data | todo | — | [[<person1_slug>]] |
+
+## Focal Points
+
+| Person | Role |
+|---|---|
+| [[<person1_slug>]] | lead |
+
+## Related Topics
+
+| Topic | Relation |
+|---|---|
+| [[<topic_slug>]] | related topic |
+
+## Related Actors
+
+| Actor | Relation |
+|---|---|
+| [[<actor_slug>]] | affected system |
+
+## Related Teams
+
+| Team | Relation |
+|---|---|
+| [[<team_name>]] | owning team |
+```
+
+**For `personal` preset:** Remove the `related_teams` field and the "Related Teams" section.
+
+#### 3.5.7 Verify Bidirectional Links
+
+After creating all entities, verify the wikilink graph is fully bidirectional.
+
+**Expected links (non-personal presets):**
+
+```
+Team → Person 1: members[] ✓ | Person 1 → Team: team field ✓
+Team → Person 2: members[] ✓ | Person 2 → Team: team field ✓
+Team → Actor: actors[] ✓ | Actor → Team: team field ✓
+Topic → Person 1: people[] ✓ | Person 1 → Topic: "Assuntos Ativos" ✓
+Topic → Actor: actors[] ✓ | Actor → Topic: "Related Topics" ✓
+Project → Person 1: focal_points[] ✓ | Person 1 → Project: "Projects" ✓
+Project → Actor: related_actors[] ✓ | Actor → Project: "Related Projects" ✓
+Project → Team: related_teams[] ✓
+Project → Topic: related_topics[] ✓ | Topic → Project: "Related Projects" ✓
+```
+
+Use Grep to spot-check that each entity file contains the expected wikilinks
+to its connected entities. If any link is missing, fix it before proceeding.
+
+---
+
+## Phase 4 — Next Steps Guide
+
+After all files are created, present the user with a summary and next steps.
+
+**Summary format:**
+
+```
+## Vault Initialized
+
+**Language:** <language>
+**Preset:** <preset label>
+**Domains:** <comma-separated domains>
+
+### Files Created
+
+| Type | Path |
+|---|---|
+| Config | .bedrock/config.json |
+| CLAUDE.md | CLAUDE.md |
+| Template | actors/_template.md |
+| Template | people/_template.md |
+| Template | teams/_template.md |
+| Template | topics/_template.md |
+| Template | discussions/_template.md |
+| Template | projects/_template.md |
+| Template | fleeting/_template.md |
+| Example | teams/<team>.md |
+| Example | people/<person1>.md |
+| Example | people/<person2>.md |
+| Example | actors/<actor>.md |
+| Example | topics/<topic>.md |
+| Example | projects/<project>.md |
+
+### What's Next?
+
+1. **Open the vault in Obsidian** — Open this folder as an Obsidian vault. You'll see the example entities
+   and their connections in the graph view immediately.
+
+2. **Ingest your first source** — Run `/bedrock:teach <url>` to import content from:
+   - A GitHub repository URL
+   - A Confluence page URL
+   - A Google Docs URL
+   - A local markdown or CSV file path
+
+3. **Query your vault** — Run `/bedrock:query <question>` to search across all entities.
+   Example: `/bedrock:query what do we know about <actor>?`
+
+4. **Create entities manually** — Run `/bedrock:preserve` with free-form text or structured input
+   to add new entities to the vault.
+
+5. **Maintain vault health** — Periodically run `/bedrock:compress` to detect duplicates,
+   orphan entities, and stale content.
+
+6. **Replace example content** — The example entities are there to show you how Bedrock works.
+   Edit or delete them as you start adding real content.
+
+> **Tip:** The example entities are fully connected with bidirectional wikilinks.
+> Open the Obsidian graph view to see how they relate to each other — this is the
+> pattern all future entities will follow.
+```
+
+Adapt the language of this guide to `VAULT_LANGUAGE`.
+
+---
+
+## Critical Rules
+
+| # | Rule |
+|---|---|
+| 1 | **NEVER block initialization** for missing dependencies — always warn and continue |
+| 2 | **NEVER modify existing skills** — init only creates new files in the vault |
+| 3 | **NEVER auto-install** dependencies — only provide instructions |
+| 4 | **NEVER run `git init`** — the user handles their own git setup |
+| 5 | **ALWAYS copy templates verbatim** — no translation or modification |
+| 6 | **ALWAYS create bidirectional wikilinks** in example entities |
+| 7 | **ALWAYS use hierarchical tags** — `type/actor`, never `actor` |
+| 8 | **ALWAYS use bare wikilinks** — `[[name]]`, never `[[dir/name]]` |
+| 9 | **ALWAYS write entity content in VAULT_LANGUAGE** — adapt example text to the chosen language |
+| 10 | **Idempotency** — respect `.bedrock/config.json` existence and offer reconfigure/skip |
