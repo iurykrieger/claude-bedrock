@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bedrock — Turn any Obsidian vault into a structured Second Brain</title>
+  <meta name="description" content="Claude Code plugin for Obsidian vault automation — entity management, ingestion, compression, and sync. 7 entity types, 6 skills, zero config.">
+  <style>
+    /* ============================================
+       CSS VARIABLES — DARK THEME (default)
+       ============================================ */
+    :root, [data-theme="dark"] {
+      --bg: #191919;
+      --bg-alt: #1e1e1e;
+      --bg-deep: #141414;
+      --surface: #262626;
+      --surface-2: #2e2e2e;
+      --border: #363636;
+      --border-subtle: #2a2a2a;
+      --border-hover: #3a3a3a;
+      --text: #dcddde;
+      --text-heading: #ebebeb;
+      --text-white: #fff;
+      --text-muted: #888;
+      --text-faint: #666;
+      --text-faintest: #555;
+      --text-arrow: #3a3a3a;
+      --accent: #a882ff;
+      --accent-hover: #c4a8ff;
+      --accent-bg: rgba(168, 130, 255, 0.07);
+      --accent-bg-strong: rgba(168, 130, 255, 0.1);
+      --accent-bg-hover: rgba(168, 130, 255, 0.15);
+      --accent-border: rgba(168, 130, 255, 0.18);
+      --accent-border-med: rgba(168, 130, 255, 0.25);
+      --accent-border-hover: rgba(168, 130, 255, 0.4);
+      --accent-border-subtle: rgba(168, 130, 255, 0.12);
+      --accent-glow: rgba(168, 130, 255, 0.06);
+      --accent-glow-strong: rgba(168, 130, 255, 0.08);
+      --success: #7ee8c7;
+      --navbar-bg: rgba(25, 25, 25, 0.85);
+      --card-shadow: rgba(0, 0, 0, 0.15);
+      --card-shadow-strong: rgba(0, 0, 0, 0.2);
+      --scroll-hint: #444;
+      --prompt-color: var(--accent);
+      --hero-gradient-mid: #c4a8ff;
+      --hero-gradient-end: #7ee8c7;
+    }
+
+    /* ============================================
+       CSS VARIABLES — LIGHT THEME
+       ============================================ */
+    [data-theme="light"] {
+      --bg: #fafafa;
+      --bg-alt: #f3f3f3;
+      --bg-deep: #eaeaea;
+      --surface: #f0f0f2;
+      --surface-2: #e6e6e8;
+      --border: #dcdcdc;
+      --border-subtle: #e8e8e8;
+      --border-hover: #c8c8c8;
+      --text: #3a3a3a;
+      --text-heading: #1a1a1a;
+      --text-white: #1a1a1a;
+      --text-muted: #6b6b6b;
+      --text-faint: #888;
+      --text-faintest: #aaa;
+      --text-arrow: #c0c0c0;
+      --accent: #7c3aed;
+      --accent-hover: #6d28d9;
+      --accent-bg: rgba(124, 58, 237, 0.05);
+      --accent-bg-strong: rgba(124, 58, 237, 0.08);
+      --accent-bg-hover: rgba(124, 58, 237, 0.12);
+      --accent-border: rgba(124, 58, 237, 0.15);
+      --accent-border-med: rgba(124, 58, 237, 0.22);
+      --accent-border-hover: rgba(124, 58, 237, 0.4);
+      --accent-border-subtle: rgba(124, 58, 237, 0.1);
+      --accent-glow: rgba(124, 58, 237, 0.04);
+      --accent-glow-strong: rgba(124, 58, 237, 0.06);
+      --success: #059669;
+      --navbar-bg: rgba(250, 250, 250, 0.88);
+      --card-shadow: rgba(0, 0, 0, 0.04);
+      --card-shadow-strong: rgba(0, 0, 0, 0.08);
+      --scroll-hint: #bbb;
+      --prompt-color: var(--accent);
+      --hero-gradient-mid: #9061f9;
+      --hero-gradient-end: #059669;
+    }
+
+    /* ============================================
+       RESET & BASE
+       ============================================ */
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      overflow-x: hidden;
+      transition: background 0.3s, color 0.3s;
+    }
+
+    h1, h2, h3 { color: var(--text-heading); font-weight: 600; letter-spacing: -0.02em; }
+    code, .mono { font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', 'JetBrains Mono', 'Consolas', monospace; }
+    a { color: var(--accent); text-decoration: none; transition: color 0.2s; }
+    a:hover { color: var(--accent-hover); }
+
+    /* ============================================
+       LAYOUT
+       ============================================ */
+    .container { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+    section { padding: 100px 0; }
+
+    .section-label {
+      text-transform: uppercase; font-size: 0.72rem; font-weight: 700;
+      letter-spacing: 0.15em; color: var(--accent); margin-bottom: 12px;
+    }
+    .section-title { font-size: 2.1rem; margin-bottom: 16px; }
+    .section-subtitle { font-size: 1.05rem; color: var(--text-muted); margin-bottom: 56px; max-width: 560px; line-height: 1.6; }
+
+    /* ============================================
+       NAVBAR
+       ============================================ */
+    .navbar {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      padding: 0 24px; height: 56px;
+      display: flex; align-items: center; justify-content: space-between;
+      background: var(--navbar-bg);
+      backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid transparent;
+      transition: background 0.3s, border-color 0.3s, box-shadow 0.3s;
+    }
+    .navbar.scrolled { background: var(--navbar-bg); border-bottom-color: var(--border-subtle); box-shadow: 0 1px 8px rgba(0,0,0,0.1); }
+
+    .navbar-logo {
+      display: flex; align-items: center; gap: 10px;
+      color: var(--text-heading); font-weight: 600; font-size: 0.95rem; letter-spacing: -0.02em;
+    }
+    .navbar-logo svg { width: 22px; height: 22px; }
+
+    .navbar-links { display: flex; align-items: center; gap: 24px; list-style: none; }
+    .navbar-links a { color: var(--text-muted); font-size: 0.82rem; transition: color 0.2s; }
+    .navbar-links a:hover { color: var(--text); }
+
+    .navbar-cta {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: var(--accent-bg-strong); border: 1px solid var(--accent-border-med);
+      border-radius: 8px; padding: 7px 14px;
+      color: var(--accent); font-size: 0.78rem; font-weight: 500;
+      transition: background 0.2s, border-color 0.2s;
+    }
+    .navbar-cta:hover { background: var(--accent-bg-hover); border-color: var(--accent-border-hover); color: var(--accent-hover); }
+
+    .navbar-controls {
+      display: flex; align-items: center; gap: 6px;
+    }
+
+    .nav-toggle {
+      background: var(--accent-bg); border: 1px solid var(--border);
+      border-radius: 6px; padding: 5px 10px;
+      color: var(--text-muted); font-size: 0.72rem; font-weight: 500;
+      cursor: pointer; transition: border-color 0.2s, color 0.2s, background 0.2s;
+      display: flex; align-items: center; gap: 5px;
+      font-family: inherit;
+    }
+    .nav-toggle:hover { border-color: var(--accent-border); color: var(--text); }
+    .nav-toggle svg { width: 14px; height: 14px; }
+
+    /* ============================================
+       HERO
+       ============================================ */
+    .hero {
+      position: relative; min-height: 100vh;
+      display: flex; align-items: center; justify-content: center;
+      overflow: hidden; background: var(--bg);
+      transition: background 0.3s;
+    }
+    .hero canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; }
+
+    .hero-content { position: relative; z-index: 1; text-align: center; padding: 0 24px; max-width: 740px; }
+
+    .hero-badges { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 36px; flex-wrap: wrap; }
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 7px;
+      background: var(--accent-bg); border: 1px solid var(--accent-border);
+      border-radius: 100px; padding: 6px 16px; font-size: 0.78rem; color: var(--accent);
+      backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    }
+    .hero-badge.obsidian { background: var(--accent-bg-strong); border-color: var(--accent-border-med); }
+    .hero-badge svg { width: 14px; height: 14px; flex-shrink: 0; }
+
+    .hero h1 { font-size: 4.5rem; font-weight: 700; letter-spacing: -0.04em; color: var(--text-white); margin-bottom: 20px; }
+    .hero h1 .accent {
+      background: linear-gradient(135deg, var(--accent) 0%, var(--hero-gradient-mid) 50%, var(--hero-gradient-end) 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    .hero .tagline { font-size: 1.2rem; color: var(--text-muted); margin-bottom: 20px; line-height: 1.6; }
+    .hero .tagline-obsidian { font-size: 0.95rem; color: var(--text-faint); margin-bottom: 44px; }
+    .hero .tagline-obsidian a { color: var(--accent); border-bottom: 1px solid var(--accent-border-subtle); transition: border-color 0.2s, color 0.2s; }
+    .hero .tagline-obsidian a:hover { border-color: var(--accent); }
+
+    .hero-cta {
+      display: inline-flex; align-items: center; gap: 0;
+      background: var(--bg-alt); border: 1px solid var(--border);
+      border-radius: 10px; overflow: hidden;
+      transition: border-color 0.25s, box-shadow 0.25s, background 0.3s;
+    }
+    .hero-cta:hover { border-color: var(--accent-border-med); box-shadow: 0 0 20px var(--accent-glow); }
+
+    .hero-cta .prompt {
+      color: var(--prompt-color); padding-left: 18px;
+      font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+      font-size: 0.88rem; user-select: none;
+    }
+    .hero-cta code { padding: 14px 10px 14px 8px; font-size: 0.88rem; color: var(--text); user-select: all; }
+
+    .hero-cta .copy-btn, .install-primary .copy-btn {
+      padding: 14px 16px; background: none; border: none; border-left: 1px solid var(--border);
+      color: var(--text-faint); cursor: pointer; font-size: 1rem;
+      transition: color 0.2s, background 0.2s;
+      display: flex; align-items: center; min-width: 46px; justify-content: center;
+    }
+    .hero-cta .copy-btn:hover, .install-primary .copy-btn:hover { color: var(--accent); background: var(--accent-glow); }
+    .hero-cta .copy-btn.copied, .install-primary .copy-btn.copied { color: var(--success); }
+
+    .scroll-hint {
+      position: absolute; bottom: 36px; left: 50%; transform: translateX(-50%);
+      z-index: 1; color: var(--scroll-hint);
+      animation: bounce 2.5s ease-in-out infinite; font-size: 1.2rem;
+    }
+    @keyframes bounce {
+      0%, 100% { transform: translateX(-50%) translateY(0); }
+      50% { transform: translateX(-50%) translateY(8px); }
+    }
+
+    /* ============================================
+       WORKFLOW
+       ============================================ */
+    .workflow-section {
+      background: var(--bg-alt); border-top: 1px solid var(--border-subtle);
+      border-bottom: 1px solid var(--border-subtle); transition: background 0.3s;
+    }
+    .workflow-pipeline { display: flex; align-items: flex-start; gap: 0; justify-content: center; flex-wrap: nowrap; }
+
+    .workflow-step { display: flex; flex-direction: column; align-items: center; text-align: center; flex: 0 1 160px; min-width: 0; }
+    .workflow-step .step-icon {
+      width: 52px; height: 52px; border-radius: 14px;
+      display: flex; align-items: center; justify-content: center; font-size: 1.3rem;
+      margin-bottom: 14px; background: var(--surface); border: 1px solid var(--border);
+      transition: border-color 0.25s, transform 0.25s, box-shadow 0.25s;
+    }
+    .workflow-step:hover .step-icon { border-color: var(--accent-border-med); transform: translateY(-2px); box-shadow: 0 4px 16px var(--accent-glow-strong); }
+    .workflow-step .step-name { font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace; font-size: 0.8rem; color: var(--text); margin-bottom: 6px; }
+    .workflow-step .step-desc { font-size: 0.75rem; color: var(--text-muted); line-height: 1.4; max-width: 130px; }
+    .workflow-arrow { color: var(--text-arrow); font-size: 1rem; flex-shrink: 0; padding-top: 14px; margin: 0 4px; }
+
+    /* ============================================
+       CARDS (shared)
+       ============================================ */
+    .use-cases-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+
+    .use-case-card, .skill-card {
+      background: var(--bg-alt); border: 1px solid var(--surface-2);
+      border-radius: 14px; transition: border-color 0.25s, transform 0.25s, box-shadow 0.25s;
+    }
+    .use-case-card:hover, .skill-card:hover { border-color: var(--border-hover); transform: translateY(-2px); box-shadow: 0 8px 24px var(--card-shadow); }
+
+    .use-case-card { padding: 32px; }
+    .use-case-card .card-icon {
+      width: 40px; height: 40px; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center; font-size: 1.2rem;
+      margin-bottom: 18px; background: var(--surface); border: 1px solid var(--border);
+    }
+    .use-case-card h3 { font-size: 1rem; margin-bottom: 8px; color: var(--text-heading); }
+    .use-case-card p { font-size: 0.85rem; color: var(--text-muted); line-height: 1.55; }
+
+    /* ============================================
+       INSTALLATION
+       ============================================ */
+    .install-section {
+      background: var(--bg-alt); border-top: 1px solid var(--border-subtle);
+      border-bottom: 1px solid var(--border-subtle); text-align: center; transition: background 0.3s;
+    }
+    .install-section .section-subtitle { margin-left: auto; margin-right: auto; }
+    .install-block { max-width: 560px; margin: 0 auto; }
+
+    .install-primary {
+      display: flex; align-items: center;
+      background: var(--bg-deep); border: 1px solid var(--border);
+      border-radius: 12px; overflow: hidden; margin-bottom: 16px;
+      transition: border-color 0.25s, box-shadow 0.25s, background 0.3s;
+    }
+    .install-primary:hover { border-color: var(--accent-border-med); box-shadow: 0 0 20px var(--accent-glow); }
+    .install-primary .prompt { color: var(--accent); padding-left: 20px; font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace; font-size: 0.9rem; user-select: none; }
+    .install-primary code { flex: 1; padding: 18px 12px; font-size: 0.88rem; color: var(--text); user-select: all; }
+    .install-primary .copy-btn { padding: 18px; min-width: 52px; }
+
+    .install-alt { font-size: 0.82rem; color: var(--text-faint); margin-bottom: 24px; }
+    .install-alt code { color: var(--text-muted); font-size: 0.8rem; }
+
+    .install-next {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: var(--accent-bg); border: 1px solid var(--accent-border-subtle);
+      border-radius: 8px; padding: 12px 20px; font-size: 0.85rem; color: var(--text-muted);
+    }
+    .install-next code { color: var(--accent); font-size: 0.82rem; }
+
+    /* ============================================
+       OBSIDIAN CALLOUT
+       ============================================ */
+    .obsidian-callout { text-align: center; padding: 64px 0; }
+    .obsidian-callout-inner {
+      display: inline-flex; align-items: center; gap: 14px;
+      background: var(--accent-bg); border: 1px solid var(--accent-border-subtle);
+      border-radius: 12px; padding: 20px 32px; transition: border-color 0.25s;
+    }
+    .obsidian-callout-inner:hover { border-color: var(--accent-border-med); }
+    .obsidian-callout svg { width: 28px; height: 28px; flex-shrink: 0; }
+    .obsidian-callout-text { text-align: left; font-size: 0.88rem; color: var(--text-muted); line-height: 1.5; }
+    .obsidian-callout-text strong { color: var(--text); font-weight: 500; }
+
+    /* ============================================
+       SKILLS GRID
+       ============================================ */
+    .skills-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .skill-card { padding: 28px; }
+    .skill-card .skill-icon {
+      width: 36px; height: 36px; border-radius: 9px;
+      display: flex; align-items: center; justify-content: center; font-size: 1.1rem;
+      margin-bottom: 16px; background: var(--surface); border: 1px solid var(--border);
+    }
+    .skill-card .skill-name { font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace; font-size: 0.82rem; color: var(--accent); margin-bottom: 8px; display: block; }
+    .skill-card p { font-size: 0.84rem; color: var(--text-muted); line-height: 1.5; }
+
+    /* ============================================
+       FOOTER
+       ============================================ */
+    footer { padding: 60px 0; border-top: 1px solid var(--border-subtle); text-align: center; background: var(--bg); transition: background 0.3s; }
+    .github-star {
+      display: inline-flex; align-items: center; gap: 10px;
+      background: var(--bg-alt); border: 1px solid var(--border);
+      border-radius: 10px; padding: 12px 24px; color: var(--text);
+      font-size: 0.88rem; font-weight: 500;
+      transition: border-color 0.25s, transform 0.2s, box-shadow 0.25s, background 0.3s;
+      margin-bottom: 28px;
+    }
+    .github-star:hover { border-color: var(--accent-border-med); transform: translateY(-1px); color: var(--text-heading); box-shadow: 0 4px 12px var(--card-shadow-strong); }
+    .github-star svg { width: 18px; height: 18px; }
+    .footer-meta { font-size: 0.78rem; color: var(--text-faintest); line-height: 2; }
+    .footer-meta a { color: var(--text-muted); transition: color 0.2s; }
+    .footer-meta a:hover { color: var(--accent); }
+    .footer-meta span { margin: 0 8px; color: var(--border); }
+
+    /* ============================================
+       RESPONSIVE
+       ============================================ */
+    @media (max-width: 768px) {
+      section { padding: 72px 0; }
+      .section-title { font-size: 1.6rem; }
+      .section-subtitle { margin-bottom: 40px; }
+      .hero h1 { font-size: 2.8rem; }
+      .hero .tagline { font-size: 1.05rem; margin-bottom: 16px; }
+      .hero .tagline-obsidian { margin-bottom: 36px; font-size: 0.88rem; }
+      .hero-cta code { font-size: 0.75rem; padding: 12px 8px 12px 6px; }
+      .hero-cta .prompt { padding-left: 14px; font-size: 0.75rem; }
+      .hero-cta .copy-btn { padding: 12px 12px; }
+      .hero-badges { gap: 8px; }
+      .hero-badge { font-size: 0.72rem; padding: 5px 12px; }
+
+      .workflow-pipeline { flex-direction: column; align-items: center; gap: 0; }
+      .workflow-arrow { transform: rotate(90deg); padding: 4px 0; margin: 0; }
+      .workflow-step { flex: none; width: 200px; }
+
+      .use-cases-grid { grid-template-columns: 1fr; }
+      .skills-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+      .skill-card { padding: 22px; }
+
+      .install-primary code { font-size: 0.75rem; padding: 14px 8px; }
+      .install-primary .prompt { padding-left: 14px; font-size: 0.75rem; }
+
+      .obsidian-callout-inner { flex-direction: column; text-align: center; padding: 20px 24px; }
+      .obsidian-callout-text { text-align: center; }
+
+      .navbar-links a:not(.navbar-cta) { display: none; }
+      .navbar-links { gap: 12px; }
+      .nav-toggle span { display: none; }
+      .nav-toggle { padding: 5px 7px; }
+
+      .footer-meta span { display: none; }
+      .footer-meta div { margin: 2px 0; }
+    }
+
+    @media (max-width: 420px) {
+      .skills-grid { grid-template-columns: 1fr; }
+      .hero-cta code { font-size: 0.65rem; }
+      .hero h1 { font-size: 2.2rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ==================== NAVBAR ==================== -->
+  <nav class="navbar" id="navbar">
+    <a href="#" class="navbar-logo">
+      <svg viewBox="0 0 24 24" fill="none">
+        <circle cx="12" cy="12" r="3" fill="#a882ff"/>
+        <circle cx="4" cy="6" r="1.5" fill="#ff7eb3"/>
+        <circle cx="20" cy="6" r="1.5" fill="#7ee8c7"/>
+        <circle cx="4" cy="18" r="1.5" fill="#ffbd59"/>
+        <circle cx="20" cy="18" r="1.5" fill="#67d4f1"/>
+        <line x1="12" y1="12" x2="4" y2="6" stroke="#a882ff" stroke-width="0.5" opacity="0.4"/>
+        <line x1="12" y1="12" x2="20" y2="6" stroke="#a882ff" stroke-width="0.5" opacity="0.4"/>
+        <line x1="12" y1="12" x2="4" y2="18" stroke="#a882ff" stroke-width="0.5" opacity="0.4"/>
+        <line x1="12" y1="12" x2="20" y2="18" stroke="#a882ff" stroke-width="0.5" opacity="0.4"/>
+      </svg>
+      Bedrock
+    </a>
+    <ul class="navbar-links">
+      <li><a href="#workflow" data-i18n="nav_workflow">Workflow</a></li>
+      <li><a href="#use-cases" data-i18n="nav_usecases">Use Cases</a></li>
+      <li><a href="#skills" data-i18n="nav_skills">Skills</a></li>
+      <li><a href="#install" class="navbar-cta" data-i18n="nav_install">Install</a></li>
+      <li><a href="https://github.com/iurykrieger/claude-bedrock" target="_blank" rel="noopener" class="nav-toggle" aria-label="Star on GitHub"><svg viewBox="0 0 16 16" fill="currentColor" width="14" height="14"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg><span>&#9733;</span></a></li>
+      <li class="navbar-controls">
+        <button class="nav-toggle" id="theme-toggle" aria-label="Toggle theme">
+          <svg id="theme-icon-dark" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="3.5"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.41 1.41M11.54 11.54l1.41 1.41M3.05 12.95l1.41-1.41M11.54 4.46l1.41-1.41"/></svg>
+          <svg id="theme-icon-light" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="display:none"><path d="M13.5 8.3A5.5 5.5 0 117.7 2.5a4 4 0 005.8 5.8z"/></svg>
+          <span id="theme-label">Light</span>
+        </button>
+        <button class="nav-toggle" id="lang-toggle" aria-label="Toggle language">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="8" cy="8" r="6.5"/><ellipse cx="8" cy="8" rx="3" ry="6.5"/><path d="M1.5 8h13M2.5 4.5h11M2.5 11.5h11"/></svg>
+          <span id="lang-label">PT</span>
+        </button>
+      </li>
+    </ul>
+  </nav>
+
+  <!-- ==================== HERO ==================== -->
+  <header class="hero">
+    <canvas id="graph-canvas"></canvas>
+    <div class="hero-content">
+      <div class="hero-badges">
+        <div class="hero-badge obsidian">
+          <svg viewBox="0 0 65 100" fill="#a882ff"><path d="M0 71.4L18.1 0l28.1 12.2L65 53.5 37.3 100z"/><path d="M18.1 0L46.2 12.2 37.3 100 12.4 82.1z" fill-opacity="0.6"/></svg>
+          <span data-i18n="badge_obsidian">Built for Obsidian</span>
+        </div>
+        <div class="hero-badge">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 1v4M8 11v4M1 8h4M11 8h4"/></svg>
+          <span data-i18n="badge_claude">Claude Code Plugin</span>
+        </div>
+      </div>
+      <h1><span class="accent">Bedrock</span></h1>
+      <p class="tagline" data-i18n="hero_tagline">Turn any Obsidian vault into a structured Second Brain.<br>7 entity types. 6 skills. Zero config.</p>
+      <p class="tagline-obsidian" data-i18n="hero_requires">Requires <a href="https://obsidian.md" target="_blank" rel="noopener">Obsidian</a> and <a href="https://docs.anthropic.com/en/docs/claude-code" target="_blank" rel="noopener">Claude Code</a></p>
+      <div class="hero-cta">
+        <span class="prompt">$</span>
+        <code>claude plugins add iurykrieger/claude-bedrock</code>
+        <button class="copy-btn" data-copy="claude plugins add iurykrieger/claude-bedrock" aria-label="Copy install command">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M10.5 5.5V3.5a1.5 1.5 0 0 0-1.5-1.5H3.5A1.5 1.5 0 0 0 2 3.5V9a1.5 1.5 0 0 0 1.5 1.5h2"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="scroll-hint" aria-hidden="true">&#8595;</div>
+  </header>
+
+  <!-- ==================== WORKFLOW ==================== -->
+  <section class="workflow-section" id="workflow">
+    <div class="container">
+      <div class="section-label" data-i18n="workflow_label">How It Works</div>
+      <h2 class="section-title" data-i18n="workflow_title">Six skills, one workflow</h2>
+      <p class="section-subtitle" data-i18n="workflow_subtitle">Set up your vault, ingest knowledge from any source, and let Bedrock keep it organized.</p>
+      <div class="workflow-pipeline">
+        <div class="workflow-step"><div class="step-icon">&#9881;</div><div class="step-name">setup</div><div class="step-desc" data-i18n="wf_setup">Initialize vault structure and templates</div></div>
+        <div class="workflow-arrow">&#8594;</div>
+        <div class="workflow-step"><div class="step-icon">&#128218;</div><div class="step-name">teach</div><div class="step-desc" data-i18n="wf_teach">Ingest from Confluence, GDocs, GitHub</div></div>
+        <div class="workflow-arrow">&#8594;</div>
+        <div class="workflow-step"><div class="step-icon">&#128279;</div><div class="step-name">preserve</div><div class="step-desc" data-i18n="wf_preserve">Create entities with bidirectional links</div></div>
+        <div class="workflow-arrow">&#8594;</div>
+        <div class="workflow-step"><div class="step-icon">&#128269;</div><div class="step-name">query</div><div class="step-desc" data-i18n="wf_query">Search and cross-reference your vault</div></div>
+        <div class="workflow-arrow">&#8594;</div>
+        <div class="workflow-step"><div class="step-icon">&#9878;</div><div class="step-name">compress</div><div class="step-desc" data-i18n="wf_compress">Deduplicate and consolidate entities</div></div>
+        <div class="workflow-arrow">&#8594;</div>
+        <div class="workflow-step"><div class="step-icon">&#128260;</div><div class="step-name">sync</div><div class="step-desc" data-i18n="wf_sync">Re-sync with external sources</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== USE CASES ==================== -->
+  <section class="use-cases-section" id="use-cases">
+    <div class="container">
+      <div class="section-label" data-i18n="uc_label">Built For</div>
+      <h2 class="section-title" data-i18n="uc_title">Your knowledge, structured</h2>
+      <p class="section-subtitle" data-i18n="uc_subtitle">Bedrock adapts to any team or individual workflow where knowledge sprawl is a problem.</p>
+      <div class="use-cases-grid">
+        <div class="use-case-card"><div class="card-icon">&#128187;</div><h3 data-i18n="uc1_title">Engineering Team Wiki</h3><p data-i18n="uc1_desc">Track systems, APIs, services, and team knowledge. Every repo becomes an entity with owners, dependencies, and status — automatically linked.</p></div>
+        <div class="use-case-card"><div class="card-icon">&#128202;</div><h3 data-i18n="uc2_title">Product Management</h3><p data-i18n="uc2_desc">Capture decisions, roadmaps, and cross-team context. Bridge notes connect people to projects to the discussions that shaped them.</p></div>
+        <div class="use-case-card"><div class="card-icon">&#127760;</div><h3 data-i18n="uc3_title">Open Source Project</h3><p data-i18n="uc3_desc">Document contributors, architecture decisions, and discussions. Ingest from GitHub PRs and issues directly into structured entities.</p></div>
+        <div class="use-case-card"><div class="card-icon">&#129504;</div><h3 data-i18n="uc4_title">Personal Second Brain</h3><p data-i18n="uc4_desc">Fleeting ideas get captured, promoted to permanent notes, and linked into your growing knowledge graph. Zettelkasten principles, automated.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== INSTALLATION ==================== -->
+  <section class="install-section" id="install">
+    <div class="container">
+      <div class="section-label" data-i18n="inst_label">Get Started</div>
+      <h2 class="section-title" data-i18n="inst_title">Up and running in seconds</h2>
+      <p class="section-subtitle" data-i18n="inst_subtitle">One command to install. One skill to set up your vault. That's it.</p>
+      <div class="install-block">
+        <div class="install-primary">
+          <span class="prompt">$</span>
+          <code>claude plugins add iurykrieger/claude-bedrock</code>
+          <button class="copy-btn" data-copy="claude plugins add iurykrieger/claude-bedrock" aria-label="Copy install command">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M10.5 5.5V3.5a1.5 1.5 0 0 0-1.5-1.5H3.5A1.5 1.5 0 0 0 2 3.5V9a1.5 1.5 0 0 0 1.5 1.5h2"/></svg>
+          </button>
+        </div>
+        <div class="install-alt" data-i18n="inst_alt">Or for local development: <code>claude --plugin-dir ./claude-bedrock</code></div>
+        <div class="install-next" data-i18n="inst_next">Then run <code>/bedrock:setup</code> to initialize your vault</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== SKILLS GRID ==================== -->
+  <section class="skills-section" id="skills">
+    <div class="container">
+      <div class="section-label" data-i18n="sk_label">Skills</div>
+      <h2 class="section-title" data-i18n="sk_title">Everything you need to manage knowledge</h2>
+      <p class="section-subtitle" data-i18n="sk_subtitle">Each skill is a specialized agent that reads your vault conventions and acts accordingly.</p>
+      <div class="skills-grid">
+        <div class="skill-card"><div class="skill-icon">&#9881;</div><span class="skill-name">/bedrock:setup</span><p data-i18n="sk_setup">Interactive wizard to scaffold directories, templates, and example entities. Pick a preset or go custom.</p></div>
+        <div class="skill-card"><div class="skill-icon">&#128269;</div><span class="skill-name">/bedrock:query</span><p data-i18n="sk_query">Ask questions in natural language. Searches entities, follows wikilinks, and cross-references to build answers.</p></div>
+        <div class="skill-card"><div class="skill-icon">&#128218;</div><span class="skill-name">/bedrock:teach</span><p data-i18n="sk_teach">Feed it a Confluence page, Google Doc, GitHub repo, or CSV. It extracts entities and writes them to your vault.</p></div>
+        <div class="skill-card"><div class="skill-icon">&#128279;</div><span class="skill-name">/bedrock:preserve</span><p data-i18n="sk_preserve">Single write point for all entities. Detects type, matches existing files, creates or updates with bidirectional links.</p></div>
+        <div class="skill-card"><div class="skill-icon">&#9878;</div><span class="skill-name">/bedrock:compress</span><p data-i18n="sk_compress">Finds duplicates, orphan entities, broken links, and stale content. Consolidates and reports vault health.</p></div>
+        <div class="skill-card"><div class="skill-icon">&#128260;</div><span class="skill-name">/bedrock:sync</span><p data-i18n="sk_sync">Re-syncs entities with their external sources. Supports GitHub activity, contributor profiles, and source metadata.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== OBSIDIAN CALLOUT ==================== -->
+  <div class="obsidian-callout">
+    <div class="container">
+      <a href="https://obsidian.md" target="_blank" rel="noopener" class="obsidian-callout-inner">
+        <svg viewBox="0 0 65 100" width="28" height="43" fill="#a882ff"><path d="M0 71.4L18.1 0l28.1 12.2L65 53.5 37.3 100z"/><path d="M18.1 0L46.2 12.2 37.3 100 12.4 82.1z" fill-opacity="0.6"/></svg>
+        <div class="obsidian-callout-text">
+          <strong data-i18n="callout_title">New to Obsidian?</strong><br>
+          <span data-i18n="callout_desc">Download the free knowledge base app at <span style="color:var(--accent)">obsidian.md</span></span>
+        </div>
+      </a>
+    </div>
+  </div>
+
+  <!-- ==================== FOOTER ==================== -->
+  <footer>
+    <div class="container">
+      <a href="https://github.com/iurykrieger/claude-bedrock" class="github-star" target="_blank" rel="noopener">
+        <svg viewBox="0 0 16 16" fill="currentColor" width="18" height="18"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+        <span data-i18n="footer_star">Star on GitHub</span>
+      </a>
+      <div class="footer-meta">
+        <div><span data-i18n="footer_license">MIT License</span> <span>&#183;</span> <span data-i18n="footer_built">Built by</span> <a href="https://github.com/iurykrieger" target="_blank" rel="noopener">Iury Krieger</a></div>
+        <div><span data-i18n="footer_powered">Powered by</span> <a href="https://obsidian.md" target="_blank" rel="noopener">Obsidian</a> + <a href="https://docs.anthropic.com/en/docs/claude-code" target="_blank" rel="noopener">Claude Code</a></div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- ==================== SCRIPTS ==================== -->
+  <script>
+    /* ============================================
+       I18N TRANSLATIONS
+       ============================================ */
+    var I18N = {
+      en: {
+        nav_workflow: 'Workflow', nav_usecases: 'Use Cases', nav_skills: 'Skills', nav_install: 'Install',
+        badge_obsidian: 'Built for Obsidian', badge_claude: 'Claude Code Plugin',
+        hero_tagline: 'Turn any Obsidian vault into a structured Second Brain.<br>7 entity types. 6 skills. Zero config.',
+        hero_requires: 'Requires <a href="https://obsidian.md" target="_blank" rel="noopener">Obsidian</a> and <a href="https://docs.anthropic.com/en/docs/claude-code" target="_blank" rel="noopener">Claude Code</a>',
+        workflow_label: 'How It Works', workflow_title: 'Six skills, one workflow',
+        workflow_subtitle: 'Set up your vault, ingest knowledge from any source, and let Bedrock keep it organized.',
+        wf_setup: 'Initialize vault structure and templates', wf_teach: 'Ingest from Confluence, GDocs, GitHub',
+        wf_preserve: 'Create entities with bidirectional links', wf_query: 'Search and cross-reference your vault',
+        wf_compress: 'Deduplicate and consolidate entities', wf_sync: 'Re-sync with external sources',
+        uc_label: 'Built For', uc_title: 'Your knowledge, structured',
+        uc_subtitle: 'Bedrock adapts to any team or individual workflow where knowledge sprawl is a problem.',
+        uc1_title: 'Engineering Team Wiki', uc1_desc: 'Track systems, APIs, services, and team knowledge. Every repo becomes an entity with owners, dependencies, and status \u2014 automatically linked.',
+        uc2_title: 'Product Management', uc2_desc: 'Capture decisions, roadmaps, and cross-team context. Bridge notes connect people to projects to the discussions that shaped them.',
+        uc3_title: 'Open Source Project', uc3_desc: 'Document contributors, architecture decisions, and discussions. Ingest from GitHub PRs and issues directly into structured entities.',
+        uc4_title: 'Personal Second Brain', uc4_desc: 'Fleeting ideas get captured, promoted to permanent notes, and linked into your growing knowledge graph. Zettelkasten principles, automated.',
+        inst_label: 'Get Started', inst_title: 'Up and running in seconds',
+        inst_subtitle: "One command to install. One skill to set up your vault. That's it.",
+        inst_alt: 'Or for local development: <code>claude --plugin-dir ./claude-bedrock</code>',
+        inst_next: 'Then run <code>/bedrock:setup</code> to initialize your vault',
+        sk_label: 'Skills', sk_title: 'Everything you need to manage knowledge',
+        sk_subtitle: "Each skill is a specialized agent that reads your vault conventions and acts accordingly.",
+        sk_setup: 'Interactive wizard to scaffold directories, templates, and example entities. Pick a preset or go custom.',
+        sk_query: 'Ask questions in natural language. Searches entities, follows wikilinks, and cross-references to build answers.',
+        sk_teach: 'Feed it a Confluence page, Google Doc, GitHub repo, or CSV. It extracts entities and writes them to your vault.',
+        sk_preserve: 'Single write point for all entities. Detects type, matches existing files, creates or updates with bidirectional links.',
+        sk_compress: 'Finds duplicates, orphan entities, broken links, and stale content. Consolidates and reports vault health.',
+        sk_sync: 'Re-syncs entities with their external sources. Supports GitHub activity, contributor profiles, and source metadata.',
+        callout_title: 'New to Obsidian?', callout_desc: 'Download the free knowledge base app at <span style="color:var(--accent)">obsidian.md</span>',
+        footer_star: 'Star on GitHub', footer_license: 'MIT License', footer_built: 'Built by', footer_powered: 'Powered by'
+      },
+      pt: {
+        nav_workflow: 'Fluxo', nav_usecases: 'Casos de Uso', nav_skills: 'Skills', nav_install: 'Instalar',
+        badge_obsidian: 'Feito para o Obsidian', badge_claude: 'Plugin Claude Code',
+        hero_tagline: 'Transforme qualquer vault Obsidian em um Segundo C\u00e9rebro estruturado.<br>7 tipos de entidade. 6 skills. Zero configura\u00e7\u00e3o.',
+        hero_requires: 'Requer <a href="https://obsidian.md" target="_blank" rel="noopener">Obsidian</a> e <a href="https://docs.anthropic.com/en/docs/claude-code" target="_blank" rel="noopener">Claude Code</a>',
+        workflow_label: 'Como Funciona', workflow_title: 'Seis skills, um fluxo',
+        workflow_subtitle: 'Configure seu vault, ingira conhecimento de qualquer fonte e deixe o Bedrock manter tudo organizado.',
+        wf_setup: 'Inicializa estrutura e templates do vault', wf_teach: 'Ingere do Confluence, GDocs, GitHub',
+        wf_preserve: 'Cria entidades com links bidirecionais', wf_query: 'Busca e cruza refer\u00eancias no vault',
+        wf_compress: 'Deduplica e consolida entidades', wf_sync: 'Re-sincroniza com fontes externas',
+        uc_label: 'Feito Para', uc_title: 'Seu conhecimento, estruturado',
+        uc_subtitle: 'O Bedrock se adapta a qualquer fluxo de time ou individual onde o conhecimento est\u00e1 disperso.',
+        uc1_title: 'Wiki de Time de Engenharia', uc1_desc: 'Rastreie sistemas, APIs, servi\u00e7os e conhecimento do time. Cada repo vira uma entidade com owners, depend\u00eancias e status \u2014 linkados automaticamente.',
+        uc2_title: 'Gest\u00e3o de Produto', uc2_desc: 'Capture decis\u00f5es, roadmaps e contexto entre times. Bridge notes conectam pessoas a projetos e \u00e0s discuss\u00f5es que os moldaram.',
+        uc3_title: 'Projeto Open Source', uc3_desc: 'Documente contribuidores, decis\u00f5es de arquitetura e discuss\u00f5es. Ingira PRs e issues do GitHub diretamente em entidades estruturadas.',
+        uc4_title: 'Segundo C\u00e9rebro Pessoal', uc4_desc: 'Ideias s\u00e3o capturadas, promovidas a notas permanentes e linkadas no seu grafo de conhecimento. Princ\u00edpios Zettelkasten, automatizados.',
+        inst_label: 'Comece Agora', inst_title: 'Pronto em segundos',
+        inst_subtitle: 'Um comando para instalar. Uma skill para configurar o vault. S\u00f3 isso.',
+        inst_alt: 'Ou para desenvolvimento local: <code>claude --plugin-dir ./claude-bedrock</code>',
+        inst_next: 'Depois execute <code>/bedrock:setup</code> para inicializar seu vault',
+        sk_label: 'Skills', sk_title: 'Tudo que voc\u00ea precisa para gerenciar conhecimento',
+        sk_subtitle: 'Cada skill \u00e9 um agente especializado que l\u00ea as conven\u00e7\u00f5es do vault e age de acordo.',
+        sk_setup: 'Wizard interativo para criar diret\u00f3rios, templates e entidades de exemplo. Escolha um preset ou personalize.',
+        sk_query: 'Fa\u00e7a perguntas em linguagem natural. Busca entidades, segue wikilinks e cruza refer\u00eancias para construir respostas.',
+        sk_teach: 'Alimente com uma p\u00e1gina do Confluence, Google Doc, repo GitHub ou CSV. Extrai entidades e grava no vault.',
+        sk_preserve: 'Ponto \u00fanico de escrita. Detecta tipo, encontra arquivos existentes, cria ou atualiza com links bidirecionais.',
+        sk_compress: 'Encontra duplicatas, entidades \u00f3rf\u00e3s, links quebrados e conte\u00fado obsoleto. Consolida e reporta a sa\u00fade do vault.',
+        sk_sync: 'Re-sincroniza entidades com suas fontes externas. Suporta atividade GitHub, perfis de contribuidores e metadados.',
+        callout_title: 'Novo no Obsidian?', callout_desc: 'Baixe o app gratuito de base de conhecimento em <span style="color:var(--accent)">obsidian.md</span>',
+        footer_star: 'Estrela no GitHub', footer_license: 'Licen\u00e7a MIT', footer_built: 'Criado por', footer_powered: 'Powered by'
+      }
+    };
+
+    var currentLang = 'en';
+
+    function setLang(lang) {
+      currentLang = lang;
+      document.documentElement.lang = lang === 'pt' ? 'pt-BR' : 'en';
+      var strings = I18N[lang];
+      document.querySelectorAll('[data-i18n]').forEach(function(el) {
+        var key = el.getAttribute('data-i18n');
+        if (strings[key]) el.innerHTML = strings[key];
+      });
+      var langLabel = document.getElementById('lang-label');
+      langLabel.textContent = lang === 'en' ? 'PT' : 'EN';
+    }
+
+    function detectLang() {
+      var nav = (navigator.language || navigator.userLanguage || 'en').toLowerCase();
+      return nav.startsWith('pt') ? 'pt' : 'en';
+    }
+
+    /* ============================================
+       THEME
+       ============================================ */
+    var currentTheme = 'dark';
+
+    function setTheme(theme) {
+      currentTheme = theme;
+      document.documentElement.setAttribute('data-theme', theme);
+      var darkIcon = document.getElementById('theme-icon-dark');
+      var lightIcon = document.getElementById('theme-icon-light');
+      var label = document.getElementById('theme-label');
+      if (theme === 'dark') {
+        darkIcon.style.display = '';
+        lightIcon.style.display = 'none';
+        label.textContent = currentLang === 'pt' ? 'Claro' : 'Light';
+      } else {
+        darkIcon.style.display = 'none';
+        lightIcon.style.display = '';
+        label.textContent = currentLang === 'pt' ? 'Escuro' : 'Dark';
+      }
+      // Update canvas colors
+      if (window.updateGraphTheme) window.updateGraphTheme(theme);
+    }
+
+    function detectTheme() {
+      if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) return 'light';
+      return 'dark';
+    }
+
+    /* ============================================
+       INIT THEME & LANG
+       ============================================ */
+    (function() {
+      var initTheme = detectTheme();
+      var initLang = detectLang();
+      setTheme(initTheme);
+      setLang(initLang);
+
+      document.getElementById('theme-toggle').addEventListener('click', function() {
+        setTheme(currentTheme === 'dark' ? 'light' : 'dark');
+      });
+
+      document.getElementById('lang-toggle').addEventListener('click', function() {
+        setLang(currentLang === 'en' ? 'pt' : 'en');
+        // Update theme label for new lang
+        var label = document.getElementById('theme-label');
+        if (currentTheme === 'dark') label.textContent = currentLang === 'pt' ? 'Claro' : 'Light';
+        else label.textContent = currentLang === 'pt' ? 'Escuro' : 'Dark';
+      });
+    })();
+
+    /* ============================================
+       CANVAS GRAPH ANIMATION
+       ============================================ */
+    (function() {
+      var canvas = document.getElementById('graph-canvas');
+      var ctx = canvas.getContext('2d');
+      var dpr = window.devicePixelRatio || 1;
+      var nodes = [];
+
+      var THEME_COLORS = {
+        dark:  { nodes: ['#a882ff','#a882ff','#ff7eb3','#7ee8c7','#ffbd59','#67d4f1'], line: [168,130,255], bg: 'transparent' },
+        light: { nodes: ['#7c3aed','#7c3aed','#e11d48','#059669','#d97706','#0284c7'], line: [124,58,237], bg: 'transparent' }
+      };
+      var colors = THEME_COLORS[currentTheme];
+
+      window.updateGraphTheme = function(theme) {
+        colors = THEME_COLORS[theme];
+        for (var i = 0; i < nodes.length; i++) {
+          nodes[i].color = colors.nodes[Math.floor(Math.random() * colors.nodes.length)];
+        }
+      };
+
+      var CONNECTION_DIST = 150;
+      var MOUSE_DIST = 200;
+      var isMobile = window.innerWidth < 768;
+      var NODE_COUNT = isMobile ? 50 : 100;
+      var mouse = { x: -9999, y: -9999, active: false };
+
+      canvas.addEventListener('mousemove', function(e) {
+        var rect = canvas.getBoundingClientRect();
+        mouse.x = e.clientX - rect.left;
+        mouse.y = e.clientY - rect.top;
+        mouse.active = true;
+      });
+      canvas.addEventListener('mouseleave', function() { mouse.active = false; });
+
+      function resize() {
+        var w = canvas.parentElement.clientWidth;
+        var h = canvas.parentElement.clientHeight;
+        canvas.width = w * dpr; canvas.height = h * dpr;
+        canvas.style.width = w + 'px'; canvas.style.height = h + 'px';
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        CONNECTION_DIST = isMobile ? 100 : 150;
+      }
+
+      function initNodes() {
+        nodes = [];
+        var w = canvas.width / dpr, h = canvas.height / dpr;
+        for (var i = 0; i < NODE_COUNT; i++) {
+          var radius = 1.5 + Math.random() * 5;
+          nodes.push({
+            x: Math.random() * w, y: Math.random() * h,
+            radius: radius,
+            color: colors.nodes[Math.floor(Math.random() * colors.nodes.length)],
+            vx: (Math.random() - 0.5) * 0.25, vy: (Math.random() - 0.5) * 0.25,
+            depth: 1 - (radius - 1.5) / 5 * 0.6
+          });
+        }
+      }
+
+      function draw() {
+        var w = canvas.width / dpr, h = canvas.height / dpr;
+        ctx.clearRect(0, 0, w, h);
+        var lc = colors.line;
+
+        // Connection lines
+        ctx.lineWidth = 0.5;
+        for (var i = 0; i < nodes.length; i++) {
+          for (var j = i + 1; j < nodes.length; j++) {
+            var dx = nodes[i].x - nodes[j].x, dy = nodes[i].y - nodes[j].y;
+            var distSq = dx * dx + dy * dy;
+            if (distSq < CONNECTION_DIST * CONNECTION_DIST) {
+              var dist = Math.sqrt(distSq);
+              var alpha = 0.06 * (1 - dist / CONNECTION_DIST);
+              ctx.beginPath();
+              ctx.strokeStyle = 'rgba(' + lc[0] + ',' + lc[1] + ',' + lc[2] + ',' + alpha + ')';
+              ctx.moveTo(nodes[i].x, nodes[i].y); ctx.lineTo(nodes[j].x, nodes[j].y);
+              ctx.stroke();
+            }
+          }
+        }
+
+        // Mouse connections
+        if (mouse.active) {
+          for (var m = 0; m < nodes.length; m++) {
+            var mn = nodes[m];
+            var mdx = mn.x - mouse.x, mdy = mn.y - mouse.y, mdistSq = mdx * mdx + mdy * mdy;
+            if (mdistSq < MOUSE_DIST * MOUSE_DIST) {
+              var mdist = Math.sqrt(mdistSq);
+              var malpha = 0.25 * (1 - mdist / MOUSE_DIST);
+              ctx.beginPath();
+              ctx.strokeStyle = 'rgba(' + lc[0] + ',' + lc[1] + ',' + lc[2] + ',' + malpha + ')';
+              ctx.lineWidth = 1;
+              ctx.moveTo(mouse.x, mouse.y); ctx.lineTo(mn.x, mn.y);
+              ctx.stroke();
+            }
+          }
+          ctx.lineWidth = 0.5;
+          ctx.beginPath(); ctx.arc(mouse.x, mouse.y, 4, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(' + lc[0] + ',' + lc[1] + ',' + lc[2] + ',0.38)'; ctx.fill();
+          ctx.beginPath(); ctx.arc(mouse.x, mouse.y, 20, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(' + lc[0] + ',' + lc[1] + ',' + lc[2] + ',0.03)'; ctx.fill();
+        }
+
+        // Nodes
+        for (var k = 0; k < nodes.length; k++) {
+          var n = nodes[k];
+          if (mouse.active) {
+            var atdx = mouse.x - n.x, atdy = mouse.y - n.y;
+            var atdist = Math.sqrt(atdx * atdx + atdy * atdy);
+            if (atdist < MOUSE_DIST && atdist > 1) {
+              var force = 0.008 * (1 - atdist / MOUSE_DIST);
+              n.vx += (atdx / atdist) * force; n.vy += (atdy / atdist) * force;
+              var speed = Math.sqrt(n.vx * n.vx + n.vy * n.vy);
+              if (speed > 0.6) { n.vx = (n.vx / speed) * 0.6; n.vy = (n.vy / speed) * 0.6; }
+            }
+          }
+          var glowAlpha = '12';
+          if (mouse.active) {
+            var gdx = n.x - mouse.x, gdy = n.y - mouse.y;
+            if (gdx * gdx + gdy * gdy < MOUSE_DIST * MOUSE_DIST) glowAlpha = '30';
+          }
+          ctx.beginPath(); ctx.arc(n.x, n.y, n.radius * 2.5, 0, Math.PI * 2);
+          ctx.fillStyle = n.color + glowAlpha; ctx.fill();
+          ctx.beginPath(); ctx.arc(n.x, n.y, n.radius, 0, Math.PI * 2);
+          ctx.fillStyle = n.color; ctx.fill();
+          n.x += n.vx * n.depth; n.y += n.vy * n.depth;
+          if (n.x < -20) n.x = w + 20; if (n.x > w + 20) n.x = -20;
+          if (n.y < -20) n.y = h + 20; if (n.y > h + 20) n.y = -20;
+        }
+        requestAnimationFrame(draw);
+      }
+
+      resize(); initNodes(); draw();
+      window.addEventListener('resize', function() {
+        isMobile = window.innerWidth < 768;
+        NODE_COUNT = isMobile ? 50 : 100;
+        resize(); initNodes();
+      });
+    })();
+
+    /* ============================================
+       STICKY NAVBAR ON SCROLL
+       ============================================ */
+    (function() {
+      var navbar = document.getElementById('navbar');
+      var hero = document.querySelector('.hero');
+      var threshold = hero ? hero.offsetHeight * 0.6 : 400;
+      window.addEventListener('scroll', function() {
+        if (window.scrollY > threshold) navbar.classList.add('scrolled');
+        else navbar.classList.remove('scrolled');
+      }, { passive: true });
+    })();
+
+    /* ============================================
+       COPY TO CLIPBOARD
+       ============================================ */
+    document.querySelectorAll('.copy-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var text = btn.getAttribute('data-copy');
+        var svgIcon = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M10.5 5.5V3.5a1.5 1.5 0 0 0-1.5-1.5H3.5A1.5 1.5 0 0 0 2 3.5V9a1.5 1.5 0 0 0 1.5 1.5h2"/></svg>';
+        var checkIcon = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5l3.5 3.5 6.5-7"/></svg>';
+        function onSuccess() {
+          btn.innerHTML = checkIcon; btn.classList.add('copied');
+          setTimeout(function() { btn.innerHTML = svgIcon; btn.classList.remove('copied'); }, 2000);
+        }
+        function onFail() {
+          var code = btn.parentElement.querySelector('code');
+          if (code) { var r = document.createRange(); r.selectNodeContents(code); var s = window.getSelection(); s.removeAllRanges(); s.addRange(r); }
+        }
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(onSuccess).catch(function() {
+            try { var ta = document.createElement('textarea'); ta.value = text; ta.style.position = 'fixed'; ta.style.left = '-9999px'; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); onSuccess(); } catch(e) { onFail(); }
+          });
+        } else {
+          try { var ta = document.createElement('textarea'); ta.value = text; ta.style.position = 'fixed'; ta.style.left = '-9999px'; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); onSuccess(); } catch(e) { onFail(); }
+        }
+      });
+    });
+  </script>
+
+</body>
+</html>
