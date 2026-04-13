@@ -1,8 +1,34 @@
-# claude-bedrock
+<p align="center">
+  <img src="docs/banner.png" alt="Bedrock — Knowledge graph visualization" width="600">
+</p>
 
-Claude Code plugin for Obsidian vault automation — entity management, ingestion, compression, and sync.
+<h1 align="center">Bedrock</h1>
 
-Bedrock turns any Obsidian vault into a structured Second Brain with 7 entity types (actors, people, teams, topics, discussions, projects, fleeting) managed by AI agents via Claude Code skills.
+<p align="center">
+  <strong>Turn any Obsidian vault into a structured Second Brain with AI agents</strong>
+</p>
+
+<p align="center">
+  <a href="https://github.com/iurykrieger/claude-bedrock/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License"></a>
+  <a href="https://github.com/iurykrieger/claude-bedrock"><img src="https://img.shields.io/badge/claude--code-plugin-a882ff" alt="Claude Code Plugin"></a>
+  <a href="https://github.com/iurykrieger/claude-bedrock"><img src="https://img.shields.io/github/v/tag/iurykrieger/claude-bedrock?label=version" alt="Version"></a>
+</p>
+
+---
+
+Bedrock is a [Claude Code](https://docs.anthropic.com/en/docs/claude-code) plugin that automates Obsidian vault management through AI-powered skills. It organizes knowledge into **7 entity types** following adapted [Zettelkasten](https://zettelkasten.de/overview/) principles — entity detection, bidirectional linking, ingestion from external sources, deduplication, and sync.
+
+No build system. No runtime. Just markdown files, AI agents, and your Obsidian vault.
+
+## Features
+
+- **6 AI-powered skills** — query, teach, preserve, compress, sync, and setup
+- **7 entity types** — actors, people, teams, topics, discussions, projects, and fleeting notes
+- **External source ingestion** — Confluence, Google Docs, GitHub, CSV
+- **Bidirectional wikilinks** — automatic cross-referencing with Obsidian graph view
+- **Hierarchical tags** — multi-dimensional filtering (`type/`, `status/`, `domain/`, `scope/`)
+- **Zettelkasten structure** — permanent, bridge, index, and fleeting note roles
+- **Trunk-based git workflow** — structured commit conventions built in
 
 ## Installation
 
@@ -10,45 +36,41 @@ Bedrock turns any Obsidian vault into a structured Second Brain with 7 entity ty
 claude plugins add iurykrieger/claude-bedrock
 ```
 
-Or for local development/testing:
+For local development:
 
 ```bash
 claude --plugin-dir ./claude-bedrock
 ```
 
-## Getting Started
+## Quick Start
 
-After installing the plugin, run the setup skill to initialize your vault:
+After installing, run the setup wizard:
 
 ```
 /bedrock:setup
 ```
 
-The setup wizard will guide you through:
+This will guide you through:
 
-1. **Language selection** — Choose the vault content language (default: English)
-2. **Dependency check** — Verify optional tools (graphify, confluence-to-markdown, gdoc-to-markdown)
-3. **Vault objective** — Pick a preset (engineering team, product management, company wiki, personal second brain, open source project, or custom)
-4. **Scaffold** — Create directories, templates, config, and connected example entities
+1. **Language selection** — choose the vault content language (default: English)
+2. **Dependency check** — verify optional tools (`graphify`, `confluence-to-markdown`, `gdoc-to-markdown`)
+3. **Vault objective** — pick a preset (engineering team, product management, company wiki, personal second brain, open source project, or custom)
+4. **Scaffold** — create directories, templates, config, and connected example entities
 
-This creates all entity directories, copies templates, generates a vault-level `CLAUDE.md`, and scaffolds example entities with bidirectional wikilinks so you can see the graph in Obsidian immediately.
-
-Configuration is stored in `.bedrock/config.json`. Run `/bedrock:setup` again to reconfigure.
+The setup creates all entity directories, copies templates, generates a vault-level `CLAUDE.md`, and scaffolds example entities with bidirectional wikilinks so you can see the graph in Obsidian immediately.
 
 ## Skills
 
 | Skill | Purpose |
 |---|---|
-| `/bedrock:setup` | Initialize and configure a new vault with guided setup |
-| `/bedrock:query` | Smart vault reader — answers questions by searching and cross-referencing entities |
-| `/bedrock:teach` | Ingest external sources (Confluence, GDocs, GitHub, CSV) — extracts entities |
-| `/bedrock:preserve` | Single write point — entity detection, matching, create/update, bidirectional links |
-| `/bedrock:compress` | Deduplication and vault health — broken links, orphan entities, stale content |
+| `/bedrock:setup` | Interactive vault initialization and configuration |
+| `/bedrock:query` | Smart vault reader — search and cross-reference entities |
+| `/bedrock:teach` | Ingest external sources — extract and create entities |
+| `/bedrock:preserve` | Single write point — detect, match, create/update entities with bidirectional links |
+| `/bedrock:compress` | Deduplication and vault health — broken links, orphans, stale content |
 | `/bedrock:sync` | Re-sync entities with external sources |
 
 ## Vault Structure
-
-After running `/bedrock:setup`, your vault will follow this directory layout:
 
 ```
 your-vault/
@@ -61,31 +83,66 @@ your-vault/
 └── fleeting/        # Raw ideas, unstructured captures (fleeting notes)
 ```
 
-Each directory should contain a `_template.md` defining the frontmatter schema. Templates are available in this plugin's `templates/` directory.
+Each directory contains a `_template.md` defining the frontmatter schema for that entity type.
 
-## Entity Definitions
+## How It Works
 
-The `entities/` directory contains semantic definitions for each entity type — used by skills to classify and route content correctly. These define:
+Bedrock follows a **skill delegation model** where all write operations flow through `/bedrock:preserve` as the single write point:
 
-- What each entity type represents
-- When to create vs. not create
-- Required frontmatter fields
-- Zettelkasten role and linking rules
-- Completeness criteria
+```
+External Source → /bedrock:teach → entity detection → /bedrock:preserve → vault
+GitHub/Confluence → /bedrock:sync  → diff analysis  → /bedrock:preserve → vault
+User question   → /bedrock:query → search + graph  → read-only response
+Vault health    → /bedrock:compress → dedup/merge   → vault updates
+```
 
-## Writing Rules
+Every entity includes structured frontmatter, hierarchical tags, and bidirectional wikilinks — making the Obsidian graph view a living map of your knowledge.
 
-All vault content follows these conventions (enforced via the plugin's CLAUDE.md):
+## Optional Dependencies
 
-- **Language:** English (en-US) by default (configurable via `/bedrock:setup`), technical terms in English
-- **Frontmatter:** Keys in English, values in the vault's configured language
-- **Wikilinks:** Bare names only (`[[name]]`, never `[[dir/name]]`)
-- **Tags:** Hierarchical (`type/actor`, `status/active`, `domain/payments`)
-- **Aliases:** Minimum 1 per entity
-- **Git:** Trunk-based, commit convention `vault(<type>): <verb> <name> [source: <origin>]`
+| Tool | Purpose | Required? |
+|---|---|---|
+| [graphify](https://github.com/iurykrieger/graphify) | Semantic code extraction for GitHub repos | No |
+| [confluence-to-markdown](https://github.com/mk-nickyang/confluence-to-markdown) | Confluence page ingestion | No |
+| [gdoc-to-markdown](https://github.com/mr-fcharles/gdoc-to-markdown) | Google Docs ingestion | No |
 
-See [CLAUDE.md](CLAUDE.md) for the complete set of rules.
+## Configuration
+
+Configuration is stored in `.bedrock/config.json` inside your vault. Run `/bedrock:setup` again at any time to reconfigure.
+
+## Contributing
+
+Contributions are welcome! Here's how to get started:
+
+1. **Fork** the repository
+2. **Clone** your fork and install the plugin locally:
+   ```bash
+   claude --plugin-dir ./claude-bedrock
+   ```
+3. **Create a branch** for your feature or fix
+4. **Make your changes** — skills live in `skills/`, entity definitions in `entities/`, templates in `templates/`
+5. **Test** by running the plugin against a test vault
+6. **Open a PR** against `main`
+
+### Project Structure
+
+```
+claude-bedrock/
+├── .claude-plugin/    # Plugin manifest (plugin.json)
+├── skills/            # Skill definitions (SKILL.md per skill)
+│   ├── setup/
+│   ├── query/
+│   ├── teach/
+│   ├── preserve/
+│   ├── compress/
+│   └── sync/
+├── entities/          # Entity type definitions
+├── templates/         # Frontmatter schema templates
+├── docs/              # Documentation assets
+├── CLAUDE.md          # AI agent instructions
+└── README.md
+```
 
 ## License
 
-MIT
+[MIT](LICENSE) — Iury Krieger
