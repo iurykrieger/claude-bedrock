@@ -84,122 +84,75 @@ At the end, you should have:
 
 ---
 
-## Phase 1.5 — Check Knowledge Graph (graphify)
+## Phase 2 — Local Vault Search
 
-Before searching the vault, check whether the graphify knowledge graph is available.
-The graph enables semantic traversal (BFS/DFS) that complements and takes priority over
-sequential search via Glob/Grep.
-
-### 1.5.1 Check graph.json
+### 2.0 Check graph availability
 
 ```bash
-# Check if graphify-out/graph.json exists and is not empty
 if [ -f "graphify-out/graph.json" ] && [ -s "graphify-out/graph.json" ]; then
-    $(cat graphify-out/.graphify_python 2>/dev/null || echo python3) -c "
-import json
-from pathlib import Path
-g = json.loads(Path('graphify-out/graph.json').read_text())
-nodes = len(g.get('nodes', []))
-edges = len(g.get('edges', []))
-communities = len(g.get('communities', {}))
-print(f'Graph available: {nodes} nodes, {edges} edges, {communities} communities')
-"
+    echo "graph_available"
 else
-    echo "Graph not available"
+    echo "graph_not_available"
 fi
 ```
 
-- **If graph.json exists and is not empty:** set `graph_available = true`. Report: "Knowledge graph available (N nodes, M edges, K communities)."
-- **If graph.json does NOT exist or is empty:** set `graph_available = false`. Proceed to Phase 2 using sequential search (Glob/Grep) without changes.
+- **If `graph_available`:** use Phase 2-G (graphify delegation) below.
+- **If `graph_not_available`:** skip to Phase 2-S (sequential search).
 
-### 1.5.2 Check community labels (optional)
+### Phase 2-G — Graphify Delegation (when graph available)
 
-If `graph_available = true`, check whether `graphify-out/.graphify_labels.json` exists.
-If yes: load labels for use in Phase 2.5 (explore communities by domain).
+The graphify query engine handles all graph traversal (BFS, DFS, path-finding, node explanation).
+`/bedrock:query` delegates to `/graphify` via the Skill tool and receives structured JSON,
+then post-processes the result with vault-specific logic in Phase 2.5.
 
----
+#### 2-G.1 Route question type to graphify mode
 
-## Phase 2 — Local Vault Search
+From the Phase 1 results (search_terms, info_type, explicit_entities), select the graphify command:
 
-**If `graph_available = true`:** use Phase 2-G (graphify-first) below.
-**If `graph_available = false`:** use Phase 2-S (sequential) — the existing flow without changes.
+| Phase 1 info_type | Graphify invocation |
+|---|---|
+| Relationship, status, overview, history, deprecation | `/graphify query "<original_question>"` |
+| Path-finding ("how does X connect to Y", with 2 explicit entities) | `/graphify path "<entityA>" "<entityB>"` |
+| Single-entity deep dive ("what is X?", "explain X", 1 explicit entity) | `/graphify explain "<entity>"` |
+| Broad domain ("tell me about the payments domain") | `/graphify query "<question>"` |
 
-### Phase 2-G — Graphify Search (when graph_available = true)
+#### 2-G.2 Invoke graphify via Skill tool
 
-The graphify query performs traversal on the knowledge graph and returns relevant nodes and edges.
-This replaces Steps 1-4 of the sequential search for most questions, but the sequential
-search remains available as a complement for entities outside the graph (people, teams).
+Use the Skill tool to invoke the selected graphify command. Append the following structured output
+instruction to the invocation prompt:
 
-#### 2-G.1 Formulate the query
-
-From the Phase 1 results (search_terms, info_type, explicit_entities):
-
-- **Relationship questions** ("what depends on X?", "which services use Y?", "how does X connect with Y?"):
-  Use the user's original question as the query.
-- **Status/overview questions** ("what is X?", "what's the stack of X?"):
-  Reformulate to focus on the entity: `"<entity-name>"`
-- **Broad questions** ("tell me about the payments domain"):
-  Skip to Phase 2.5 (explore communities).
-
-#### 2-G.2 Execute graphify query
-
-Choose the traversal mode:
-- **BFS (default)** — for broad context (neighborhood of a node). Use for most questions.
-- **DFS** — for path-finding ("how does X connect with Y", "what's the path from X to Y").
-
-```bash
-$(cat graphify-out/.graphify_python) -c "
-from graphify.query import query
-result = query('<user-question>', budget=1500)
-# result contains: relevant nodes, edges, relevance score
-import json; print(json.dumps(result, indent=2))
-"
+```
+After completing the traversal, return ONLY a JSON object with this structure (no prose, no markdown fences):
+{
+  "mode": "query|path|explain",
+  "start_nodes": ["node_id1", "node_id2"],
+  "nodes": [
+    {"id": "node_id", "label": "Human Readable Name", "source_file": "relative/path", "community": 0, "source_location": "file:line"}
+  ],
+  "edges": [
+    {"source": "node_id", "target": "node_id", "relation": "calls|references|...", "confidence": "EXTRACTED|INFERRED|AMBIGUOUS", "confidence_score": 0.9}
+  ],
+  "communities": {
+    "0": {"label": "Community Name", "node_ids": ["id1", "id2"]}
+  },
+  "traversal": {"mode": "bfs|dfs", "depth": 3, "budget_used": 1200}
+}
 ```
 
-**Token budget:** default 1500 (sufficient for 10-15 nodes with descriptions). If the user
-explicitly asks for more context: increase to 3000.
+**IMPORTANT:**
+- Invoke via the Skill tool — never call graphify Python API directly (`graphify.query`, `graphify.build`, etc.)
+- This follows the same delegation pattern as `/bedrock:teach` → `/graphify`
 
-For path-finding between two concepts:
-```bash
-$(cat graphify-out/.graphify_python) -c "
-from graphify.query import find_path
-result = find_path('<nodeA>', '<nodeB>')
-import json; print(json.dumps(result, indent=2))
-"
-```
+#### 2-G.3 Parse graphify response
 
-For explanation of a specific node:
-```bash
-$(cat graphify-out/.graphify_python) -c "
-from graphify.query import explain
-result = explain('<node-name>')
-import json; print(json.dumps(result, indent=2))
-"
-```
+Extract the JSON object from the graphify Skill tool response.
 
-#### 2-G.3 Resolve nodes to vault .md files
+- **If JSON parses successfully:** store as `graphify_result` for Phase 2.5. Report: "Graphify query returned N nodes, M edges."
+- **If parsing fails** (graphify returned prose, error, or timeout): log warning "Graphify delegation failed — falling back to sequential search." Then execute Phase 2-S instead.
 
-For each node returned by the graphify query:
+### Phase 2-S — Sequential Search (when graph not available or graphify delegation failed)
 
-1. Extract `id` (graphify_node_id) and `label` from the node
-2. Resolve to a .md file in the vault:
-   - **Nodes with `source_file` pointing to actors:** search for code entity in `actors/*/nodes/` via `graphify_node_id` in frontmatter, or search for the parent actor in `actors/`
-   - **Nodes with label matching an entity filename:** Glob for `actors/<label>*.md`, `topics/*<label>*.md`, etc.
-   - **If not resolved:** record as "node without corresponding .md" — will be mentioned in the response
-3. Read the resolved .md files (frontmatter + body) — limit: 15 entities total
-
-#### 2-G.4 Supplement with sequential search
-
-Graphify does not index people and teams directly (they are vault entities, not code entities).
-For questions involving people/teams:
-
-1. Use Glob/Grep to search in `people/` and `teams/` for the search terms from Phase 1
-2. Add results to those already obtained from graphify
-3. Respect the total limit of 15 entities
-
-### Phase 2-S — Sequential Search (when graph_available = false)
-
-When the graph is not available, use the original flow without changes:
+When the graph is not available or graphify delegation failed, use sequential search:
 
 ### 2.1 Read entity definitions
 
@@ -267,47 +220,52 @@ Record for each entity read:
 
 ---
 
-## Phase 2.5 — Explore Communities (when graph_available = true and question is broad)
+## Phase 2.5 — Vault-Specific Post-Processing
+
+This phase applies to both graphify delegation results (Phase 2-G) and sequential search results (Phase 2-S).
+When coming from Phase 2-G, consume `graphify_result`. When coming from Phase 2-S, consume the entity list
+found via Glob/Grep. In both cases, the output is a list of resolved vault `.md` entities for Phase 3.
+
+### 2.5.1 Resolve graphify nodes to vault .md files (only when coming from Phase 2-G)
+
+For each node in `graphify_result.nodes`:
+
+1. Extract `id` and `label` from the node
+2. Resolve to a .md file in the vault:
+   - **Nodes with `source_file` pointing to actors:** search for code entity in `actors/*/nodes/` via node `id` in frontmatter, or search for the parent actor in `actors/`
+   - **Nodes with label matching an entity filename:** Glob for `actors/<label>*.md`, `topics/*<label>*.md`, etc.
+   - **If not resolved:** record as "node without corresponding .md" — will be mentioned in the response
+3. Read the resolved .md files (frontmatter + body) — limit: 15 entities total
+
+### 2.5.2 Supplement with people/teams
+
+Graphify does not index people and teams directly (they are vault entities, not code entities).
+For questions involving people/teams:
+
+1. Use Glob/Grep to search in `people/` and `teams/` for the search terms from Phase 1
+2. Add results to those already obtained from graphify (or from sequential search)
+3. Respect the total limit of 15 entities
+
+### 2.5.3 Community exploration for broad questions (only when coming from Phase 2-G)
 
 When the question is broad and does not mention specific entities (e.g.: "tell me about the payments domain",
 "what's happening with notifications?", "overview of processing"):
 
-### 2.5.1 Identify relevant community
-
-1. Read `graphify-out/.graphify_labels.json` (if it exists) — contains human-readable labels per community
-2. Look for a community whose label matches the domain or theme of the question
-3. If no label matches: skip this phase and use Phase 2-G with the original question
-
-### 2.5.2 List community nodes
-
-```bash
-$(cat graphify-out/.graphify_python) -c "
-import json
-from pathlib import Path
-graph = json.loads(Path('graphify-out/graph.json').read_text())
-# Filter nodes by identified community
-community_nodes = [n for n in graph.get('nodes', []) if n.get('community') == <community_id>]
-print(json.dumps(community_nodes[:20], indent=2))  # top 20 nodes in the community
-"
-```
-
-### 2.5.3 Resolve and read .md files
-
-For each community node (limit: 10 nodes):
-1. Resolve to a .md file in the vault (same logic as 2-G.3)
-2. Read frontmatter for a quick overview
-3. Prioritize nodes with higher degree (more edges) — these are the "god nodes" of the community
-
-Result: domain overview based on graph structure, not textual search.
+1. Use `graphify_result.communities` from the graphify response — do NOT load graph.json directly
+2. Identify the community whose label matches the domain or theme of the question
+3. For the relevant community: resolve `node_ids` to vault .md files
+4. Prioritize nodes that appear in more edges in `graphify_result.edges` (higher connectivity)
+5. If `communities` data is missing or empty in the graphify response: skip this step and rely on node-level results from 2.5.1
+6. Limit: 10 nodes per community exploration
 
 ---
 
 ## Phase 3 — Cross-reference Context via Wikilinks
 
-> **Note:** When `graph_available = true`, graphify already returns connected nodes via edges.
-> The wikilink cross-referencing in this phase is **complementary** — used mainly for entities
-> that are not in the graph (people, teams, sources, fleeting). If the Phase 2-G results already
-> cover the question with 15 entities, this phase can be reduced or skipped.
+> **Note:** When graphify delegation was used (Phase 2-G), the graphify response already returns
+> connected nodes via edges. The wikilink cross-referencing in this phase is **complementary** —
+> used mainly for entities that are not in the graph (people, teams, sources, fleeting). If the
+> Phase 2.5 results already cover the question with 15 entities, this phase can be reduced or skipped.
 
 ### 3.1 Extract wikilinks from found entities
 
@@ -468,10 +426,12 @@ When appropriate, suggest actions to the user:
 
 | Rule | Detail |
 |---|---|
-| Read-only | NEVER write, edit, or delete files. Only Read, Glob, Grep, Skill (external fetch), Agent (parallel search), and GitHub MCP (reading) |
+| Read-only | NEVER write, edit, or delete files. Only Read, Glob, Grep, Skill (graphify delegation + external fetch), Agent (parallel search), and GitHub MCP (reading) |
+| Invoke graphify via Skill tool | NEVER call graphify Python API directly (`graphify.query`, `graphify.build`, etc.). Always invoke via the Skill tool. This follows the same delegation pattern as `/bedrock:teach` → `/graphify`. |
+| Graphify fallback to sequential | If graphify delegation fails (parse error, timeout, no graph.json), fall back to Phase 2-S. Never block the query. |
 | No fabrication | Respond ONLY with information found in the vault or consulted external sources. Never fabricate data |
 | Clarification before guessing | If the question is ambiguous, ask for clarification. Do not assume |
-| Limit of 15 entities | Do not read more than 15 entities per query (Phase 2 + Phase 3) |
+| Limit of 15 entities | Do not read more than 15 entities per query (Phase 2.5 + Phase 3) |
 | Limit of 3 external URLs | Do not fetch more than 3 external sources per query |
 | 1 level of wikilinks | Do not follow wikilinks beyond the first level |
 | 1 level of external links | Do not follow links within external documents |
