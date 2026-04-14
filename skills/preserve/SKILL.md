@@ -3,7 +3,8 @@ name: preserve
 description: >
   Single write point for the vault. Centralizes entity detection, textual matching,
   entity creation/update, and bidirectional linking. Accepts structured input
-  (list of entities) or free-form input (text, meeting notes, session context).
+  (list of entities), free-form input (text, meeting notes, session context),
+  or graphify output (graph.json + obsidian markdown from /graphify pipeline).
   Use when: "bedrock preserve", "bedrock-preserve", "save to vault", "record in vault", "/bedrock:preserve",
   or when another skill (e.g., /bedrock:teach) needs to persist entities in the vault.
 user_invocable: true
@@ -27,9 +28,9 @@ Where `<base_dir>` is the path provided in "Base directory for this skill".
 
 ## Overview
 
-This skill centralizes ALL write logic for the vault. It receives input (structured or free-form),
-identifies entities, correlates with the existing vault, proposes changes to the user, and executes
-after confirmation. It is the only path to create or update entities in the vault (except `/sync-people`
+This skill centralizes ALL write logic for the vault. It receives input (structured, free-form,
+or graphify output), identifies entities, correlates with the existing vault, proposes changes
+to the user, and executes after confirmation. It is the only path to create or update entities in the vault (except `/sync-people`
 which handles people/teams via GitHub API).
 
 **You are an execution agent.** Follow the phases below in order, without skipping steps.
@@ -52,7 +53,7 @@ If the pull fails:
 
 ## Phase 1 — Parse Input
 
-`/bedrock:preserve` accepts two input modes. Determine which to apply:
+`/bedrock:preserve` accepts three input modes. Determine which to apply:
 
 ### 1.1 Structured input
 
@@ -108,7 +109,74 @@ To classify new content, consult the plugin's entity definitions (see "Plugin Pa
 
 Convert the result to the structured format from section 1.1 and proceed.
 
-### 1.3 Zettelkasten Classification
+### 1.3 Graphify output input
+
+When called by `/bedrock:teach` (or any skill) with a graphify output reference,
+OR when the user invokes `/bedrock:preserve` directly pointing at a `graphify-out/` directory:
+
+**Input format:**
+- `graphify_output_path`: path to `graphify-out/` directory
+- `source_url`: original external source URL/path (optional — may not be present for manual invocation)
+- `source_type`: type of external source (optional)
+
+**Detection:** If the input contains a path ending in `graphify-out/` or `graphify-out`,
+or references `graph.json`, treat as graphify output input.
+
+**Processing:**
+
+1. **Read graph.json** from `graphify_output_path/graph.json`:
+   - Parse NetworkX node-link format
+   - Extract all nodes with: `id`, `label`, `file_type`, `source_file`, `source_location`
+   - Extract all edges with: `source`, `target`, `relation`, `confidence`, `confidence_score`
+   - If `graph.json` is missing or empty: abort with error "No graph.json found in graphify output. Run /graphify first."
+
+2. **Read obsidian files** from `graphify_output_path/obsidian/*.md`:
+   - For each markdown file, read frontmatter and body content
+   - Correlate with graph.json by matching filename stem to node `id` (kebab-cased)
+   - If obsidian file doesn't exist for a node: fall back to graph.json metadata alone
+
+3. **Read analysis** from `graphify_output_path/.graphify_analysis.json` (if exists):
+   - Extract community assignments, god nodes, community labels
+   - Use community labels to inform `domain/*` tags when creating entities
+
+4. **Classify graphify nodes into vault entity types** — /preserve owns this classification:
+   - Read ALL entity definitions from plugin (see "Plugin Paths")
+   - For each graphify node, classify:
+     - `file_type: code` → `knowledge-node` (actor inferred from `source_file` path or repo name in the path)
+     - `file_type: document` → classify using entity definitions ("When to create" / "When NOT to create" / "How to distinguish")
+     - `file_type: paper` → `topic` or `fleeting` depending on completeness criteria
+     - God nodes (high degree in `.graphify_analysis.json`) → consider as `actor` or `topic`
+     - Apply Zettelkasten classification (section 1.4): if content doesn't meet completeness criteria → `fleeting`
+
+5. **Filter relevant nodes:**
+   - For knowledge-nodes: select top ~50 by relevance (degree > average, or label contains "Service", "Controller", "Client", "Factory", "Handler", "Mapper", "Gateway", "Provider"). Exclude test nodes (labels with "Test", "Tests", "Builder", "Mock", "Fake") and trivial nodes (getters, setters, simple DTOs).
+   - For document/paper nodes: include all.
+
+6. **Match against existing vault** — Use existing textual matching logic from Phase 2 (filename, name, aliases, `graphify_node_id`). Mark matched nodes as `update`, unmatched as `create`.
+
+7. **Build internal structured format** for each classified + filtered entity:
+   - `type`: from classification (step 4)
+   - `name`: from graphify node `label` (kebab-cased for filename)
+   - `action`: `create` or `update` (from step 6 matching)
+   - `content`: from obsidian markdown file body (or generate from graph.json metadata if no obsidian file)
+   - `relations`: from graph.json edges (convert node ids to entity slugs via kebab-case)
+   - `source`: from input `source_type` (or `"graphify"` if not provided)
+   - `source_url`: from input `source_url` (if provided)
+   - `source_type`: from input `source_type` (if provided)
+   - `metadata`: for knowledge-nodes, include:
+     - `graphify_node_id`: node `id` from graph.json
+     - `actor`: wikilink of the parent actor (inferred from `source_file` path)
+     - `node_type`: infer from context (`function`, `class`, `module`, `interface`, `endpoint`)
+     - `source_file`: relative path from graph.json
+     - `confidence`: from the strongest edge connected to the node (`EXTRACTED` > `INFERRED` > `AMBIGUOUS`)
+
+8. **Proceed to Phase 3** (Change Proposal) — present the classified entity list for user confirmation, then execute writes as normal (Phases 4-7).
+
+> **Note:** When invoked directly by the user (not via /teach), the user confirmation in Phase 3
+> is the only gate before writes. When invoked via /teach, /teach has already shown the user
+> the graphify report (god nodes, communities) providing context for the confirmation.
+
+### 1.4 Zettelkasten Classification
 
 Before converting to structured format, classify each entity by Zettelkasten role.
 Consult the plugin's entity definitions ("Completeness Criteria" section) to determine the correct type:
