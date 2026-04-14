@@ -96,7 +96,7 @@ Use Glob to probe known installation paths. **Never block initialization.**
 
 | Dependency | Check method | What it unlocks |
 |---|---|---|
-| graphify | Glob: `~/.claude/skills/graphify/SKILL.md` | Semantic code extraction for GitHub repos via `/bedrock:teach`. Extracts functions, classes, and relationships into knowledge-nodes. |
+| graphify | Glob: `~/.claude/skills/graphify/SKILL.md` | **Required.** Extraction engine for all `/bedrock:teach` ingestion. Processes code, docs, PDFs, and any content into a knowledge graph. Without it, /teach cannot function. |
 | confluence-to-markdown | Glob: `~/.claude/skills/confluence-to-markdown/SKILL.md` | Confluence page ingestion via `/bedrock:teach`. Converts Confluence pages to markdown for entity extraction. |
 | gdoc-to-markdown | Glob: `~/.claude/skills/gdoc-to-markdown/SKILL.md` | Google Docs ingestion via `/bedrock:teach`. Converts Google Docs to markdown for entity extraction. |
 
@@ -112,11 +112,20 @@ Use Glob to probe known installation paths. **Never block initialization.**
 | gdoc-to-markdown | installed / NOT FOUND | Google Docs ingestion |
 ```
 
-For each missing dependency, include:
+For **graphify** specifically (required):
 
 ```
-> graphify is not installed. To install:
-> Run the graphify skill setup, or check https://github.com/iurykrieger/graphify for instructions.
+> ⚠️ graphify is not installed. This is REQUIRED for /bedrock:teach to work.
+> To install, check https://github.com/iurykrieger/graphify for instructions.
+>
+> Your vault will initialize, but /bedrock:teach will not function until graphify is installed.
+```
+
+For other missing dependencies (optional):
+
+```
+> <dependency> is not installed. To install:
+> Check the skill's repository for instructions.
 >
 > This is optional — your vault will work without it. You can install it later.
 ```
