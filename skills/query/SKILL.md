@@ -183,7 +183,7 @@ For each node returned by the graphify query:
 
 1. Extract `id` (graphify_node_id) and `label` from the node
 2. Resolve to a .md file in the vault:
-   - **Nodes with `source_file` pointing to actors:** search for knowledge-node in `actors/*/nodes/` via `graphify_node_id` in frontmatter, or search for the parent actor in `actors/`
+   - **Nodes with `source_file` pointing to actors:** search for code entity in `actors/*/nodes/` via `graphify_node_id` in frontmatter, or search for the parent actor in `actors/`
    - **Nodes with label matching an entity filename:** Glob for `actors/<label>*.md`, `topics/*<label>*.md`, etc.
    - **If not resolved:** record as "node without corresponding .md" — will be mentioned in the response
 3. Read the resolved .md files (frontmatter + body) — limit: 15 entities total

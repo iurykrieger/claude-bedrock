@@ -14,13 +14,14 @@ This is **not a codebase**. The target vault is markdown-only — no build syste
 
 ## Entity Types
 
-The vault organizes knowledge into 7 entity types, each in its own directory:
+The vault organizes knowledge into 8 entity types, each in its own directory:
 
 | Entity | Directory | Filename pattern | Example |
 |---|---|---|---|
 | Actors | `actors/` | `repo-name.md` | `billing-api.md` |
 | People | `people/` | `first-last.md` | `alice-smith.md` |
 | Teams | `teams/` | `squad-name.md` | `squad-payments.md` |
+| Concepts | `concepts/` | `slug.md` | `event-sourcing.md` |
 | Topics | `topics/` | `YYYY-MM-category-slug.md` | `2026-04-feature-new-checkout.md` |
 | Discussions | `discussions/` | `YYYY-MM-DD-slug.md` | `2026-04-02-daily-payments.md` |
 | Projects | `projects/` | `slug.md` | `processing-3-0.md` |
@@ -56,7 +57,7 @@ Tags use `/` separator for multi-dimensional filtering in Obsidian graph view:
 
 | Dimension | Prefix | Values |
 |---|---|---|
-| Type | `type/` | `actor`, `person`, `team`, `topic`, `discussion`, `project`, `fleeting` |
+| Type | `type/` | `actor`, `person`, `team`, `concept`, `topic`, `discussion`, `project`, `fleeting` |
 | Status | `status/` | `active`, `deprecated`, `planning`, `blocked`, `done`, `in-progress`, `open`, `completed`, `cancelled`, `raw`, `reviewing`, `promoted`, `archived` |
 | Domain | `domain/` | `payments`, `finance`, `notifications`, `checkout`, `orders`, `integrations`, `compliance`, `core`, `data`, `infra`, `marketplace`, `internal-tools`, `platform`, `security` |
 | Scope | `scope/` | `pci`, `sox`, `lgpd` (fintech), `hipaa` (health), `gdpr` (Europe), `soc2` (SaaS) |
@@ -94,7 +95,7 @@ Rules:
 | Entity | Body | Frontmatter |
 |---|---|---|
 | **Actors** | May modify and merge — new data replaces stale content | Merge new data, never delete fields |
-| **People, Teams, Topics** | Append-only — never delete content from another agent/human | Merge new data, never delete fields |
+| **People, Teams, Concepts, Topics** | Append-only — never delete content from another agent/human | Merge new data, never delete fields |
 | **All** | Never remove existing wikilinks | Always update `updated_at` and `updated_by` |
 
 ---
@@ -121,7 +122,7 @@ These are the Claude Code skills provided by the Bedrock plugin:
 
 | Field | Values |
 |---|---|
-| `<type>` | `person`, `team`, `actor`, `topic`, `discussion`, `project`, `note` |
+| `<type>` | `person`, `team`, `actor`, `concept`, `topic`, `discussion`, `project`, `note` |
 | `<verb>` | `creates`, `updates`, `links`, `compresses` |
 | `<origin>` | `memory`, `github`, `jira`, `confluence`, `gdoc`, `sheets`, `manual`, `compress` |
 
@@ -140,7 +141,7 @@ The vault follows adapted Zettelkasten principles. Each entity type has a **role
 
 | Role | Entity types | Behavior |
 |---|---|---|
-| **Permanent notes** | `actors/`, `people/`, `teams/` | Consolidated, stable knowledge. Self-contained. |
+| **Permanent notes** | `actors/`, `people/`, `teams/`, `concepts/` | Consolidated, stable knowledge. Self-contained. |
 | **Bridge notes** | `topics/`, `discussions/` | Connect permanents, explaining *why* they relate. |
 | **Index notes** | `projects/` | Curation — organize reading paths (thematic MOCs). |
 | **Fleeting notes** | `fleeting/` | Inbox — raw ideas, forming concepts. Temporary by design. |
@@ -163,7 +164,7 @@ Details in `entities/*.md` (section "Zettelkasten Role" per type) within the plu
 - **Never** use flat tags (`[actor]`) — always hierarchical (`[type/actor]`)
 - **Never** use path-qualified wikilinks — `[[name]]`, not `[[dir/name]]`
 - **Never** use display names in wikilinks — `[[notification-service]]`, not `[[NotificationService]]`
-- **Never** delete content in people/teams/topics written by another agent or human
+- **Never** delete content in people/teams/concepts/topics written by another agent or human
 - **Never** delete existing wikilinks or frontmatter fields
 - **Never** commit credentials, tokens, PANs, CVVs, or any sensitive data
 - **Never** log raw card data (PAN, CVV, tracks, EMV) in documentation examples

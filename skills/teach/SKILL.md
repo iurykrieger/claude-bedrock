@@ -270,7 +270,7 @@ Present to the user:
 |---|---|---|
 | actor | billing-api | update |
 | topic | 2026-04-migration-payments | create |
-| knowledge-node | process-transaction | create |
+| code | process-transaction | create |
 
 ### Provenance
 Each entity above received in the `sources` frontmatter field:

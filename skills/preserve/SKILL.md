@@ -61,7 +61,7 @@ When called by another skill (e.g., `/bedrock:teach`) or when the user provides 
 The format is a list of entities, each with:
 
 ```yaml
-- type: actor | person | team | topic | discussion | project | fleeting | knowledge-node
+- type: actor | person | team | concept | topic | discussion | project | fleeting | code
   name: "canonical entity name"
   action: create | update
   content: "content to include in the entity body"
@@ -69,10 +69,11 @@ The format is a list of entities, each with:
     actors: ["actor-slug-1", "actor-slug-2"]
     people: ["person-slug-1"]
     teams: ["team-slug-1"]
+    concepts: ["concept-slug-1"]
     topics: ["topic-slug-1"]
     discussions: ["discussion-slug-1"]
     projects: ["project-slug-1"]
-    knowledge_nodes: ["node-slug-1"]
+    code: ["node-slug-1"]
   source: "github | confluence | jira | session | manual | gdoc | csv | graphify"
   metadata: {}  # additional frontmatter fields specific to the type
 ```
@@ -88,6 +89,7 @@ unstructured content. Analyze the text and extract:
    - People: names in "First Last" format
    - Actors: service names, APIs, repositories
    - Teams: squad names
+   - Concepts: patterns, principles, techniques, protocols, abstractions
    - Topics: discussion themes, bugs, RFCs, features
    - Discussions: meetings, decisions, debates
    - Projects: initiatives, migrations, cross-team features
@@ -142,14 +144,15 @@ or references `graph.json`, treat as graphify output input.
 4. **Classify graphify nodes into vault entity types** — /preserve owns this classification:
    - Read ALL entity definitions from plugin (see "Plugin Paths")
    - For each graphify node, classify:
-     - `file_type: code` → `knowledge-node` (actor inferred from `source_file` path or repo name in the path)
-     - `file_type: document` → classify using entity definitions ("When to create" / "When NOT to create" / "How to distinguish")
-     - `file_type: paper` → `topic` or `fleeting` depending on completeness criteria
-     - God nodes (high degree in `.graphify_analysis.json`) → consider as `actor` or `topic`
+     - `file_type: code` → `code` (actor inferred from `source_file` path or repo name in the path)
+     - `file_type: document` or `file_type: paper` → check for concept first: if the node describes a pattern, principle, technique, protocol, or abstraction AND is self-contained AND is not specific to a single actor → `concept`
+     - `file_type: document` (non-concept) → classify using entity definitions ("When to create" / "When NOT to create" / "How to distinguish")
+     - `file_type: paper` (non-concept) → `topic` or `fleeting` depending on completeness criteria
+     - God nodes (high degree in `.graphify_analysis.json`) → consider as `actor`, `concept`, or `topic`
      - Apply Zettelkasten classification (section 1.4): if content doesn't meet completeness criteria → `fleeting`
 
 5. **Filter relevant nodes:**
-   - For knowledge-nodes: select top ~50 by relevance (degree > average, or label contains "Service", "Controller", "Client", "Factory", "Handler", "Mapper", "Gateway", "Provider"). Exclude test nodes (labels with "Test", "Tests", "Builder", "Mock", "Fake") and trivial nodes (getters, setters, simple DTOs).
+   - For code entities: select top ~50 by relevance (degree > average, or label contains "Service", "Controller", "Client", "Factory", "Handler", "Mapper", "Gateway", "Provider"). Exclude test nodes (labels with "Test", "Tests", "Builder", "Mock", "Fake") and trivial nodes (getters, setters, simple DTOs).
    - For document/paper nodes: include all.
 
 6. **Match against existing vault** — Use existing textual matching logic from Phase 2 (filename, name, aliases, `graphify_node_id`). Mark matched nodes as `update`, unmatched as `create`.
@@ -163,11 +166,14 @@ or references `graph.json`, treat as graphify output input.
    - `source`: from input `source_type` (or `"graphify"` if not provided)
    - `source_url`: from input `source_url` (if provided)
    - `source_type`: from input `source_type` (if provided)
-   - `metadata`: for knowledge-nodes, include:
+   - `metadata`: for code entities, include:
      - `graphify_node_id`: node `id` from graph.json
      - `actor`: wikilink of the parent actor (inferred from `source_file` path)
      - `node_type`: infer from context (`function`, `class`, `module`, `interface`, `endpoint`)
      - `source_file`: relative path from graph.json
+     - `confidence`: from the strongest edge connected to the node (`EXTRACTED` > `INFERRED` > `AMBIGUOUS`)
+   - `metadata`: for concepts (from graphify), include:
+     - `graphify_node_id`: node `id` from graph.json
      - `confidence`: from the strongest edge connected to the node (`EXTRACTED` > `INFERRED` > `AMBIGUOUS`)
 
 8. **Proceed to Phase 3** (Change Proposal) — present the classified entity list for user confirmation, then execute writes as normal (Phases 4-7).
@@ -183,7 +189,8 @@ Consult the plugin's entity definitions ("Completeness Criteria" section) to det
 
 **Classification rule:**
 - If the content meets the completeness criteria of a permanent type (actor, person, team) → classify as permanent
-- If the content has `graphify_node_id` and `actor` defined → classify as `knowledge-node` (permanent extension, sub-entity of actor)
+- If the content has `graphify_node_id` and `actor` defined → classify as `code` (permanent extension, sub-entity of actor)
+- If the content defines a pattern, principle, technique, protocol, or abstraction that is self-contained and actor-independent → classify as `concept` (permanent)
 - If the content meets the completeness criteria of a bridge type (topic, discussion) → classify as bridge
 - If the content meets the completeness criteria of an index type (project) → classify as index
 - **If the content does NOT meet the completeness criteria of any type** → classify as `fleeting`
@@ -220,7 +227,7 @@ List all files in each entity directory (exclude `_template.md` and `_template_n
 
 ```
 actors/*.md and actors/*/*.md (actors can be folders: actors/<name>/<name>.md)
-actors/*/nodes/*.md (knowledge-nodes within actors)
+actors/*/nodes/*.md (code entities within actors)
 people/*.md
 teams/*.md
 topics/*.md
@@ -233,7 +240,7 @@ For each file found, extract:
 - `filename` (without extension) — canonical identifier
 - `name` (or `title`) from frontmatter — human-readable name
 - `aliases` from frontmatter — alternative names
-- `graphify_node_id` from frontmatter — for knowledge-nodes (if present)
+- `graphify_node_id` from frontmatter — for code entities (if present)
 
 ### 2.2 Textual matching
 
@@ -245,7 +252,7 @@ For each entity from the input, check if it already exists in the vault:
 2. **Match by name/title field** (case-insensitive): `"Billing API"` finds `billing-api.md`
 3. **Match by aliases** (case-insensitive): `"BillingAPI"` finds `billing-api.md` if alias contains "BillingAPI"
 4. **Match by filename without hyphens** (case-insensitive): `billing-api` → `billingapi` finds "BillingAPI"
-5. **Match by graphify_node_id** (for knowledge-nodes): exact match by `graphify_node_id` in frontmatter. This is the most reliable match for knowledge-nodes and takes priority over the others when present.
+5. **Match by graphify_node_id** (for code entities): exact match by `graphify_node_id` in frontmatter. This is the most reliable match for code entities and takes priority over the others when present.
 
 **Safety rules:**
 - DO NOT match by substrings of 3 characters or fewer (e.g., "api" should not match everything)
@@ -353,17 +360,18 @@ For each entity marked as `create`:
 | Type | Directory | Filename pattern | Name frontmatter key |
 |---|---|---|---|
 | actor | actors/ or actors/\<name\>/ | `repo-name.md` | `name` |
-| knowledge-node | actors/\<actor\>/nodes/ | `node-slug.md` | `name` |
+| code | actors/\<actor\>/nodes/ | `node-slug.md` | `name` |
 | person | people/ | `first-last.md` | `name` |
 | team | teams/ | `squad-name.md` | `name` |
+| concept | concepts/ | `slug.md` | `name` |
 | topic | topics/ | `YYYY-MM-category-slug.md` | `title` |
 | discussion | discussions/ | `YYYY-MM-DD-slug.md` | `title` |
 | project | projects/ | `project-slug.md` | `name` |
 | fleeting | fleeting/ | `YYYY-MM-DD-slug.md` | `title` |
 
-### 4.1.2 Knowledge-node specific rules
+### 4.1.2 Code entity specific rules
 
-When creating a knowledge-node:
+When creating a code entity:
 
 1. **Resolve the parent actor:** the `actor` field in the input (wikilink or slug) indicates the actor. Verify that the actor exists in `actors/`.
 2. **Ensure folder structure:** if the actor is still a flat file (`actors/<name>.md`):
@@ -371,21 +379,21 @@ When creating a knowledge-node:
    - Move `actors/<name>.md` → `actors/<name>/<name>.md` (use `git mv`)
    - Create subfolder `actors/<name>/nodes/`
    - Add "Knowledge Nodes" section to the actor body (before the "Infrastructure" section or at the end)
-3. **Create knowledge-node:** use template `actors/_template_node.md`
+3. **Create code entity:** use template `actors/_template_node.md`
    - Save to `actors/<actor>/nodes/<node-slug>.md`
    - Filename: kebab-case of the node's `name` (e.g., `ProcessTransaction` → `process-transaction.md`)
    - Fill `graphify_node_id`, `actor`, `node_type`, `source_file`, `confidence` from the input
    - Inherit `domain/*` tags from the parent actor
    - Generate at least 1 alias (human-readable name + camelCase if applicable)
 4. **Bidirectional backlink:**
-   - In the knowledge-node: `actor: "[[actor-name]]"` in frontmatter
+   - In the code entity: `actor: "[[actor-name]]"` in frontmatter
    - In the actor: add `- [[node-slug]] — brief description` in the "Knowledge Nodes" section
 
 ### 4.1.1 Linking rules by Zettelkasten role
 
 When filling the entity body, apply semantic linking rules by role:
 
-- **Permanent notes** (actors, people, teams): wikilinks in the body must have textual context.
+- **Permanent notes** (actors, people, teams, concepts): wikilinks in the body must have textual context.
   E.g., "receives authorizations from [[payment-gateway]] via gRPC" — not just "[[payment-gateway]]"
 - **Bridge notes** (topics, discussions): wikilinks in the body explain *why* permanents relate.
   E.g., "the deprecation of [[legacy-gateway]] is blocked because clients depend on [[billing-api]]"
@@ -404,7 +412,7 @@ For each entity marked as `update`:
    - Add new aliases if discovered
 3. **Body:**
    - **Actors:** can be modified/merged — new information replaces outdated information
-   - **People, Teams, Topics:** append-only — add information, NEVER delete existing content
+   - **People, Teams, Concepts, Topics:** append-only — add information, NEVER delete existing content
    - **Discussions, Projects:** append-only for the general body; structured fields (action_items, conclusions) can be updated
    - **"Recent Activity" section** (actors): REPLACE content (temporal data)
 4. **Wikilinks:** add new ones, NEVER remove existing ones
@@ -459,8 +467,8 @@ Discussion ──related_actors──→ Actor
 Discussion ──related_people──→ Person
 Discussion ──related_projects──→ Project
 Discussion ──related_topics──→ Topic
-Knowledge-node ──actor──→ Actor ──"Knowledge Nodes" section──→ Knowledge-node
-Knowledge-node ──relations──→ Knowledge-node (bidirectional via relations[])
+Code ──actor──→ Actor ──"Knowledge Nodes" section──→ Code
+Code ──relations──→ Code (bidirectional via relations[])
 ```
 
 ### 5.2 Implementation
@@ -503,7 +511,7 @@ Determine the commit message following the convention:
 vault(<type>): <verb> <name> [source: <source>]
 ```
 
-Types: `actor`, `person`, `team`, `topic`, `discussion`, `project`, `source`
+Types: `actor`, `person`, `team`, `concept`, `topic`, `discussion`, `project`, `source`
 Verbs: `creates`, `updates`, `links`
 Sources: `memory`, `github`, `jira`, `confluence`, `gdoc`, `csv`, `manual`, `session`, `preserve`
 

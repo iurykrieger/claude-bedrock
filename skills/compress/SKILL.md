@@ -64,9 +64,9 @@ For each entity type (`actors`, `people`, `teams`, `topics`, `discussions`, `pro
 
 1. List all `.md` files in the directory, **excluding `_template.md` and `_template_node.md`**
    - For actors: include both `actors/*.md` (flat) and `actors/*/*.md` (folder)
-   - Include knowledge-nodes: `actors/*/nodes/*.md`
+   - Include code entities: `actors/*/nodes/*.md`
 2. For each entity, read frontmatter + body
-3. For knowledge-nodes: additionally extract `graphify_node_id` and `actor` from frontmatter
+3. For code entities: additionally extract `graphify_node_id` and `actor` from frontmatter
 4. Extract **claims** — distinct factual assertions:
    - Each bullet point, table row, or paragraph is a potential claim
    - **Ignore** empty structural sections (template placeholders)
@@ -103,19 +103,19 @@ print(f'{len(nodes)} total nodes, {len(code_nodes)} code nodes')
 
 Collect:
 - `graph_nodes`: all nodes from graph.json with `file_type: code` and their `id`
-- `vault_knowledge_nodes`: all knowledge-nodes in `actors/*/nodes/*.md` with their `graphify_node_id`
+- `vault_code_entities`: all code entities in `actors/*/nodes/*.md` with their `graphify_node_id`
 - `vault_actors`: list of actors (folders in `actors/` that contain `<name>.md`)
 
-### 1.5.2 Check A — Orphan knowledge-nodes (actor removed)
+### 1.5.2 Check A — Orphan code entities (actor removed)
 
-For each knowledge-node found in Phase 1:
+For each code entity found in Phase 1:
 1. Extract `actor` from frontmatter (wikilink to the parent actor)
 2. Resolve the actor: verify if `actors/<actor-name>/<actor-name>.md` exists
 3. If it does NOT exist: mark as **orphan (actor removed)**
 
-### 1.5.3 Check B — Orphan knowledge-nodes (node removed from graph)
+### 1.5.3 Check B — Orphan code entities (node removed from graph)
 
-For each knowledge-node with `graphify_node_id` defined:
+For each code entity with `graphify_node_id` defined:
 1. Verify if the `graphify_node_id` exists in `graph_nodes` (IDs from graph.json)
 2. If it does NOT exist: mark as **orphan (node removed from graph)** — the code was probably
    deleted from the repository and /bedrock:teach reprocessed without generating this node
@@ -123,7 +123,7 @@ For each knowledge-node with `graphify_node_id` defined:
 ### 1.5.4 Check C — Graph nodes not persisted
 
 For each node in `graph_nodes` (nodes with `file_type: code` in graph.json):
-1. Verify if a knowledge-node exists in `vault_knowledge_nodes` with the corresponding `graphify_node_id`
+1. Verify if a code entity exists in `vault_code_entities` with the corresponding `graphify_node_id`
 2. If it does NOT exist: register as **node not persisted** — /bedrock:teach extracted this node but
    /bedrock:preserve did not write it to the vault (may indicate that /bedrock:teach did not complete the preservation phase)
 
@@ -141,11 +141,11 @@ stat -f "%Sm" -t "%Y-%m-%d" graphify-out/graph.json 2>/dev/null || stat -c "%y" 
 Store counters for the health report:
 - `graph_exists`: yes/no
 - `graph_total_nodes`: N
-- `vault_knowledge_nodes_count`: M
+- `vault_code_entities_count`: M
 - `nodes_synced`: nodes present in both the graph and the vault
-- `orphan_actor_removed`: knowledge-nodes whose actor does not exist
-- `orphan_node_removed`: knowledge-nodes whose graphify_node_id is not in the graph
-- `nodes_not_persisted`: graph nodes without a corresponding knowledge-node
+- `orphan_actor_removed`: code entities whose actor does not exist
+- `orphan_node_removed`: code entities whose graphify_node_id is not in the graph
+- `nodes_not_persisted`: graph nodes without a corresponding code entity
 - `graph_updated_at`: modification date of graph.json
 - `graph_stale`: yes/no
 
@@ -155,9 +155,9 @@ Store counters for the health report:
 
 For each entity type, compare claims **WITHIN the same type** (NEVER cross-type).
 
-**Knowledge-nodes:** compare WITHIN the same actor (knowledge-nodes from different actors are not
+**Code entities:** compare WITHIN the same actor (code entities from different actors are not
 compared with each other, as they may represent legitimately similar functions in distinct repos).
-Two knowledge-nodes from the same actor with semantically identical descriptions → cluster.
+Two code entities from the same actor with semantically identical descriptions → cluster.
 
 ### 2.1 Semantic duplication
 Two claims that say the same thing with different words.
@@ -242,18 +242,18 @@ Confirm execution? (yes/no)
 
 ### Graph orphan cleanup proposal (if Phase 1.5 found orphans)
 
-If Phase 1.5 identified orphan knowledge-nodes or unpersisted nodes, present an additional proposal:
+If Phase 1.5 identified orphan code entities or unpersisted nodes, present an additional proposal:
 
 ```markdown
 ## Graph Orphans
 
-### Orphan knowledge-nodes (actor removed)
-| # | Knowledge-node | Actor (removed) | Proposed action |
+### Orphan code entities (actor removed)
+| # | Code entity | Actor (removed) | Proposed action |
 |---|---|---|---|
 | 1 | [[node-name]] | [[actor-name]] | `git rm actors/<actor>/nodes/<node>.md` |
 
-### Orphan knowledge-nodes (node removed from graph)
-| # | Knowledge-node | graphify_node_id | Proposed action |
+### Orphan code entities (node removed from graph)
+| # | Code entity | graphify_node_id | Proposed action |
 |---|---|---|---|
 | 1 | [[node-name]] | `id_in_graph` | `git rm actors/<actor>/nodes/<node>.md` |
 
@@ -311,15 +311,15 @@ For each cluster confirmed by the user:
 #### Discussions / Projects (append-only)
 Follow the same rule as People/Teams/Topics: append-only with consolidation callout.
 
-#### Orphan knowledge-nodes (if confirmed by the user)
+#### Orphan code entities (if confirmed by the user)
 
-For each confirmed orphan knowledge-node (actor removed or node removed from graph):
+For each confirmed orphan code entity (actor removed or node removed from graph):
 1. Execute `git rm actors/<actor>/nodes/<node-name>.md`
 2. If the folder `actors/<actor>/nodes/` becomes empty: keep it (do not delete empty folder)
-3. Remove the knowledge-node reference from the "Knowledge Nodes" section of the parent actor (if actor exists)
+3. Remove the code entity reference from the "Knowledge Nodes" section of the parent actor (if actor exists)
 4. Update `updated_at` and `updated_by` of the parent actor (if touched)
 
-**IMPORTANT:** Knowledge-nodes are the only entity that can be deleted via `git rm`.
+**IMPORTANT:** Code entities are the only entity that can be deleted via `git rm`.
 All other entities follow the consolidation rule (never delete).
 The graph.json is NOT modified — if nodes need to be removed from the graph, run /bedrock:teach with `--update`.
 
@@ -366,10 +366,10 @@ Using the data collected in Phase 1.5, generate the integrity section:
 |---|---|
 | Graph.json exists | yes/no |
 | Nodes in graph.json | N |
-| Knowledge-nodes in vault | M |
+| Code entities in vault | M |
 | Synced nodes (graph <-> vault) | X |
-| Orphan knowledge-nodes (actor removed) | Y |
-| Orphan knowledge-nodes (node removed from graph) | Z |
+| Orphan code entities (actor removed) | Y |
+| Orphan code entities (node removed from graph) | Z |
 | Graph nodes not persisted | W |
 | Graph.json updated at | YYYY-MM-DD |
 | Graph.json stale (>30d) | yes/no |
@@ -391,10 +391,10 @@ If graph.json is stale: add warning "Suggestion: run /bedrock:teach or /sync to 
 
 ```bash
 git add actors/ people/ teams/ topics/ discussions/ projects/ fleeting/
-# Message includes removed orphan knowledge-nodes (if any)
+# Message includes removed orphan code entities (if any)
 git commit -m "vault: compress N entities [source: compress]"
-# If orphan knowledge-nodes were removed, use:
-# git commit -m "vault: compress N entities, remove M orphan knowledge-nodes [source: compress]"
+# If orphan code entities were removed, use:
+# git commit -m "vault: compress N entities, remove M orphan code entities [source: compress]"
 ```
 
 Where N = total number of entities touched.
