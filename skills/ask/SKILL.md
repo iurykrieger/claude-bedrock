@@ -1,19 +1,20 @@
 ---
 name: ask
 description: >
-  Orchestrated vault reader skill. Receives a natural language question,
-  decomposes it into sub-queries, executes multiple /graphify calls to search the knowledge graph,
-  blends graph results with direct vault reads (frontmatter, wikilinks, body prose),
-  cross-references context between entities, prioritizes recent information,
-  and optionally fetches external sources by delegating to known skills.
+  Adaptive vault reader skill. Receives a natural language question,
+  searches the vault first (Glob/Grep, entity reads, wikilink traversal),
+  then self-assesses whether more context is needed. Escalates to /graphify
+  for graph-level understanding or to /bedrock:teach for remote content ingestion
+  only when the vault alone is insufficient. Answers simple questions with zero
+  graphify calls.
   Use when: "bedrock ask", "bedrock-ask", "/bedrock:ask", any question about the vault,
   "what do we know about", "who owns", "what's the status of", "tell me about",
   "how does it work", or any Second Brain query.
 user_invocable: true
-allowed-tools: Bash, Read, Glob, Grep, Skill, Agent, mcp__plugin_github_github__get_file_contents, mcp__plugin_github_github__list_commits, mcp__plugin_github_github__list_pull_requests
+allowed-tools: Bash, Read, Glob, Grep, Skill, Agent
 ---
 
-# /bedrock:ask — Orchestrated Vault Reader
+# /bedrock:ask — Adaptive Vault Reader
 
 ## Plugin Paths
 
@@ -30,14 +31,16 @@ Where `<base_dir>` is the path provided in "Base directory for this skill".
 
 ## Overview
 
-This skill receives a natural language question, decomposes it into one or more sub-queries,
-executes them against the knowledge graph via `/graphify`, and blends the results with direct
-vault reads to produce rich, contextualized answers.
+This skill receives a natural language question and answers it using an adaptive,
+vault-first approach. It always reads vault content first, then decides whether
+to escalate to graphify or /teach based on what's actually needed — not what the
+question looks like in isolation.
 
-**You are a query orchestrator agent. You only READ — never write, edit, or delete files.**
+**You are an adaptive context orchestrator agent. You only READ — never write, edit, or delete files directly.**
 
-If the query reveals outdated or missing information, suggest that the user run
-`/bedrock:preserve` or `/bedrock:teach` to update the vault. Never perform the update yourself.
+Writes happen exclusively through `/bedrock:teach` delegation (which flows through `/bedrock:preserve`).
+If the query reveals outdated or missing information and no remote source is available to ingest,
+suggest that the user run `/bedrock:preserve` or `/bedrock:teach` to update the vault.
 
 ---
 
@@ -103,130 +106,14 @@ At the end, you should have:
 - **info_type**: classification of the type of information sought
 - **explicit_entities**: entities mentioned directly by name (if any)
 
-### 1.4 Decompose into sub-queries
-
-Based on the classification from 1.1–1.3, produce a **sub-query plan**: a list of 1–N graphify
-invocations, each with a mode and a prompt. The plan must not exceed `max_graphify_calls`.
-
-Use the following decomposition rules:
-
-| Question shape | Sub-query plan |
-|---|---|
-| Single entity, simple question ("what is X?", "explain X") | 1 call: `explain "<entity>"` |
-| Two entities, relationship question ("how does X relate to Y?", "what connects X and Y?") | 1 call: `path "<entityA>" "<entityB>"` |
-| Broad domain question ("tell me about the payments domain", "overview of processing") | 1 call: `query "<question>"` |
-| Single entity + context ("what is X and what depends on it?") | 2 calls: `explain "<entity>"` + `query "what depends on <entity>?"` |
-| Two entities + broad context ("how do X and Y relate, and what's the status of their domain?") | 2–3 calls: `path "<X>" "<Y>"` + `query "<domain context question>"` |
-| Complex multi-entity question (3+ entities or multiple domains) | Decompose into 2–3 focused calls, each targeting a different angle. Prioritize by relevance to the original question. |
-| Simple factual question ("who owns X?", "what team manages Y?") | 1 call: `query "<question>"` |
-
-**Rules:**
-- Never exceed `max_graphify_calls`
-- Prefer fewer calls when possible — 1 call is better than 2 if it covers the question
-- Each sub-query must have a clear, distinct purpose (no redundant calls)
-- If the question is simple enough for 1 call, use 1 call
-
-**Output of Phase 1.4:**
-```
-sub_query_plan:
-  - mode: explain | query | path
-    prompt: "<the prompt for this graphify call>"
-    purpose: "<why this call is needed>"
-```
-
 ---
 
-## Phase 2 — Orchestrated Search
+## Phase 2 — Vault-First Search
 
-### 2.0 Check graph availability
+This phase **always runs** for every question, regardless of graph availability.
+It is the foundation of the adaptive approach — read vault content first, decide later.
 
-```bash
-if [ -f "graphify-out/graph.json" ] && [ -s "graphify-out/graph.json" ]; then
-    echo "graph_available"
-else
-    echo "graph_not_available"
-fi
-```
-
-- **If `graph_available`:** use Phase 2-G (orchestrated graphify delegation) below.
-- **If `graph_not_available`:** use Phase 2-S (sequential fallback with warning).
-
-### Phase 2-G — Orchestrated Graphify Delegation (when graph available)
-
-Execute the sub-query plan produced in Phase 1.4. Each sub-query is a separate `/graphify`
-invocation via the Skill tool. Results are accumulated across calls.
-
-#### 2-G.1 Execute sub-queries sequentially
-
-For each sub-query in `sub_query_plan` (in order):
-
-1. **Invoke graphify via Skill tool.** Use the Skill tool to invoke the graphify command
-   matching the sub-query's mode:
-
-   | Mode | Skill invocation |
-   |---|---|
-   | `explain` | `/graphify explain "<prompt>"` |
-   | `query` | `/graphify query "<prompt>"` |
-   | `path` | `/graphify path "<entityA>" "<entityB>"` |
-
-   Append the following structured output instruction to every invocation prompt:
-
-   ```
-   After completing the traversal, return ONLY a JSON object with this structure (no prose, no markdown fences):
-   {
-     "mode": "query|path|explain",
-     "start_nodes": ["node_id1", "node_id2"],
-     "nodes": [
-       {"id": "node_id", "label": "Human Readable Name", "source_file": "relative/path", "community": 0, "source_location": "file:line"}
-     ],
-     "edges": [
-       {"source": "node_id", "target": "node_id", "relation": "calls|references|...", "confidence": "EXTRACTED|INFERRED|AMBIGUOUS", "confidence_score": 0.9}
-     ],
-     "communities": {
-       "0": {"label": "Community Name", "node_ids": ["id1", "id2"]}
-     },
-     "traversal": {"mode": "bfs|dfs", "depth": 3, "budget_used": 1200}
-   }
-   ```
-
-2. **Parse the response.** Extract the JSON object from the Skill tool response.
-   - **If JSON parses successfully:** accumulate the `nodes`, `edges`, and `communities`
-     into a running `graphify_results` aggregate.
-   - **If parsing fails** (graphify returned prose, error, or timeout): log warning
-     "Sub-query N failed (mode: <mode>) — skipping." Continue with the next sub-query.
-
-3. **Report progress:** After each successful call, log:
-   "Sub-query N/<total> (mode: <mode>) returned M nodes, K edges."
-
-**IMPORTANT:**
-- Invoke via the Skill tool — never call graphify Python API directly
-- This follows the same delegation pattern as `/bedrock:teach` → `/graphify`
-- If ALL sub-queries fail, fall back to Phase 2-S (sequential search)
-
-#### 2-G.2 Deduplicate accumulated results
-
-After all sub-queries complete:
-
-1. **Deduplicate nodes** by `id` — if the same node appears in multiple results, keep the first occurrence
-2. **Deduplicate edges** by `source` + `target` + `relation` — keep the first occurrence
-3. **Merge communities** — union community node sets; if two results name the same community differently, keep both labels
-
-Store the deduplicated result as `graphify_result` for Phase 2.5.
-
-Report: "Orchestration complete: N sub-queries executed, M unique nodes, K unique edges collected."
-
-### Phase 2-S — Sequential Search (when graph not available or all graphify calls failed)
-
-**Before searching, display this warning to the user:**
-
-> [!warning] Knowledge graph unavailable
-> The knowledge graph is not available (`graphify-out/graph.json` missing or empty).
-> Results will be limited to sequential vault search — answers may be less complete.
-> Run `/graphify build` to rebuild the graph from the vault's actor repositories.
-
-Then proceed with sequential search:
-
-### 2-S.1 Read entity definitions
+### 2.1 Read entity definitions
 
 Use Read to read the entity definition files from the plugin (see "Plugin Paths" section):
 - If the question is about a system → read `<base_dir>/../../entities/actor.md`
@@ -237,7 +124,7 @@ Use Read to read the entity definition files from the plugin (see "Plugin Paths"
 - If the question is about a project/initiative → read `<base_dir>/../../entities/project.md`
 - If you don't know the type → read all entity definitions from the plugin to classify correctly
 
-### 2-S.2 Search entities by name and alias
+### 2.2 Search entities by name and alias
 
 For each search term identified in Phase 1:
 
@@ -245,7 +132,7 @@ For each search term identified in Phase 1:
 ```
 Glob: actors/<term>*.md, people/<term>*.md, teams/<term>*.md,
       topics/*<term>*.md, discussions/*<term>*.md, projects/<term>*.md,
-      sources/<term>*.md, fleeting/*<term>*.md
+      fleeting/*<term>*.md
 ```
 
 **Step 2 — Search by alias in frontmatter:**
@@ -267,7 +154,7 @@ If steps 1-3 did not return sufficient results:
 Grep: pattern="<term>" in entity directories (case-insensitive)
 ```
 
-### 2-S.3 Filter by domain
+### 2.3 Filter by domain
 
 If domains were identified in Phase 1, filter results:
 ```
@@ -276,7 +163,7 @@ Grep: pattern="domain/<domain>" in the found files (tags field of frontmatter)
 
 Keep all results, but prioritize those matching the domain.
 
-### 2-S.4 Read found entities
+### 2.4 Read found entities
 
 For each entity found (limit: 15 entities):
 
@@ -290,63 +177,7 @@ Record for each entity read:
 - external URLs found in the content (Confluence, Google Docs, GitHub)
 - Explicit date in the filename (if any)
 
----
-
-## Phase 2.5 — Blend and Post-Process
-
-This phase applies to both orchestrated graphify results (Phase 2-G) and sequential search results (Phase 2-S).
-When coming from Phase 2-G, consume the deduplicated `graphify_result`. When coming from Phase 2-S, consume the entity list
-found via Glob/Grep. In both cases, the output is a list of resolved vault `.md` entities for Phase 3.
-
-### 2.5.1 Resolve graphify nodes to vault .md files (only when coming from Phase 2-G)
-
-For each node in `graphify_result.nodes`:
-
-1. Extract `id` and `label` from the node
-2. Resolve to a .md file in the vault:
-   - **Nodes with `source_file` pointing to actors:** search for code entity in `actors/*/nodes/` via node `id` in frontmatter, or search for the parent actor in `actors/`
-   - **Nodes with label matching an entity filename:** Glob for `actors/<label>*.md`, `topics/*<label>*.md`, etc.
-   - **If not resolved:** record as "node without corresponding .md" — will be mentioned in the response
-3. Read the resolved .md files (frontmatter + body) — limit: 15 entities total
-
-### 2.5.2 Supplement with people/teams
-
-Graphify does not index people and teams directly (they are vault entities, not code entities).
-For questions involving people/teams:
-
-1. Use Glob/Grep to search in `people/` and `teams/` for the search terms from Phase 1
-2. Add results to those already obtained from graphify (or from sequential search)
-3. Respect the total limit of 15 entities
-
-### 2.5.3 Community exploration for broad questions (only when coming from Phase 2-G)
-
-When the question is broad and does not mention specific entities (e.g.: "tell me about the payments domain",
-"what's happening with notifications?", "overview of processing"):
-
-1. Use `graphify_result.communities` from the graphify response — do NOT load graph.json directly
-2. Identify the community whose label matches the domain or theme of the question
-3. For the relevant community: resolve `node_ids` to vault .md files
-4. Prioritize nodes that appear in more edges in `graphify_result.edges` (higher connectivity)
-5. If `communities` data is missing or empty in the graphify response: skip this step and rely on node-level results from 2.5.1
-6. Limit: 10 nodes per community exploration
-
----
-
-## Phase 3 — Cross-reference Context via Wikilinks
-
-> **Note:** When graphify delegation was used (Phase 2-G), the graphify response already returns
-> connected nodes via edges. The wikilink cross-referencing in this phase is **complementary** —
-> used mainly for entities that are not in the graph (people, teams, sources, fleeting). If the
-> Phase 2.5 results already cover the question with 15 entities, this phase can be reduced or skipped.
-
-### 3.1 Extract wikilinks from found entities
-
-For each entity read in Phase 2, extract all wikilinks (`[[...]]`) from:
-- Frontmatter: fields such as `team`, `members`, `actors`, `people`, `focal_points`,
-  `related_topics`, `related_actors`, `related_teams`, `related_people`, `related_projects`
-- Body: inline wikilinks in the text
-
-### 3.2 Follow wikilinks (1 level of depth)
+### 2.5 Follow wikilinks (1 level of depth)
 
 For each extracted wikilink that is relevant to the question:
 
@@ -366,8 +197,183 @@ For each extracted wikilink that is relevant to the question:
 - The question is about history → follow related discussions, topics
 - The question is about architecture → follow dependent actors
 
-**Limit:** Do not read more than 15 entities total (Phase 2 + Phase 3 combined).
+**Limit:** Do not read more than 15 entities total (2.4 + 2.5 combined).
 If the limit is reached, prioritize entities directly mentioned in the question.
+
+### 2.6 Phase 2 output
+
+At the end of Phase 2, you have:
+- A set of vault entities with their full content
+- Wikilinks between them (structural relationships)
+- External URLs found in their content (Confluence, GDocs, GitHub)
+- A sense of whether the vault content covers the question
+
+---
+
+## Phase 3 — Context Assessment + Conditional Escalation
+
+This is the core decision point. After reading vault content in Phase 2,
+assess whether you have enough context to answer the question.
+
+### 3.1 Self-Assessment
+
+Evaluate the vault content you read in Phase 2 against the original question.
+Determine one of three outcomes:
+
+**`vault_sufficient`** — You have enough information to compose a good answer.
+Indicators:
+- The question is factual/status/ownership and the vault entities contain a clear answer
+- Examples: "who owns X", "what's the status of Y", "what team manages Z", "what is X"
+- The entities read in Phase 2 directly address the question
+- No significant gaps in the information
+
+**`needs_graphify`** — The vault content is partial but the knowledge graph could fill the gaps.
+Indicators:
+- The question involves code-level relationships, cross-domain dependencies, or architectural paths
+- The vault entities reference systems whose connections aren't explicit in the markdown
+- You feel you're missing structural context that the knowledge graph could provide
+- Examples: "how does X connect to Y at the code level", "what are the dependencies of X", "trace the data flow from A to B"
+
+**`needs_remote_content`** — The vault entities reference external URLs that appear directly relevant
+to the question, but the content behind those URLs isn't ingested in the vault.
+Indicators:
+- An entity's `sources` field or body text contains a URL (Confluence, GDocs, GitHub) that likely holds the answer
+- The question asks about something documented externally (e.g., "what's the runbook for X" and the entity links to a Confluence page)
+- The vault has a pointer to the answer but not the answer itself
+
+**Priority when multiple outcomes apply:**
+`needs_remote_content` > `needs_graphify` > `vault_sufficient`
+
+Rationale: remote content must be internalized first for the vault to be complete.
+Graphify can run on richer data after ingestion. If both apply, handle remote content first,
+then re-assess whether graphify is still needed.
+
+**After determining the outcome:**
+- `vault_sufficient` → skip directly to **Phase 4** (recency) then **Phase 5** (respond)
+- `needs_graphify` → proceed to **Phase 3-G**
+- `needs_remote_content` → proceed to **Phase 3-T**
+
+---
+
+### Phase 3-G — Graphify Escalation
+
+Execute only when the self-assessment determines `needs_graphify`.
+
+#### 3-G.0 Check graph availability
+
+```bash
+if [ -f "graphify-out/graph.json" ] && [ -s "graphify-out/graph.json" ]; then
+    echo "graph_available"
+else
+    echo "graph_not_available"
+fi
+```
+
+**If `graph_not_available`:** Display the following warning and skip to Phase 4 with vault-only content:
+
+> [!warning] Knowledge graph unavailable
+> The knowledge graph is not available (`graphify-out/graph.json` missing or empty).
+> The answer below is based on vault content only — it may be incomplete for this type of question.
+> Run `/graphify build` to rebuild the graph from the vault's actor repositories.
+
+#### 3-G.1 Formulate graphify calls
+
+Based on the gap between what you have (Phase 2 content) and what the question needs,
+formulate 1–N graphify calls. Use the same modes as before:
+
+| Gap identified | Graphify mode |
+|---|---|
+| Need to understand a single entity's code structure | `explain "<entity>"` |
+| Need to find how two entities connect | `path "<entityA>" "<entityB>"` |
+| Need broad relationship or dependency context | `query "<question about the gap>"` |
+
+The LLM decides the calls based on what's missing — not from a pre-planned decomposition.
+Never exceed `max_graphify_calls`.
+
+#### 3-G.2 Execute graphify calls sequentially
+
+For each call, invoke `/graphify` via the Skill tool. Append the structured JSON output instruction:
+
+```
+After completing the traversal, return ONLY a JSON object with this structure (no prose, no markdown fences):
+{
+  "mode": "query|path|explain",
+  "start_nodes": ["node_id1", "node_id2"],
+  "nodes": [
+    {"id": "node_id", "label": "Human Readable Name", "source_file": "relative/path", "community": 0, "source_location": "file:line"}
+  ],
+  "edges": [
+    {"source": "node_id", "target": "node_id", "relation": "calls|references|...", "confidence": "EXTRACTED|INFERRED|AMBIGUOUS", "confidence_score": 0.9}
+  ],
+  "communities": {
+    "0": {"label": "Community Name", "node_ids": ["id1", "id2"]}
+  },
+  "traversal": {"mode": "bfs|dfs", "depth": 3, "budget_used": 1200}
+}
+```
+
+- **If JSON parses successfully:** accumulate nodes, edges, and communities.
+- **If parsing fails:** log warning "Graphify call N failed — skipping." Continue with next call.
+- **If ALL calls fail:** continue to Phase 4 with vault-only content. Never block.
+
+#### 3-G.3 Deduplicate and blend
+
+1. Deduplicate nodes by `id`, edges by `source+target+relation`
+2. Resolve graphify nodes to vault `.md` files (by label or source_file)
+3. Merge with the vault entities already collected in Phase 2
+4. Respect the 15-entity total limit
+
+#### 3-G.4 Check for remote content need
+
+If graphify results reveal additional external URLs that appear relevant to the question
+and aren't ingested in the vault → escalate to Phase 3-T before proceeding.
+
+---
+
+### Phase 3-T — Teach Delegation
+
+Execute when the self-assessment determines `needs_remote_content`, or when Phase 3-G.4
+identifies uningested URLs.
+
+#### 3-T.1 Identify URLs to ingest
+
+From the vault entities read in Phase 2 (and optionally Phase 3-G), identify external URLs
+that appear directly relevant to answering the question:
+- Confluence URLs (containing `confluence` or `atlassian.net`)
+- Google Docs URLs (containing `docs.google.com`)
+- GitHub URLs (containing `github.com`)
+
+**Limit:** 2 URLs per `/bedrock:ask` invocation. If more than 2 relevant URLs exist,
+prioritize those most directly related to the question.
+
+#### 3-T.2 Invoke /bedrock:teach
+
+For each URL, invoke `/bedrock:teach` via the Skill tool:
+
+```
+/bedrock:teach <URL>
+
+Context: Ingesting to answer the question: "<original question>"
+```
+
+**IMPORTANT:**
+- Invoke via the Skill tool — same delegation pattern as teach → preserve
+- `/teach` handles its own flow: fetch content, extract entities, present to user for confirmation, delegate to `/preserve`
+- `/ask` waits for `/teach` to complete
+
+#### 3-T.3 Re-read newly created entities
+
+After `/teach` completes successfully:
+1. Search the vault for entities that were just created or updated (based on `/teach`'s output)
+2. Read these new entities (frontmatter + body)
+3. Add them to the working set of vault entities for response composition
+
+#### 3-T.4 Best-effort fallback
+
+If `/teach` fails or the user declines the confirmation:
+- Log: "Teach delegation for <URL> did not complete. Continuing with available content."
+- Continue to Phase 4 with whatever content is available
+- **Never block the response** because of a failed teach delegation
 
 ---
 
@@ -379,7 +385,7 @@ For discussions and topics, extract the date from the filename:
 - Pattern `YYYY-MM-DD-slug.md` → full date (e.g.: `2026-04-02`)
 - Pattern `YYYY-MM-slug.md` → partial date, assume day 01 (e.g.: `2026-04-01`)
 
-For consolidated entities (actors, people, teams, projects, sources):
+For consolidated entities (actors, people, teams, projects):
 - Treat as equally up-to-date — do not apply temporal ranking
 - Trust that content is up-to-date via `/bedrock:preserve` and `/bedrock:compress`
 
@@ -394,51 +400,9 @@ When the response involves multiple dated discussions or topics:
 
 ---
 
-## Phase 5 — External Fetch (When Necessary)
+## Phase 5 — Respond to the User
 
-### 5.1 Assess necessity
-
-External fetch is only necessary when:
-1. Local information is insufficient to answer the question, AND
-2. The consulted entities contain relevant external URLs
-
-If local information is sufficient: **skip this phase entirely**.
-
-### 5.2 Identify external URLs
-
-In the entities read (Phases 2 and 3), look for URLs:
-- Confluence: URLs containing `confluence` or `atlassian.net`
-- Google Docs: URLs containing `docs.google.com`
-- GitHub: URLs containing `github.com` (repositories, issues, PRs)
-
-### 5.3 Delegate reading to corresponding skill
-
-For each relevant URL (limit: 3 external URLs per query):
-
-| URL contains | Action |
-|---|---|
-| `confluence` or `atlassian.net` | Invoke skill `/confluence-to-markdown` passing the URL |
-| `docs.google.com` | Invoke skill `/gdoc-to-markdown` passing the URL |
-| `github.com` with file path | Use `mcp__plugin_github_github__get_file_contents` with owner, repo, and path extracted from the URL |
-| `github.com` without path (repo root) | Use `mcp__plugin_github_github__get_file_contents` to read README.md + `mcp__plugin_github_github__list_commits` for the last 5 commits |
-
-**External fetch rules:**
-- **Best-effort:** If the skill or MCP fails, continue with local information. Never block the response.
-- **1 level only:** Do not follow links found within the external document.
-- **Limit of 3 URLs:** If there are more than 3 relevant URLs, prioritize those that seem most directly related to the question.
-
-### 5.4 Integrate external content
-
-Incorporate the obtained content into the response context. Clearly mark the origin:
-- "(source: Confluence — <page title>)"
-- "(source: Google Docs — <doc title>)"
-- "(source: GitHub — <owner/repo>)"
-
----
-
-## Phase 6 — Respond to the User
-
-### 6.1 Compose the response
+### 5.1 Compose the response
 
 Build the response following these rules:
 
@@ -455,9 +419,10 @@ Build the response following these rules:
    - Use bare wikilinks (never `[[dir/entity-name]]`)
    - Group citations at the end if there are many, or inline when natural
 
-4. **External source indication:**
-   - If external fetch was used, clearly indicate: "I also consulted [external source]."
-   - Include original URL for user reference
+4. **Escalation transparency:**
+   - If graphify was used, note: "I consulted the knowledge graph for deeper context."
+   - If /teach was invoked, note: "I ingested [source] into the vault to answer this question."
+   - If vault-only was sufficient, no special note needed
 
 5. **When nothing is found:**
    - State explicitly: "I didn't find information about [X] in the vault."
@@ -469,7 +434,6 @@ Build the response following these rules:
    - **Permanent notes** (actors, people, teams) — maximum weight, consolidated information. Present as current facts.
    - **Bridge notes** (topics, discussions) — high weight, contextualized information. Most recent discussions/topics first.
    - **Index notes** (projects) — medium weight, organizational reference. Point to where the detail is.
-   - **Literature notes** (sources) — medium weight, traceability metadata.
    - **Fleeting notes** — low weight, unconsolidated information. **ALWAYS** flag with disclaimer:
      `(source: fleeting note — unconsolidated information)`
    - If there is conflicting information between sources, point out the discrepancy.
@@ -484,13 +448,13 @@ Build the response following these rules:
    - `/bedrock:ask` does NOT promote automatically — it only flags. Promotion happens when
      `/bedrock:preserve` is invoked with the instruction to promote.
 
-### 6.2 Post-response suggestions
+### 5.2 Post-response suggestions
 
 When appropriate, suggest actions to the user:
 
 - If information is outdated: "The vault may be outdated about [X]. Consider running `/bedrock:teach <source>` to update."
 - If the question revealed gaps: "I didn't find [Y] in the vault. If you have this information, you can use `/bedrock:preserve` to record it."
-- If the question is complex and the response incomplete: "For a more complete view, you may also consult [external URL found but not fetched]."
+- If the question is complex and the response incomplete: "For a more complete view, you may also want to run `/bedrock:teach <URL>` to ingest additional sources."
 
 ---
 
@@ -498,24 +462,24 @@ When appropriate, suggest actions to the user:
 
 | Rule | Detail |
 |---|---|
-| Read-only | NEVER write, edit, or delete files. Only Read, Glob, Grep, Skill (graphify delegation + external fetch), Agent (parallel search), and GitHub MCP (reading) |
-| Orchestrated graphify delegation | Decompose the question in Phase 1.4, then execute sub-queries sequentially in Phase 2-G. Each call via the Skill tool — NEVER call graphify Python API directly |
-| Max graphify calls | Read `query.max_graphify_calls` from `.bedrock/config.json` (default: 3, valid range: 1–5). Never exceed this limit |
-| Deduplicate across calls | After all sub-queries, deduplicate nodes by `id` and edges by `source+target+relation` before resolving to vault files |
-| Graph unavailable warning | When `graphify-out/graph.json` is missing or empty, display `> [!warning]` callout telling the user to run `/graphify build`, then proceed with sequential fallback |
-| Graphify fallback to sequential | If all graphify calls fail (parse error, timeout, no graph.json), fall back to Phase 2-S. Never block the query |
-| No fabrication | Respond ONLY with information found in the vault or consulted external sources. Never fabricate data |
-| Clarification before guessing | If the question is ambiguous, ask for clarification. Do not assume |
-| Limit of 15 entities | Do not read more than 15 entities per query (Phase 2.5 + Phase 3) |
-| Limit of 3 external URLs | Do not fetch more than 3 external sources per query |
-| 1 level of wikilinks | Do not follow wikilinks beyond the first level |
-| 1 level of external links | Do not follow links within external documents |
-| Best-effort for fetch | If external fetch fails, respond with local info |
+| Vault-first principle | Phase 2 ALWAYS runs before any escalation. Read vault content first, decide later. Never skip Phase 2. |
+| LLM self-assessment | The decision to escalate is made by the LLM after reading vault content (Phase 3.1), not by a heuristic rule table. Use the guidance provided, but the LLM makes the final call. |
+| Escalation priority | When multiple outcomes apply: `needs_remote_content` > `needs_graphify` > `vault_sufficient`. Internalize first, then analyze. |
+| No direct writes | `/ask` NEVER writes, edits, or deletes files directly. All writes are delegated through `/bedrock:teach` → `/bedrock:preserve`. |
+| Teach delegation via Skill tool | Invoke `/bedrock:teach` via the Skill tool. `/teach` owns its confirmation gate. `/ask` cannot bypass it. |
+| Graphify via Skill tool | Invoke `/graphify` via the Skill tool — NEVER call the Python API directly. |
+| Max graphify calls | Read `query.max_graphify_calls` from `.bedrock/config.json` (default: 3, valid range: 1–5). Only consumed when graphify is actually invoked. |
+| Graph unavailable warning | When `needs_graphify` but `graphify-out/graph.json` is missing, display `> [!warning]` callout with `/graphify build` instruction. Continue with vault-only content. |
+| Best-effort escalation | If graphify fails or teach fails or user declines: continue with available content. NEVER block the response. |
+| Limit of 15 entities | Do not read more than 15 entities total across Phase 2 + Phase 3 |
+| Limit of 2 teach URLs | Do not invoke `/bedrock:teach` for more than 2 URLs per `/bedrock:ask` invocation |
+| No fabrication | Respond ONLY with information found in the vault or obtained through escalation. Never fabricate data. |
+| Clarification before guessing | If the question is ambiguous, ask for clarification. Do not assume. |
 | Vault language with technical terms in English | Response always in the vault's configured language |
 | Bare wikilinks | `[[name]]`, never `[[dir/name]]` |
 | Consolidated entities = up-to-date | Actors, people, teams do not need temporal ranking |
 | Dated discussions/topics = prioritize recent | Sort by date in filename (YYYY-MM-DD) |
 | Sensitive data | NEVER display credentials, tokens, PANs, CVVs found in the vault |
 | Fleeting notes with disclaimer | ALWAYS flag information from fleeting notes with `(source: fleeting note — unconsolidated information)` |
-| Promotion as side-effect | When a relevant fleeting note meets promotion criteria, flag with callout. Do NOT promote automatically |
-| Weight hierarchy | permanent > bridge > index/literature > fleeting. Use as guideline, not mathematical formula |
+| Promotion as side-effect | When a relevant fleeting note meets promotion criteria, flag with callout. Do NOT promote automatically. |
+| Weight hierarchy | permanent > bridge > index > fleeting. Use as guideline, not mathematical formula. |
