@@ -1,16 +1,17 @@
 ---
 name: compress
 description: >
-  Scans the vault, identifies duplicated or fragmented content between entities of the same type,
-  builds a unification proposal in table format, and executes after user confirmation.
-  Generates a health report (unresolved wikilinks, orphan entities, stale entities).
-  Use when: "bedrock compress", "bedrock-compress", "clean vault", "consolidate vault", "unify entities",
-  "find duplications", "/bedrock:compress".
+  Vault alignment engine. Detects and fixes 5 types of structural misalignments:
+  broken backlinks, concept fragmentation, entity miscategorization, duplicated entities,
+  and misnamed entities. Delegates all writes to /bedrock:preserve.
+  Supports interactive mode (user confirmation) and cron mode (autonomous mechanical fixes +
+  queued semantic proposals). Use when: "bedrock compress", "bedrock-compress",
+  "align vault", "fix backlinks", "fix misalignments", "/bedrock:compress".
 user_invocable: true
-allowed-tools: Bash, Read, Write, Edit, Glob, Grep, Agent
+allowed-tools: Bash, Read, Glob, Grep, Skill, Agent
 ---
 
-# /bedrock:compress — Vault Consolidation and Health Check
+# /bedrock:compress — Vault Alignment Engine
 
 ## Plugin Paths
 
@@ -27,20 +28,39 @@ Where `<base_dir>` is the path provided in "Base directory for this skill".
 
 ## Overview
 
-This skill scans all entities in the vault, detects semantically duplicated
-or fragmented content WITHIN the same entity type, proposes unification to the user, and executes
-after explicit confirmation. It also generates a vault health report.
+This skill scans all entities in the vault, detects 5 types of structural misalignments,
+proposes fixes to the user, and delegates all writes to `/bedrock:preserve`.
 
 **You are an execution agent.** Follow the phases below in order, without skipping steps.
 
+### Execution modes
+
+The skill accepts an optional `--mode` argument:
+
+- **`interactive`** (default): all 5 capabilities prompt the user for confirmation before execution.
+- **`cron`**: capabilities 1 and 4 (mechanical, deterministic) execute autonomously without confirmation.
+  Capabilities 2, 3, and 5 (semantic, judgment-dependent) are detected but written as a proposal to a
+  fleeting note for human review — they are NOT executed.
+
+Parse the mode from the invocation arguments. If no `--mode` is specified, default to `interactive`.
+
+### Five alignment capabilities
+
+| # | Capability | Type | Cron behavior |
+|---|---|---|---|
+| 1 | Broken backlinks | Mechanical | Autonomous — fix without confirmation |
+| 2 | Concept match | Semantic | Queued — write proposal to fleeting note |
+| 3 | Entity misalignment | Semantic | Queued — write proposal to fleeting note |
+| 4 | Duplicated entities | Mechanical | Autonomous — fix without confirmation |
+| 5 | Misnamed entities | Semantic | Queued — write proposal to fleeting note |
+
 **Critical rules:**
-- **NEVER** execute changes without explicit user confirmation
-- **NEVER** compare entities of different types (actor vs topic, etc.)
-- **NEVER** delete entities — only consolidate content
-- **NEVER** modify frontmatter (except `updated_at` and `updated_by`)
-- **NEVER** modify templates (`_template.md`), conventions, or patterns
+- **NEVER** write entity files directly — all mutations go through `/bedrock:preserve`
+- **NEVER** execute semantic capabilities (2, 3, 5) without confirmation in interactive mode
+- **NEVER** execute semantic capabilities (2, 3, 5) autonomously in cron mode — always queue
 - **NEVER** remove existing wikilinks
-- People/Teams/Topics: **append-only** — add consolidation note, never delete content
+- **NEVER** delete entities (compress aligns, it does not delete)
+- People/Teams/Concepts/Topics: **append-only** — never delete content
 - Actors: **free merge** — may edit body freely
 
 ---
@@ -58,471 +78,518 @@ If it fails:
 
 ---
 
-## Phase 1 — Scan the Vault
+## Phase 1 — Scan and Detect
 
-For each entity type (`actors`, `people`, `teams`, `topics`, `discussions`, `projects`, `fleeting`):
+Scan the entire vault and run all 5 detection algorithms. Store results for Phase 2.
 
-1. List all `.md` files in the directory, **excluding `_template.md` and `_template_node.md`**
+### 1.0 Load entity definitions
+
+Read the entity definitions from the plugin directory to understand classification criteria:
+- `<base_dir>/../../entities/concept.md` — needed for capability 2 (concept match)
+- `<base_dir>/../../entities/*.md` — needed for capability 3 (entity misalignment)
+
+Store the "When to create", "When NOT to create", and "How to distinguish" sections
+from each entity definition for use in detection.
+
+### 1.1 Read all entities
+
+For each entity directory (`actors/`, `people/`, `teams/`, `concepts/`, `topics/`, `discussions/`, `projects/`, `fleeting/`):
+
+1. List all `.md` files, **excluding `_template.md` and `_template_node.md`**
    - For actors: include both `actors/*.md` (flat) and `actors/*/*.md` (folder)
-   - Include code entities: `actors/*/nodes/*.md`
 2. For each entity, read frontmatter + body
-3. For code entities: additionally extract `graphify_node_id` and `actor` from frontmatter
-4. Extract **claims** — distinct factual assertions:
-   - Each bullet point, table row, or paragraph is a potential claim
-   - **Ignore** empty structural sections (template placeholders)
-   - **Ignore** "Expected Bidirectional Links" section (reference, not content)
-   - **Ignore** "Recent Activity" section (temporal, not factual)
-   - **Ignore** standard mandatory callouts (`[!warning] Deprecated`, `[!danger] PCI Scope`, etc.)
+3. Extract:
+   - `type` from frontmatter
+   - `name` from frontmatter (or filename as fallback)
+   - `aliases` from frontmatter (array)
+   - All wikilinks `[[target]]` from body AND frontmatter arrays
+   - All proper nouns, service names, team names, person names mentioned in the body (for capabilities 4 and 5)
 
-**Output:** map `type → [{entity, claims[]}]`
+**Optimization for large vaults:** If the vault has more than 100 entities in a type,
+use subagents via Agent tool to parallelize reading by entity type.
 
-### Optimization for large vaults
+**Output:** `vault_data` map: `entity_name → {type, name, aliases[], wikilinks[], body_mentions[], frontmatter, body}`
 
-If the vault has more than 100 entities in a type, process in batches of 30.
-Use subagents via Agent tool to parallelize reading by entity type.
+### 1.2 Capability 1 — Detect broken backlinks
 
----
+For each entity A in `vault_data`:
+1. For each wikilink `[[B]]` found in A (body or frontmatter arrays):
+   - Skip if B does not exist as an entity file in the vault (wikilinks to non-existent entities are valid in Obsidian)
+   - If B exists: check if B contains a wikilink `[[A]]` (body or frontmatter arrays)
+   - If B does NOT link back to A: register as **broken backlink**
 
-## Phase 1.5 — Graph Integrity (graphify)
+**Output:** `broken_backlinks[]` — list of `{source: A, target: B, direction: "A→B exists, B→A missing"}`
 
-If `graphify-out/graph.json` exists, verify consistency between the graph and the vault.
-If it does NOT exist: skip this phase and report "Graph.json not found. Run /bedrock:teach to generate." in the health report.
+### 1.3 Capability 2 — Detect concept fragmentation
 
-### 1.5.1 Load data
+Scan all entity bodies for recurring terms or phrases that:
+1. Appear in **3+ different entities** (across any types)
+2. Do NOT have a corresponding entity file in `concepts/` (or any other entity directory)
+3. Are NOT already wrapped in a wikilink `[[term]]`
 
-```bash
-$(cat graphify-out/.graphify_python 2>/dev/null || echo python3) -c "
-import json
-from pathlib import Path
-g = json.loads(Path('graphify-out/graph.json').read_text())
-nodes = g.get('nodes', [])
-code_nodes = [n for n in nodes if n.get('file_type') == 'code']
-print(f'{len(nodes)} total nodes, {len(code_nodes)} code nodes')
-"
-```
+For each candidate term, evaluate against the concept entity definition (`entities/concept.md`):
+- Is it **timeless and definitional**? (not temporal, not an initiative)
+- Is it **actor-independent**? (not specific to one system's implementation)
+- Does it match "When to create" criteria?
+- Does it NOT match "When NOT to create" criteria?
 
-Collect:
-- `graph_nodes`: all nodes from graph.json with `file_type: code` and their `id`
-- `vault_code_entities`: all code entities in `actors/*/nodes/*.md` with their `graphify_node_id`
-- `vault_actors`: list of actors (folders in `actors/` that contain `<name>.md`)
+Filter out:
+- Common English words and generic terms
+- Terms that are already entity filenames or aliases
+- Terms shorter than 2 words (unless they are well-known patterns like "CQRS", "mTLS")
 
-### 1.5.2 Check A — Orphan code entities (actor removed)
+**Output:** `concept_candidates[]` — list of `{term, occurrences: [{entity, context_snippet}], meets_concept_criteria: bool}`
 
-For each code entity found in Phase 1:
-1. Extract `actor` from frontmatter (wikilink to the parent actor)
-2. Resolve the actor: verify if `actors/<actor-name>/<actor-name>.md` exists
-3. If it does NOT exist: mark as **orphan (actor removed)**
+### 1.4 Capability 3 — Detect entity misalignment
 
-### 1.5.3 Check B — Orphan code entities (node removed from graph)
+For each entity in `vault_data`:
+1. Read the entity's frontmatter `type` field
+2. Read the corresponding entity definition from `entities/<type>.md`
+3. Evaluate the entity's content against:
+   - "When to create" criteria for the current type → does the entity still qualify?
+   - "When NOT to create" criteria for the current type → does the entity violate any?
+   - "How to distinguish" table → does the entity look like another type?
+4. If a different type is a better fit:
+   - Score the entity against "When to create" criteria of the proposed new type
+   - Score the entity against "When NOT to create" criteria of the proposed new type
+   - If the new type scores higher: flag as **misaligned**
 
-For each code entity with `graphify_node_id` defined:
-1. Verify if the `graphify_node_id` exists in `graph_nodes` (IDs from graph.json)
-2. If it does NOT exist: mark as **orphan (node removed from graph)** — the code was probably
-   deleted from the repository and /bedrock:teach reprocessed without generating this node
+Focus on these common misalignments:
+- Fleeting notes that have matured into topics, actors, or concepts (critical mass, corroboration)
+- Topics that are actually concepts (timeless definition vs. temporal initiative)
+- Actors that are actually projects (no repo/deployment yet)
 
-### 1.5.4 Check C — Graph nodes not persisted
+**Output:** `misaligned_entities[]` — list of `{entity, current_type, proposed_type, reason}`
 
-For each node in `graph_nodes` (nodes with `file_type: code` in graph.json):
-1. Verify if a code entity exists in `vault_code_entities` with the corresponding `graphify_node_id`
-2. If it does NOT exist: register as **node not persisted** — /bedrock:teach extracted this node but
-   /bedrock:preserve did not write it to the vault (may indicate that /bedrock:teach did not complete the preservation phase)
+### 1.5 Capability 4 — Detect duplicated entities
 
-### 1.5.5 Check D — graph.json stale
+Scan all entity bodies for proper nouns, service names, team names, and person names that:
+1. Are mentioned in **3+ different entity files**
+2. Do NOT have a corresponding entity file anywhere in the vault
+3. Are NOT already wrapped in a wikilink `[[name]]`
 
-1. Check the modification date of `graphify-out/graph.json`
-```bash
-stat -f "%Sm" -t "%Y-%m-%d" graphify-out/graph.json 2>/dev/null || stat -c "%y" graphify-out/graph.json 2>/dev/null | cut -d' ' -f1
-```
-2. If the date is older than 30 days: mark as **stale**
-3. Suggest: "Graph.json is outdated (>30 days). Run /bedrock:teach or /sync to update."
+Identification heuristics:
+- Capitalized multi-word phrases (e.g., "Payment Gateway", "Alice Smith")
+- Kebab-case or camelCase terms that look like service names (e.g., "billing-api", "notificationService")
+- Terms following patterns like "the X team", "the X service", "X squad"
 
-### 1.5.6 Result
+Filter out:
+- Terms that are already entity filenames or aliases (existing entities)
+- Generic organizational terms ("the team", "the service", "the API")
+- Terms that appear only within wikilinks (already linked)
 
-Store counters for the health report:
-- `graph_exists`: yes/no
-- `graph_total_nodes`: N
-- `vault_code_entities_count`: M
-- `nodes_synced`: nodes present in both the graph and the vault
-- `orphan_actor_removed`: code entities whose actor does not exist
-- `orphan_node_removed`: code entities whose graphify_node_id is not in the graph
-- `nodes_not_persisted`: graph nodes without a corresponding code entity
-- `graph_updated_at`: modification date of graph.json
-- `graph_stale`: yes/no
+**Output:** `missing_entities[]` — list of `{name, inferred_type, mentions: [{entity, context_snippet}]}`
 
----
+### 1.6 Capability 5 — Detect misnamed entities
 
-## Phase 2 — Detect Duplication
+Scan for name variants of the same real-world entity:
+1. For each entity, collect all known names: filename (kebab-case), `name` field, `aliases[]`
+2. For each proper noun/service name found in body text across the vault:
+   - Check if it is a variant of an existing entity name (case-insensitive, with/without hyphens, abbreviated forms)
+   - Example matches: "Iury" ↔ "Iury Krieger", "billing-api" ↔ "BillingAPI" ↔ "Billing API"
+3. If a mention is a variant of an existing entity but NOT wrapped in a wikilink AND
+   the variant is NOT in the entity's `aliases[]`: flag as **misnamed**
+4. If two distinct entity files refer to the same real-world entity (e.g., `iury.md` and `iury-krieger.md`):
+   flag as **duplicate entity files** requiring merge
 
-For each entity type, compare claims **WITHIN the same type** (NEVER cross-type).
-
-**Code entities:** compare WITHIN the same actor (code entities from different actors are not
-compared with each other, as they may represent legitimately similar functions in distinct repos).
-Two code entities from the same actor with semantically identical descriptions → cluster.
-
-### 2.1 Semantic duplication
-Two claims that say the same thing with different words.
-Example:
-- Actor A: "Card payments API"
-- Actor B: "Service that processes credit card payments"
-
-### 2.2 Fragmentation
-Information about the same subject scattered across 3+ entities without consolidation.
-Example:
-- Actor A mentions "uses Kafka for events"
-- Actor B mentions "publishes events to Kafka"
-- Actor C mentions "consumes Kafka events from B"
-- No entity consolidates the complete flow
-
-### 2.3 Generate clusters
-
-For each duplication found, create a cluster:
-
-```yaml
-cluster:
-  id: N
-  type: actor | person | team | topic | discussion | project
-  description: "description of the duplicated content"
-  entities:
-    - name: "entity-a"
-      claim: "text of the duplicated claim"
-    - name: "entity-b"
-      claim: "text of the duplicated claim"
-  primary_entity: "entity-a"  # the most complete/relevant
-  unified_content: "consolidated text"
-```
-
-**Criteria for choosing the primary entity:**
-- Most complete (more claims, more details)
-- Most recent (most recent `updated_at`)
-- Most connected (more inbound/outbound wikilinks)
-
-If no duplication is found, inform the user and skip to the Health Report (Phase 4.2).
+**Output:** `misnamed_entities[]` — list of `{canonical_entity, variant_name, found_in: [{entity, context_snippet}], action: "add_alias" | "merge_entities"}`
 
 ---
 
-## Phase 3 — Build Proposal
+## Phase 2 — Build Proposal
 
-For each cluster, present to the user:
+Present all findings to the user in a structured report, grouped by capability.
+
+### 2.1 Summary table
 
 ```markdown
-### Cluster N: <description of the duplicated content>
+## /bedrock:compress — Alignment Proposal
 
-**Type:** <entity type>
+| # | Capability | Findings | Mode |
+|---|---|---|---|
+| 1 | Broken backlinks | N found | Autonomous / Interactive |
+| 2 | Concept match | N candidates | Queued / Interactive |
+| 3 | Entity misalignment | N misaligned | Queued / Interactive |
+| 4 | Duplicated entities | N missing | Autonomous / Interactive |
+| 5 | Misnamed entities | N variants | Queued / Interactive |
 
-**Entities involved:**
-| Entity | Claim |
-|---|---|
-| [[entity-a]] | "description X of the service" |
-| [[entity-b]] | "service does X" |
-
-**Proposal:**
-- **Keep in:** [[entity-a]] (most complete/relevant entity)
-- **Unified content:** "consolidated description..."
-- **Remove from / Consolidate in:** [[entity-b]]
-
-**Impact:** N entities, M claims
+**Total findings:** N
+**Mode:** interactive / cron
 ```
 
-### Proposal summary
-
-After listing all clusters:
+### 2.2 Capability 1 — Broken backlinks
 
 ```markdown
-## Summary
+### Capability 1: Broken Backlinks
 
-| # | Description | Type | Entities | Claims |
+| # | Source | Target | Missing direction |
+|---|---|---|---|
+| 1 | [[entity-a]] | [[entity-b]] | entity-b → entity-a |
+| 2 | [[entity-c]] | [[entity-d]] | entity-d → entity-c |
+
+**Fix:** Add missing backlinks in target entities via /bedrock:preserve.
+```
+
+If no broken backlinks found: "No broken backlinks found."
+
+### 2.3 Capability 2 — Concept match
+
+```markdown
+### Capability 2: Concept Fragmentation
+
+| # | Candidate concept | Occurrences | Entities |
+|---|---|---|---|
+| 1 | "event sourcing" | 5 | [[actor-a]], [[topic-b]], [[actor-c]], ... |
+| 2 | "circuit breaker" | 3 | [[actor-d]], [[actor-e]], [[topic-f]] |
+
+**Fix:** Create concept entities and add wikilinks in referencing entities via /bedrock:preserve.
+```
+
+If no candidates found: "No concept fragmentation found."
+
+### 2.4 Capability 3 — Entity misalignment
+
+```markdown
+### Capability 3: Entity Misalignment
+
+| # | Entity | Current type | Proposed type | Reason |
 |---|---|---|---|---|
-| 1 | ... | actor | 2 | 3 |
-| 2 | ... | topic | 3 | 5 |
+| 1 | [[note-about-cqrs]] | fleeting | concept | Meets critical mass: >3 paragraphs, timeless definition |
+| 2 | [[new-checkout-system]] | actor | project | No repo or deployment yet |
 
-**Total:** N clusters, M entities, P claims
-
-Confirm execution? (yes/no)
+**Fix:** Recategorize via /bedrock:preserve (create under new type, mark original as promoted/consolidated).
 ```
 
-### Graph orphan cleanup proposal (if Phase 1.5 found orphans)
+If no misalignments found: "No entity misalignments found."
 
-If Phase 1.5 identified orphan code entities or unpersisted nodes, present an additional proposal:
+### 2.5 Capability 4 — Duplicated entities
 
 ```markdown
-## Graph Orphans
+### Capability 4: Missing Entities (Mentioned but Not Created)
 
-### Orphan code entities (actor removed)
-| # | Code entity | Actor (removed) | Proposed action |
+| # | Name | Inferred type | Mentions |
 |---|---|---|---|
-| 1 | [[node-name]] | [[actor-name]] | `git rm actors/<actor>/nodes/<node>.md` |
+| 1 | "Payment Gateway" | actor | 4 mentions in [[topic-a]], [[actor-b]], [[discussion-c]], [[actor-d]] |
+| 2 | "Alice Smith" | person | 3 mentions in [[discussion-e]], [[topic-f]], [[discussion-g]] |
 
-### Orphan code entities (node removed from graph)
-| # | Code entity | graphify_node_id | Proposed action |
-|---|---|---|---|
-| 1 | [[node-name]] | `id_in_graph` | `git rm actors/<actor>/nodes/<node>.md` |
-
-### Graph nodes not persisted
-| # | Node ID | Label | Proposed action |
-|---|---|---|---|
-| 1 | `node_id` | Node Label | Run `/bedrock:teach` on the corresponding actor |
-
-Confirm orphan cleanup? (yes/no/partial)
+**Fix:** Create missing entities and establish backlinks via /bedrock:preserve.
 ```
 
-**IMPORTANT:** Orphan cleanup is SEPARATE from duplicate consolidation.
-The user can confirm one without the other. Allow partial confirmation by actor
-(e.g., "clean orphans only from billing-api").
+If no missing entities found: "No duplicated entity mentions found."
+
+### 2.6 Capability 5 — Misnamed entities
+
+```markdown
+### Capability 5: Misnamed Entities
+
+| # | Canonical entity | Variant found | Found in | Action |
+|---|---|---|---|---|
+| 1 | [[iury-krieger]] | "Iury" | [[discussion-a]], [[topic-b]] | Add alias + wikilink |
+| 2 | [[billing-api]] | "BillingAPI" | [[actor-c]] | Add alias + wikilink |
+| 3 | [[iury.md]] + [[iury-krieger.md]] | Same person | — | Merge entities |
+
+**Fix:** Add aliases and wikilinks, or merge duplicate entity files via /bedrock:preserve.
+```
+
+If no misnamed entities found: "No misnamed entities found."
+
+### 2.7 No findings
+
+If ALL 5 capabilities found 0 issues:
+Report "Vault is aligned. No misalignments detected." and end (skip Phases 3-5).
+
+---
+
+## Phase 3 — Confirmation and Mode Handling
+
+### Interactive mode (`--mode interactive` or default)
+
+Present the full proposal from Phase 2 and ask:
+
+```markdown
+Confirm execution? (yes / no / partial)
+- **yes**: execute all findings
+- **no**: abort
+- **partial**: specify which capabilities or individual findings to execute (e.g., "only capability 1 and 4", "all except finding 3 in capability 5")
+```
 
 **STOP HERE and wait for user confirmation.**
 
-If the user says "no" or asks for adjustments, adjust the proposal and re-present.
-If the user partially confirms (e.g., "only clusters 1 and 3"), execute only the confirmed ones.
+If the user says "no": report "No changes made." and end.
+If the user partially confirms: filter the execution list accordingly.
+
+### Cron mode (`--mode cron`)
+
+No user confirmation needed for mechanical capabilities. Split findings:
+
+**Autonomous execution (capabilities 1 and 4):**
+- Proceed directly to Phase 4 with all findings from capabilities 1 and 4.
+- When invoking `/bedrock:preserve`, include in the prompt:
+  "Autonomous mode — do not ask for confirmation, process directly."
+
+**Queued proposals (capabilities 2, 3, and 5):**
+- If there are findings in capabilities 2, 3, or 5: compile them into a single fleeting note
+  and delegate creation to `/bedrock:preserve`:
+
+```yaml
+entities:
+  - type: fleeting
+    name: "<today's date YYYY-MM-DD>-compress-proposals"
+    action: create
+    content: |
+      ## Compress Alignment Proposals — <today's date>
+
+      The following alignment issues were detected by `/bedrock:compress` running in cron mode.
+      Review each proposal and run `/bedrock:compress` in interactive mode to execute.
+
+      ### Concept Fragmentation (Capability 2)
+      <formatted findings from Phase 2.3>
+
+      ### Entity Misalignment (Capability 3)
+      <formatted findings from Phase 2.4>
+
+      ### Misnamed Entities (Capability 5)
+      <formatted findings from Phase 2.6>
+    relations: {}
+    source: "compress"
+    metadata:
+      status: "raw"
+      source: "session"
+      captured_at: "<today's date YYYY-MM-DD>"
+```
+
+- Include in the `/bedrock:preserve` invocation:
+  "Autonomous mode — do not ask for confirmation, process directly."
 
 ---
 
-## Phase 4 — Execute
+## Phase 4 — Delegate to /bedrock:preserve
 
-### 4.1 Consolidate entities
+### 4.1 Compile structured entity list
 
-For each cluster confirmed by the user:
+Build the entity list in the format accepted by `/bedrock:preserve`, grouping all confirmed fixes:
 
-#### Actors (free merge)
-1. Read the primary entity (`entity-a`)
-2. Incorporate the unified content into the body of the primary entity
-3. Read the secondary entity (`entity-b`)
-4. Remove the duplicated claim from the body of the secondary entity
-5. Update frontmatter of both:
-   ```yaml
-   updated_at: <today's date YYYY-MM-DD>
-   updated_by: "compress@agent"
-   ```
+#### Capability 1 fixes (broken backlinks)
 
-#### People / Teams / Topics (append-only)
-1. Read the primary entity (`entity-a`)
-2. Add the unified content as a new section or supplement in the body
-3. Read the secondary entity (`entity-b`)
-4. **Do NOT delete** the original content. Add a callout after the duplicated claim:
-   ```markdown
-   > [!info] Content consolidated in [[entity-a]]
-   > This content has been consolidated in the primary entity. See [[entity-a]] for the most complete version.
-   ```
-5. Update frontmatter of both:
-   ```yaml
-   updated_at: <today's date YYYY-MM-DD>
-   updated_by: "compress@agent"
-   ```
-
-#### Discussions / Projects (append-only)
-Follow the same rule as People/Teams/Topics: append-only with consolidation callout.
-
-#### Orphan code entities (if confirmed by the user)
-
-For each confirmed orphan code entity (actor removed or node removed from graph):
-1. Execute `git rm actors/<actor>/nodes/<node-name>.md`
-2. If the folder `actors/<actor>/nodes/` becomes empty: keep it (do not delete empty folder)
-3. Remove the code entity reference from the "Knowledge Nodes" section of the parent actor (if actor exists)
-4. Update `updated_at` and `updated_by` of the parent actor (if touched)
-
-**IMPORTANT:** Code entities are the only entity that can be deleted via `git rm`.
-All other entities follow the consolidation rule (never delete).
-The graph.json is NOT modified — if nodes need to be removed from the graph, run /bedrock:teach with `--update`.
-
-### 4.2 Generate Health Report
-
-Leverage the full vault scan to generate:
-
-#### Unresolved wikilinks
-- Scan all entity files
-- Extract all wikilinks `[[name]]`
-- Check if a corresponding file exists in any entity directory
-- List those that do not resolve
-
-#### Orphan entities
-- Entities with no inbound wikilinks (no other entity points to them)
-- Check via Grep across all entity files
-
-#### Stale entities
-- Entities with `updated_at` older than 60 days from the current date
-- Extract `updated_at` from the frontmatter of each entity
-
-#### Stagnant fleeting notes
-- Fleeting notes with `raw` status for more than 30 days (based on `captured_at`)
-- For each stagnant fleeting note, check if it meets promotion criteria (see `entities/fleeting.md`):
-  - **Critical mass:** >3 paragraphs with verifiable sources → suggest promotion
-  - **Corroboration:** information confirmed by an existing permanent → suggest promotion
-  - If no criteria met → suggest archiving (`status: archived`)
-- Include in the health report with suggested actions:
-  ```
-  | Fleeting Note | Days in raw | Suggested action |
-  |---|---|---|
-  | [[2026-03-05-novo-servico]] | 35 | Promote (critical mass) |
-  | [[2026-03-01-ideia-vaga]] | 39 | Archive (no promotion criteria met) |
-  ```
-
-#### Graph Integrity (if graphify-out/graph.json exists)
-
-Using the data collected in Phase 1.5, generate the integrity section:
-
-```markdown
-## Graph Integrity
-
-| Metric | Value |
-|---|---|
-| Graph.json exists | yes/no |
-| Nodes in graph.json | N |
-| Code entities in vault | M |
-| Synced nodes (graph <-> vault) | X |
-| Orphan code entities (actor removed) | Y |
-| Orphan code entities (node removed from graph) | Z |
-| Graph nodes not persisted | W |
-| Graph.json updated at | YYYY-MM-DD |
-| Graph.json stale (>30d) | yes/no |
+For each broken backlink `{source: A, target: B}`:
+```yaml
+- type: <B's entity type>
+  name: "<B's entity name>"
+  action: update
+  content: ""
+  relations:
+    <A's type plural>: ["<A's entity name>"]
+  source: "compress"
 ```
 
-If graph.json does not exist: report only "Graph.json not found. Run /bedrock:teach to generate."
-If graph.json exists but there are no orphans: report all counters with zeros.
-If graph.json is stale: add warning "Suggestion: run /bedrock:teach or /sync to update the graph."
+The content field is empty because the fix is adding a relation (backlink), not body content.
+`/bedrock:preserve` handles adding the wikilink in B's body or frontmatter.
 
-**Filter:** Report only actionable findings. Ignore:
-- Wikilinks to entities that are valid references but not yet created (acceptable in Obsidian)
-- Templates and configuration files
+#### Capability 2 fixes (concept creation)
+
+For each confirmed concept candidate:
+```yaml
+- type: concept
+  name: "<concept-slug>"
+  action: create
+  content: "<brief definition derived from the recurring mentions>"
+  relations:
+    <referencing entity types>: ["<entity-1>", "<entity-2>", ...]
+  source: "compress"
+```
+
+Plus, for each referencing entity that should link to the new concept:
+```yaml
+- type: <entity's type>
+  name: "<entity's name>"
+  action: update
+  content: ""
+  relations:
+    concepts: ["<concept-slug>"]
+  source: "compress"
+```
+
+#### Capability 3 fixes (entity misalignment)
+
+For each misaligned entity:
+
+**If current type is `fleeting` (promotion):**
+```yaml
+- type: <proposed new type>
+  name: "<new entity name in correct format>"
+  action: create
+  content: "<content migrated from the fleeting note>"
+  relations:
+    <inferred relations>: [...]
+  source: "compress"
+- type: fleeting
+  name: "<original fleeting note name>"
+  action: update
+  content: ""
+  relations: {}
+  source: "compress"
+  metadata:
+    status: "promoted"
+    promoted_to: "[[<new entity name>]]"
+```
+
+**If current type is NOT fleeting (recategorization):**
+```yaml
+- type: <proposed new type>
+  name: "<new entity name in correct format>"
+  action: create
+  content: "<content from the misaligned entity>"
+  relations:
+    <inferred relations>: [...]
+  source: "compress"
+```
+
+Add a consolidation callout in the original entity (via update):
+```yaml
+- type: <current type>
+  name: "<original entity name>"
+  action: update
+  content: "> [!info] Content recategorized to [[<new entity name>]]\n> This entity was recategorized by /bedrock:compress. See [[<new entity name>]] for the current version."
+  relations:
+    <new type plural>: ["<new entity name>"]
+  source: "compress"
+```
+
+#### Capability 4 fixes (create missing entities)
+
+For each missing entity:
+```yaml
+- type: <inferred type>
+  name: "<entity-slug>"
+  action: create
+  content: "<aggregated context from all mentions>"
+  relations:
+    <mentioning entity types>: ["<entity-1>", "<entity-2>", ...]
+  source: "compress"
+```
+
+Plus, for each mentioning entity (to establish backlinks):
+```yaml
+- type: <entity's type>
+  name: "<entity's name>"
+  action: update
+  content: ""
+  relations:
+    <new entity's type plural>: ["<entity-slug>"]
+  source: "compress"
+```
+
+#### Capability 5 fixes (misnamed entities)
+
+**For alias additions:**
+```yaml
+- type: <entity's type>
+  name: "<canonical entity name>"
+  action: update
+  content: ""
+  relations: {}
+  source: "compress"
+  metadata:
+    aliases: ["<existing aliases>", "<new variant name>"]
+```
+
+For each file where the variant was found (to add the wikilink):
+```yaml
+- type: <entity's type>
+  name: "<entity where variant was found>"
+  action: update
+  content: ""
+  relations:
+    <canonical entity's type plural>: ["<canonical entity name>"]
+  source: "compress"
+```
+
+**For entity merges** (two files for the same real-world entity):
+```yaml
+- type: <canonical entity's type>
+  name: "<canonical entity name>"
+  action: update
+  content: "<merged content from both entities>"
+  relations:
+    <merged relations from both>: [...]
+  source: "compress"
+  metadata:
+    aliases: ["<combined aliases from both entities>"]
+```
+
+Add a consolidation callout in the secondary entity:
+```yaml
+- type: <secondary entity's type>
+  name: "<secondary entity name>"
+  action: update
+  content: "> [!info] Content consolidated in [[<canonical entity name>]]\n> This entity has been consolidated by /bedrock:compress. See [[<canonical entity name>]] for the merged version."
+  relations:
+    <canonical entity's type plural>: ["<canonical entity name>"]
+  source: "compress"
+```
+
+### 4.2 Invoke /bedrock:preserve
+
+Use the Skill tool to invoke `/bedrock:preserve` passing the compiled structured entity list as argument.
+
+Include `source: "compress"` for all entities so `/bedrock:preserve` records provenance.
+
+If running in cron mode (autonomous capabilities):
+- Add to the invocation prompt: "Autonomous mode — do not ask for confirmation, process directly."
+
+### 4.3 Await result
+
+`/bedrock:preserve` returns:
+- List of created/updated entities
+- Commit hash (if there was a commit)
+- Any errors or warnings
+
+Record the result for use in the final report (Phase 5).
 
 ---
 
-## Phase 5 — Git Commit + Report
-
-### 5.1 Stage
-
-```bash
-git add actors/ people/ teams/ topics/ discussions/ projects/ fleeting/
-
-# Check if there is anything to commit
-git diff --cached --quiet && echo "Nothing to commit" && exit 0
-```
-
-### 5.2 Read git strategy
-
-Read the vault's git strategy from `.bedrock/config.json`:
-
-```bash
-cat .bedrock/config.json 2>/dev/null
-```
-
-Extract the `git.strategy` field. If the file does not exist or has no `git` key, default to `"commit-push"`.
-
-Valid values: `"commit-push"`, `"commit-push-pr"`, `"commit-only"`.
-
-Prepare the commit message following the convention:
-```
-vault: compress N entities [source: compress]
-```
-If orphan code entities were removed, use:
-```
-vault: compress N entities, remove M orphan code entities [source: compress]
-```
-
-Where N = total number of entities touched.
-
-### 5.3 Dispatch by strategy
-
-**Strategy: `commit-push`** (default)
-
-```bash
-git commit -m "<message per convention>"
-git push origin main
-```
-
-If push fails (conflict):
-```bash
-git pull --rebase origin main
-git push origin main
-```
-
-If it fails 2x: STOP and inform the user.
-If there is no remote: commit locally and warn.
-
----
-
-**Strategy: `commit-push-pr`**
-
-First, check that `gh` is available:
-
-```bash
-which gh 2>/dev/null
-```
-
-If `gh` is not found: warn the user and **fall back to `commit-push`** strategy (above).
-
-If `gh` is available:
-
-1. **Create a branch.** Derive the branch name from the commit message:
-
-   `vault/<YYYY-MM-DD>-compress-<N>-entities` (e.g., `vault/2026-04-15-compress-25-entities`)
-
-   Check for collisions:
-   ```bash
-   git branch --list "vault/<YYYY-MM-DD>-compress*"
-   ```
-   If the branch already exists, append a counter: `vault/2026-04-15-compress-25-entities-2`.
-
-   ```bash
-   git checkout -b <branch-name>
-   ```
-
-2. **Commit and push the branch:**
-   ```bash
-   git commit -m "<message per convention>"
-   git push origin <branch-name>
-   ```
-
-3. **Open a pull request:**
-   ```bash
-   gh pr create --title "<commit message>" --body "Automated by /bedrock:compress" --base main
-   ```
-
-4. **Return to main:**
-   ```bash
-   git checkout main
-   ```
-
----
-
-**Strategy: `commit-only`**
-
-```bash
-git commit -m "<message per convention>"
-```
-
-Do not push. Output:
-```
-Git strategy: commit-only — changes committed locally. Use `git push` manually when ready.
-```
-
-### 5.4 Final Report
+## Phase 5 — Final Report
 
 Present to the user:
 
 ```markdown
 ## /bedrock:compress — Report
 
-### Processed clusters
-| # | Description | Type | Entities | Unified claims |
+### Mode: interactive / cron
+
+### Alignment fixes applied
+| # | Capability | Findings | Fixed | Queued |
 |---|---|---|---|---|
-| 1 | ... | actor | 2 | 3 |
-| 2 | ... | topic | 3 | 5 |
+| 1 | Broken backlinks | N | M | — |
+| 2 | Concept match | N | M | P (cron) |
+| 3 | Entity misalignment | N | M | P (cron) |
+| 4 | Duplicated entities | N | M | — |
+| 5 | Misnamed entities | N | M | P (cron) |
 
-**Total:** N clusters, M entities, P unified claims
+**Total:** N findings, M fixed, P queued
 
-### Health Report
-| Check | Count | Details |
+### Entities processed (via /bedrock:preserve)
+| Type | Name | Action |
 |---|---|---|
-| Unresolved wikilinks | N | [[link1]], [[link2]], ... |
-| Orphan entities | N | [[entity1]], [[entity2]], ... |
-| Stale entities (>60d) | N | [[entity3]], [[entity4]], ... |
+| <type> | <name> | create / update |
+| ... | ... | ... |
+
+### Queued proposals (cron mode only)
+- Created fleeting note: [[<YYYY-MM-DD>-compress-proposals]]
+- Contains N proposals for capabilities 2, 3, 5
+- Review and run `/bedrock:compress` in interactive mode to execute
 
 ### Git
-- Commit: `vault: compress N entities [source: compress]`
+- Commit: <hash from /bedrock:preserve>
 - Push: success / failed (reason)
+
+### Suggestions
+- Run `/bedrock:healthcheck` for a full vault health report
+- [additional suggestions based on findings]
 ```
 
-If no clusters were processed (no duplication found or user refused all),
-present only the Health Report.
+If no fixes were applied (user refused all, or no findings):
+Present only the summary table with zero counts.
 
 ---
 
@@ -531,8 +598,27 @@ present only the Health Report.
 | Situation | Action |
 |---|---|
 | Empty vault (no entities) | Report "No entities found in the vault." and end |
-| No duplication found | Report and skip to Health Report |
-| User refuses all clusters | Report and skip to Health Report |
+| No findings across all 5 capabilities | Report "Vault is aligned." and end |
+| User refuses all findings (interactive) | Report "No changes made." and end |
 | Error reading entity | Skip entity, warn in the report |
-| Conflict on git push | Rebase + retry (max 2). If it fails: warn the user |
+| `/bedrock:preserve` fails | Report the error, list what was NOT processed |
 | Entity without frontmatter | Skip entity, warn in the report |
+| `--mode` argument not recognized | Default to `interactive`, warn the user |
+
+---
+
+## Critical Rules
+
+| Rule | Detail |
+|---|---|
+| All writes via /bedrock:preserve | NEVER use Write or Edit on entity files. Invoke `/bedrock:preserve` via the Skill tool. |
+| Mechanical vs. semantic split | Capabilities 1, 4 = mechanical (autonomous in cron). Capabilities 2, 3, 5 = semantic (queued in cron, confirmed in interactive). |
+| User confirmation in interactive | ALWAYS wait for explicit confirmation before delegating to /bedrock:preserve in interactive mode. |
+| Append-only for people/teams/topics | When fixing entities of these types, NEVER delete existing content. Add callouts and new links only. |
+| Actors allow free merge | Actor bodies can be modified freely. Frontmatter is merge-only (never delete fields). |
+| Never remove wikilinks | When fixing backlinks or renaming, ADD new links. Never remove existing ones. |
+| Entity definitions are authoritative | Capabilities 2 and 3 MUST read entity definitions from the plugin directory. Do not hardcode classification heuristics. |
+| 3+ threshold | Capabilities 2 and 4 require a term/name to appear in 3+ different entities before flagging. |
+| Provenance | All entities delegated to /bedrock:preserve use `source: "compress"`. |
+| MCP in main context | Do NOT use subagents for MCP calls — permissions are not inherited. |
+| Sensitive data | NEVER include credentials, tokens, passwords, PANs, CVVs. |

@@ -109,7 +109,8 @@ These are the Claude Code skills provided by the Bedrock plugin:
 | `/bedrock:query` | Smart vault reader — answers questions by searching and cross-referencing entities |
 | `/bedrock:teach` | Ingest external sources (Confluence, GDocs, GitHub, CSV) — extracts entities — delegates to `/bedrock:preserve` |
 | `/bedrock:preserve` | Single write point — entity detection, matching, create/update, bidirectional links, git commit |
-| `/bedrock:compress` | Deduplication and vault health — broken links, orphan entities, stale content |
+| `/bedrock:compress` | Vault alignment engine — fixes broken backlinks, concept fragmentation, entity miscategorization, duplicated entities, misnamed entities. Supports `--mode cron` for scheduled execution |
+| `/bedrock:healthcheck` | Read-only vault health diagnostic — checks graphify-out integrity, setup, orphan entities, dangling content, old content (>15 days). Safe to run at any frequency |
 | `/bedrock:sync` | Re-sync entities with external sources. Flags: `--people` (sync contributors), `--github` (sync PRs/activity) |
 
 ---
