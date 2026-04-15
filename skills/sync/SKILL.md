@@ -133,15 +133,17 @@ For each syncable source, fetch updated content:
 
 For sources with `source_type: confluence`:
 
-1. Invoke skill `/confluence-to-markdown` passing the source URL
-2. The return is the page content in markdown format
+1. Read the internal fetcher at `<base_dir>/../confluence-to-markdown/SKILL.md`
+2. Follow its instructions to parse the URL, choose layer (MCP → API → browser), and extract content
+3. The fetcher returns Markdown content and page title
 
 ### 2.2 Google Docs
 
 For sources with `source_type: gdoc`:
 
-1. Invoke skill `/gdoc-to-markdown` passing the source URL
-2. The return is the document content in markdown format
+1. Read the internal fetcher at `<base_dir>/../gdoc-to-markdown/SKILL.md`
+2. Follow its instructions to parse the URL, detect document type, choose layer (MCP → API/public export → browser), and extract content
+3. The fetcher returns Markdown content and document metadata
 
 ### 2.3 GitHub Repository
 

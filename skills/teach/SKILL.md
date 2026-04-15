@@ -53,8 +53,8 @@ The user provides an argument. Classify it in the following priority order:
 
 | Input | Detected type | Fetch method |
 |---|---|---|
-| URL containing `confluence` or `atlassian.net` | confluence | Read `skills/confluence/SKILL.md`, follow instructions, save output to tmp |
-| URL containing `docs.google.com` | gdoc | Read `skills/gdoc/SKILL.md`, follow instructions, save output to tmp |
+| URL containing `confluence` or `atlassian.net` | confluence | Read `skills/confluence-to-markdown/SKILL.md`, follow instructions, save output to tmp |
+| URL containing `docs.google.com` | gdoc | Read `skills/gdoc-to-markdown/SKILL.md`, follow instructions, save output to tmp |
 | URL containing `github.com` | github-repo | `git clone --depth 1` to tmp + GitHub MCP enrichment |
 | URL starting with `http://` or `https://` (any other) | remote-url | WebFetch content, save as markdown to tmp |
 | Local path ending in `.csv` | csv | Copy to tmp (pass through raw) |
@@ -100,23 +100,23 @@ For GitHub URLs (e.g.: `https://github.com/acme-corp/billing-api`):
 #### 1.3.2 Confluence
 
 For Confluence URLs:
-1. Read the internal skill at `<base_dir>/../confluence/SKILL.md`
-2. Follow its instructions to parse the URL, choose strategy (API or browser), and extract content
+1. Read the internal skill at `<base_dir>/../confluence-to-markdown/SKILL.md`
+2. Follow its instructions to parse the URL, choose layer (MCP → API → browser), and extract content
 3. Save the returned Markdown content to `$TEACH_TMP/<slug>.md`
    - `<slug>` is derived from the page title or URL path (kebab-case, lowercase)
 
-If neither API credentials nor Claude in Chrome are available: warn the user with the guidance message from the fetcher module and abort this source type.
+If all three layers (MCP, API, browser) are unavailable: warn the user with the guidance message from the fetcher module and abort this source type.
 
 #### 1.3.3 Google Docs / Sheets
 
 For Google Docs or Sheets URLs:
-1. Read the internal skill at `<base_dir>/../gdoc/SKILL.md`
-2. Follow its instructions to parse the URL, detect document type (Doc vs Sheet), choose strategy (API or public export), and extract content
+1. Read the internal skill at `<base_dir>/../gdoc-to-markdown/SKILL.md`
+2. Follow its instructions to parse the URL, detect document type (Doc vs Sheet), choose layer (MCP → API/public export → browser), and extract content
 3. The fetcher saves output to `/tmp/gdoc_{docId}.md` or `/tmp/gsheet_{docId}.md`
 4. Copy the output file to `$TEACH_TMP/<slug>.md`
    - `<slug>` is derived from the document title or URL path (kebab-case, lowercase)
 
-If neither API token nor public export work: warn the user with the guidance message from the fetcher module and abort this source type.
+If all three layers (MCP, API/public export, browser) are unavailable: warn the user with the guidance message from the fetcher module and abort this source type.
 
 #### 1.3.4 Remote URL (generic)
 
@@ -302,7 +302,7 @@ Each entity above received in the `sources` frontmatter field:
 | Delegate to /bedrock:preserve | ALL entities are persisted via `/bedrock:preserve` — teach does NOT create, update, or write vault entities. |
 | Cleanup /tmp after /preserve confirms | Remove `/tmp/bedrock-teach-<ts>/` only after /preserve confirms completion, not after graphify finishes. |
 | Provenance via source_url | ALWAYS include `source_url` and `source_type` when delegating to /bedrock:preserve. |
-| Internal fetcher skills | Read internal skills from `<base_dir>/../confluence/SKILL.md` and `<base_dir>/../gdoc/SKILL.md` for content fetching. Never invoke external skills. |
+| Internal fetcher skills | Read internal skills from `<base_dir>/../confluence-to-markdown/SKILL.md` and `<base_dir>/../gdoc-to-markdown/SKILL.md` for content fetching. Never invoke external skills. |
 | Best-effort for external sources | If MCP or fetch fails, warn and continue with what was obtained. Never block ingestion. |
 | MCP in main context | Do NOT use subagents for GitHub/Atlassian MCP calls — permissions are not inherited. |
 | Maximum 2 push attempts | After that, abort and inform (handled by /preserve). |
