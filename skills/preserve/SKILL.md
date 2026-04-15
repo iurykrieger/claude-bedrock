@@ -26,6 +26,52 @@ Where `<base_dir>` is the path provided in "Base directory for this skill".
 
 ---
 
+## Vault Resolution
+
+Resolve which vault to operate on. This skill can be invoked from any directory.
+
+**Step 1 — Parse `--vault` flag:**
+Check if the input arguments include `--vault <name>`. If found, extract the vault name and remove it from the arguments before further parsing.
+
+**Step 2 — Resolve vault path:**
+
+1. **If `--vault <name>` was provided:**
+   Read the vault registry at `<base_dir>/../../vaults.json`. Find the entry matching the name.
+   If not found: error — "Vault `<name>` is not registered. Run `/bedrock:vaults` to see available vaults."
+   If found: set `VAULT_PATH` to the entry's `path` value.
+
+2. **If no `--vault` flag — CWD detection:**
+   Read `<base_dir>/../../vaults.json`. Check if the current working directory is inside any registered vault path
+   (CWD starts with a registered vault's absolute path). If multiple match, use the longest path (most specific).
+   If found: set `VAULT_PATH` to the matching vault's `path`.
+
+3. **If CWD detection fails — default vault:**
+   From the registry, find the vault with `"default": true`.
+   If found: set `VAULT_PATH` to the default vault's `path`.
+
+4. **If no resolution:**
+   Error — "No vault resolved. Available vaults:" followed by the registry listing.
+   "Use `--vault <name>` to specify, or run `/bedrock:setup` to register a vault."
+
+**Step 3 — Validate vault path:**
+```bash
+test -d "<VAULT_PATH>" && echo "exists" || echo "missing"
+```
+If missing: error — "Vault path `<VAULT_PATH>` does not exist on disk. Run `/bedrock:setup` to re-register."
+
+**Step 4 — Read vault config:**
+```bash
+cat <VAULT_PATH>/.bedrock/config.json 2>/dev/null
+```
+Extract `language`, `git.strategy`, and other relevant fields for use in later phases.
+
+**From this point forward, ALL vault file operations use `<VAULT_PATH>` as the root.**
+- Entity directories: `<VAULT_PATH>/actors/`, `<VAULT_PATH>/people/`, etc.
+- Vault config: `<VAULT_PATH>/.bedrock/config.json`
+- Git operations: `git -C <VAULT_PATH> <command>`
+
+---
+
 ## Overview
 
 This skill centralizes ALL write logic for the vault. It receives input (structured, free-form,
@@ -41,12 +87,12 @@ which handles people/teams via GitHub API).
 
 Execute:
 ```bash
-git pull --rebase origin main
+git -C <VAULT_PATH> pull --rebase origin main
 ```
 
 If the pull fails:
 - No remote configured: warn "No remote configured. Working locally." and proceed.
-- Pull conflict: `git rebase --abort` and warn the user. DO NOT proceed without resolving.
+- Pull conflict: `git -C <VAULT_PATH> rebase --abort` and warn the user. DO NOT proceed without resolving.
 - Otherwise: proceed.
 
 ---
@@ -226,14 +272,14 @@ content (especially in free-form mode, Phase 1.2).
 List all files in each entity directory (exclude `_template.md` and `_template_node.md`):
 
 ```
-actors/*.md and actors/*/*.md (actors can be folders: actors/<name>/<name>.md)
-actors/*/nodes/*.md (code entities within actors)
-people/*.md
-teams/*.md
-topics/*.md
-discussions/*.md (if exists)
-projects/*.md (if exists)
-fleeting/*.md (if exists)
+<VAULT_PATH>/actors/*.md and <VAULT_PATH>/actors/*/*.md (actors can be folders)
+<VAULT_PATH>/actors/*/nodes/*.md (code entities within actors)
+<VAULT_PATH>/people/*.md
+<VAULT_PATH>/teams/*.md
+<VAULT_PATH>/topics/*.md
+<VAULT_PATH>/discussions/*.md (if exists)
+<VAULT_PATH>/projects/*.md (if exists)
+<VAULT_PATH>/fleeting/*.md (if exists)
 ```
 
 For each file found, extract:
@@ -531,10 +577,10 @@ vault: teaches <source-name>, creates N updates M entities [source: <type>]
 
 ```bash
 # Stage touched entities (includes actor subfolders: actors/*/nodes/)
-git add actors/ people/ teams/ topics/ discussions/ projects/ fleeting/
+git -C <VAULT_PATH> add actors/ people/ teams/ topics/ discussions/ projects/ fleeting/
 
 # Check if there is anything to commit
-git diff --cached --quiet && echo "Nothing to commit" && exit 0
+git -C <VAULT_PATH> diff --cached --quiet && echo "Nothing to commit" && exit 0
 ```
 
 #### 6.2.2 Read git strategy
@@ -542,7 +588,7 @@ git diff --cached --quiet && echo "Nothing to commit" && exit 0
 Read the vault's git strategy from `.bedrock/config.json`:
 
 ```bash
-cat .bedrock/config.json 2>/dev/null
+cat <VAULT_PATH>/.bedrock/config.json 2>/dev/null
 ```
 
 Extract the `git.strategy` field. If the file does not exist or has no `git` key, default to `"commit-push"`.
@@ -554,14 +600,14 @@ Valid values: `"commit-push"`, `"commit-push-pr"`, `"commit-only"`.
 **Strategy: `commit-push`** (default)
 
 ```bash
-git commit -m "<message per convention>"
-git push origin main
+git -C <VAULT_PATH> commit -m "<message per convention>"
+git -C <VAULT_PATH> push origin main
 ```
 
 If push fails (conflict):
 ```bash
-git pull --rebase origin main
-git push origin main
+git -C <VAULT_PATH> pull --rebase origin main
+git -C <VAULT_PATH> push origin main
 ```
 
 If it fails 2x: STOP and inform the user.
@@ -588,28 +634,28 @@ If `gh` is available:
 
    Check for collisions:
    ```bash
-   git branch --list "vault/<YYYY-MM-DD>-<slug>*"
+   git -C <VAULT_PATH> branch --list "vault/<YYYY-MM-DD>-<slug>*"
    ```
    If the branch already exists, append a counter: `vault/2026-04-15-billing-api-2`.
 
    ```bash
-   git checkout -b <branch-name>
+   git -C <VAULT_PATH> checkout -b <branch-name>
    ```
 
 2. **Commit and push the branch:**
    ```bash
-   git commit -m "<message per convention>"
-   git push origin <branch-name>
+   git -C <VAULT_PATH> commit -m "<message per convention>"
+   git -C <VAULT_PATH> push origin <branch-name>
    ```
 
 3. **Open a pull request:**
    ```bash
-   gh pr create --title "<commit message>" --body "Automated by /bedrock:preserve" --base main
+   cd <VAULT_PATH> && gh pr create --title "<commit message>" --body "Automated by /bedrock:preserve" --base main
    ```
 
 4. **Return to main:**
    ```bash
-   git checkout main
+   git -C <VAULT_PATH> checkout main
    ```
 
 ---
@@ -617,7 +663,7 @@ If `gh` is available:
 **Strategy: `commit-only`**
 
 ```bash
-git commit -m "<message per convention>"
+git -C <VAULT_PATH> commit -m "<message per convention>"
 ```
 
 Do not push. Output:
@@ -684,3 +730,6 @@ Present to the user:
 | 13 | **Hierarchical tags** — `[type/actor]`, never `[actor]` |
 | 14 | **Mandatory aliases** — at least 1 alias per new entity |
 | 15 | **Mandatory callouts** — `[!warning] Deprecated` for deprecated, `[!danger] PCI Scope` for PCI |
+| 16 | **Vault resolution first** — resolve `VAULT_PATH` before any file operation or git command |
+| 17 | **All git commands use `git -C <VAULT_PATH>`** — never assume CWD is the vault |
+| 18 | **All entity paths use `<VAULT_PATH>/` prefix** — `<VAULT_PATH>/actors/`, not `actors/` |

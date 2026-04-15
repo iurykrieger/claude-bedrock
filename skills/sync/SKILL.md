@@ -28,6 +28,52 @@ Where `<base_dir>` is the path provided in "Base directory for this skill".
 
 ---
 
+## Vault Resolution
+
+Resolve which vault to sync. This skill can be invoked from any directory.
+
+**Step 1 — Parse `--vault` flag:**
+Check if the input arguments include `--vault <name>`. If found, extract the vault name and remove it from the arguments before parsing `--people` or `--github`.
+
+**Step 2 — Resolve vault path:**
+
+1. **If `--vault <name>` was provided:**
+   Read the vault registry at `<base_dir>/../../vaults.json`. Find the entry matching the name.
+   If not found: error — "Vault `<name>` is not registered. Run `/bedrock:vaults` to see available vaults."
+   If found: set `VAULT_PATH` to the entry's `path` value. Store the resolved vault name as `VAULT_NAME`.
+
+2. **If no `--vault` flag — CWD detection:**
+   Read `<base_dir>/../../vaults.json`. Check if the current working directory is inside any registered vault path
+   (CWD starts with a registered vault's absolute path). If multiple match, use the longest path (most specific).
+   If found: set `VAULT_PATH` to the matching vault's `path`. Store its name as `VAULT_NAME`.
+
+3. **If CWD detection fails — default vault:**
+   From the registry, find the vault with `"default": true`.
+   If found: set `VAULT_PATH` to the default vault's `path`. Store its name as `VAULT_NAME`.
+
+4. **If no resolution:**
+   Error — "No vault resolved. Available vaults:" followed by the registry listing.
+   "Use `--vault <name>` to specify, or run `/bedrock:setup` to register a vault."
+
+**Step 3 — Validate vault path:**
+```bash
+test -d "<VAULT_PATH>" && echo "exists" || echo "missing"
+```
+If missing: error — "Vault path `<VAULT_PATH>` does not exist on disk. Run `/bedrock:setup` to re-register."
+
+**Step 4 — Read vault config:**
+```bash
+cat <VAULT_PATH>/.bedrock/config.json 2>/dev/null
+```
+Extract `language`, `git.strategy`, and other relevant fields for use in later phases.
+
+**From this point forward, ALL vault file operations use `<VAULT_PATH>` as the root.**
+- Entity directories: `<VAULT_PATH>/actors/`, `<VAULT_PATH>/people/`, etc.
+- Git operations: `git -C <VAULT_PATH> <command>`
+- When delegating to `/bedrock:preserve`, pass `--vault <VAULT_NAME>`
+
+---
+
 ## Overview
 
 This skill synchronizes the vault with external sources. It operates in three modes:
@@ -79,12 +125,12 @@ After re-sync, `/bedrock:preserve` updates `synced_at` in the `sources` field of
 
 Execute:
 ```bash
-git pull --rebase origin main
+git -C <VAULT_PATH> pull --rebase origin main
 ```
 
 If the pull fails:
 - No remote configured: warn "No remote configured. Working locally." and proceed.
-- Pull conflict: `git rebase --abort` and warn the user. Do NOT proceed without resolving.
+- Pull conflict: `git -C <VAULT_PATH> rebase --abort` and warn the user. Do NOT proceed without resolving.
 - Otherwise: proceed.
 
 ---
@@ -189,13 +235,13 @@ Internalize these definitions — you will use them to classify content.
 ### 3.2 Catalog existing entities
 
 Use Glob to list all files in each entity directory (excluding `_template.md`):
-- `actors/*.md`
-- `people/*.md`
-- `teams/*.md`
-- `topics/*.md`
-- `discussions/*.md`
-- `projects/*.md`
-- `fleeting/*.md`
+- `<VAULT_PATH>/actors/*.md`
+- `<VAULT_PATH>/people/*.md`
+- `<VAULT_PATH>/teams/*.md`
+- `<VAULT_PATH>/topics/*.md`
+- `<VAULT_PATH>/discussions/*.md`
+- `<VAULT_PATH>/projects/*.md`
+- `<VAULT_PATH>/fleeting/*.md`
 
 For each file found:
 - Extract the filename without extension (e.g.: `billing-api`)
@@ -303,7 +349,8 @@ entities:
 
 ### 5.2 Invoke /bedrock:preserve
 
-Use the Skill tool to invoke `/bedrock:preserve` passing the structured list as argument.
+Use the Skill tool to invoke `/bedrock:preserve --vault <VAULT_NAME>` passing the structured list as argument.
+The `--vault <VAULT_NAME>` flag ensures preserve writes to the same vault.
 
 `/bedrock:preserve` handles:
 - Textual matching with existing entities
@@ -405,8 +452,8 @@ Do not make git commit/push. Do not update `topics/` or `actors/`. Do not read C
 
 ## Phase 1 — Actor collection
 
-1. Use Glob to list all files `actors/*.md`
-2. Exclude `actors/_template.md`
+1. Use Glob to list all files `<VAULT_PATH>/actors/*.md`
+2. Exclude `<VAULT_PATH>/actors/_template.md`
 3. For each file, use Read to extract from the YAML frontmatter:
    - `repository` — GitHub URL (e.g.: `https://github.com/acme-corp/billing-api/`)
    - `team` — squad wikilink (e.g.: `[[squad-payments]]`)
@@ -523,7 +570,7 @@ Where:
 6. Update the "Focal Points" section in the markdown body to reflect the merged list
 7. Use Edit to apply the changes (do not rewrite the entire file — preserve manual content)
 
-**Identification by login:** Before creating a new file, use Grep to search for `github: "{login}"` in `people/*.md`. If found, update that file instead of creating a new one (even if the filename does not match).
+**Identification by login:** Before creating a new file, use Grep to search for `github: "{login}"` in `<VAULT_PATH>/people/*.md`. If found, update that file instead of creating a new one (even if the filename does not match).
 
 At the end of this phase, report: "Phase 4: N people created, M updated."
 
@@ -631,12 +678,12 @@ Do NOT ask for user confirmation in any phase.
 
 Execute:
 ```bash
-git pull --rebase origin main
+git -C <VAULT_PATH> pull --rebase origin main
 ```
 
 If the pull fails:
 - No remote configured: log "No remote configured. Working locally." and proceed.
-- Pull conflict: `git rebase --abort`, log the error and **ABORT** the entire execution.
+- Pull conflict: `git -C <VAULT_PATH> rebase --abort`, log the error and **ABORT** the entire execution.
   Record in the report: "Aborted — git conflict on initial pull."
 - Otherwise: proceed.
 
@@ -644,8 +691,8 @@ If the pull fails:
 
 ## Phase 1 — Collect Syncable Actors
 
-1. Use Glob to list all files `actors/*.md`
-2. Exclude `actors/_template.md`
+1. Use Glob to list all files `<VAULT_PATH>/actors/*.md`
+2. Exclude `<VAULT_PATH>/actors/_template.md`
 3. For each file, use Read to extract from the YAML frontmatter:
    - `status` — actor status
    - `repository` — GitHub repository URL
@@ -727,7 +774,7 @@ Log: "Phase 3: N total PRs, M relevant after filter, K filtered as noise."
 
 Use Glob + Read to collect:
 
-**Topics (`topics/*.md`, excluding `_template.md`):**
+**Topics (`<VAULT_PATH>/topics/*.md`, excluding `_template.md`):**
 - `filename` (without extension)
 - `title`
 - `aliases`
@@ -876,7 +923,8 @@ Build the entity list in the format accepted by `/bedrock:preserve`.
 
 ### 5.2 Invoke /bedrock:preserve
 
-Use the Skill tool to invoke `/bedrock:preserve` passing the structured list as argument.
+Use the Skill tool to invoke `/bedrock:preserve --vault <VAULT_NAME>` passing the structured list as argument.
+The `--vault <VAULT_NAME>` flag ensures preserve writes to the same vault.
 
 > **IMPORTANT for background execution:** When invoking `/bedrock:preserve`, include in the
 > instruction that `/bedrock:preserve` must also operate without human confirmation.
@@ -903,8 +951,8 @@ After `/bedrock:preserve` completes, update the frontmatter of EACH processed ac
 ### 5.4 Git commit of watermarks
 
 ```bash
-git add actors/
-git diff --cached --quiet && echo "Nothing to commit" && exit 0
+git -C <VAULT_PATH> add actors/
+git -C <VAULT_PATH> diff --cached --quiet && echo "Nothing to commit" && exit 0
 ```
 
 #### Read git strategy
@@ -912,7 +960,7 @@ git diff --cached --quiet && echo "Nothing to commit" && exit 0
 Read the vault's git strategy from `.bedrock/config.json`:
 
 ```bash
-cat .bedrock/config.json 2>/dev/null
+cat <VAULT_PATH>/.bedrock/config.json 2>/dev/null
 ```
 
 Extract the `git.strategy` field. If the file does not exist or has no `git` key, default to `"commit-push"`.
@@ -929,14 +977,14 @@ vault(source): syncs github activity for N actors [source: github]
 **Strategy: `commit-push`** (default)
 
 ```bash
-git commit -m "<message per convention>"
-git push origin main
+git -C <VAULT_PATH> commit -m "<message per convention>"
+git -C <VAULT_PATH> push origin main
 ```
 
 If push fails (conflict):
 ```bash
-git pull --rebase origin main
-git push origin main
+git -C <VAULT_PATH> pull --rebase origin main
+git -C <VAULT_PATH> push origin main
 ```
 
 If it fails 2x: log the error and continue to the report.
@@ -962,28 +1010,28 @@ If `gh` is available:
 
    Check for collisions:
    ```bash
-   git branch --list "vault/<YYYY-MM-DD>-sync-github*"
+   git -C <VAULT_PATH> branch --list "vault/<YYYY-MM-DD>-sync-github*"
    ```
    If the branch already exists, append a counter: `vault/2026-04-15-sync-github-5-actors-2`.
 
    ```bash
-   git checkout -b <branch-name>
+   git -C <VAULT_PATH> checkout -b <branch-name>
    ```
 
 2. **Commit and push the branch:**
    ```bash
-   git commit -m "<message per convention>"
-   git push origin <branch-name>
+   git -C <VAULT_PATH> commit -m "<message per convention>"
+   git -C <VAULT_PATH> push origin <branch-name>
    ```
 
 3. **Open a pull request:**
    ```bash
-   gh pr create --title "<commit message>" --body "Automated by /bedrock:sync" --base main
+   cd <VAULT_PATH> && gh pr create --title "<commit message>" --body "Automated by /bedrock:sync" --base main
    ```
 
 4. **Return to main:**
    ```bash
-   git checkout main
+   git -C <VAULT_PATH> checkout main
    ```
 
 ---
@@ -991,7 +1039,7 @@ If `gh` is available:
 **Strategy: `commit-only`**
 
 ```bash
-git commit -m "<message per convention>"
+git -C <VAULT_PATH> commit -m "<message per convention>"
 ```
 
 Do not push. Output:
@@ -1085,15 +1133,15 @@ tags: [type/fleeting, status/raw]
 
 ### 6.2 Save report
 
-Save the report to `fleeting/YYYY-MM-DD-sync-github.md`.
+Save the report to `<VAULT_PATH>/fleeting/YYYY-MM-DD-sync-github.md`.
 
 If the file already exists (duplicate execution on the same day): overwrite with most recent data.
 
 ### 6.3 Git commit of report
 
 ```bash
-git add fleeting/
-git diff --cached --quiet && echo "Nothing to commit" && exit 0
+git -C <VAULT_PATH> add fleeting/
+git -C <VAULT_PATH> diff --cached --quiet && echo "Nothing to commit" && exit 0
 ```
 
 #### Read git strategy
@@ -1101,7 +1149,7 @@ git diff --cached --quiet && echo "Nothing to commit" && exit 0
 Read the vault's git strategy from `.bedrock/config.json`:
 
 ```bash
-cat .bedrock/config.json 2>/dev/null
+cat <VAULT_PATH>/.bedrock/config.json 2>/dev/null
 ```
 
 Extract the `git.strategy` field. If the file does not exist or has no `git` key, default to `"commit-push"`.
@@ -1118,14 +1166,14 @@ vault(note): creates sync-github-report YYYY-MM-DD [source: github]
 **Strategy: `commit-push`** (default)
 
 ```bash
-git commit -m "<message per convention>"
-git push origin main
+git -C <VAULT_PATH> commit -m "<message per convention>"
+git -C <VAULT_PATH> push origin main
 ```
 
 If push fails (conflict):
 ```bash
-git pull --rebase origin main
-git push origin main
+git -C <VAULT_PATH> pull --rebase origin main
+git -C <VAULT_PATH> push origin main
 ```
 
 If it fails 2x: log the error and continue.
@@ -1151,28 +1199,28 @@ If `gh` is available:
 
    Check for collisions:
    ```bash
-   git branch --list "vault/<YYYY-MM-DD>-sync-github-report*"
+   git -C <VAULT_PATH> branch --list "vault/<YYYY-MM-DD>-sync-github-report*"
    ```
    If the branch already exists, append a counter.
 
    ```bash
-   git checkout -b <branch-name>
+   git -C <VAULT_PATH> checkout -b <branch-name>
    ```
 
 2. **Commit and push the branch:**
    ```bash
-   git commit -m "<message per convention>"
-   git push origin <branch-name>
+   git -C <VAULT_PATH> commit -m "<message per convention>"
+   git -C <VAULT_PATH> push origin <branch-name>
    ```
 
 3. **Open a pull request:**
    ```bash
-   gh pr create --title "<commit message>" --body "Automated by /bedrock:sync" --base main
+   cd <VAULT_PATH> && gh pr create --title "<commit message>" --body "Automated by /bedrock:sync" --base main
    ```
 
 4. **Return to main:**
    ```bash
-   git checkout main
+   git -C <VAULT_PATH> checkout main
    ```
 
 ---
@@ -1180,7 +1228,7 @@ If `gh` is available:
 **Strategy: `commit-only`**
 
 ```bash
-git commit -m "<message per convention>"
+git -C <VAULT_PATH> commit -m "<message per convention>"
 ```
 
 Do not push. Output:
@@ -1224,4 +1272,8 @@ sync-github@agent completed.
 | 12 | **Frontmatter keys in English**, values in the vault's configured language |
 | 13 | **Bare wikilinks** — `[[name]]`, never `[[dir/name]]` |
 | 14 | **Append-only for topics** — add information, never delete existing content |
-| 15 | **Report always generated** — even if no correlations, generate report in `fleeting/` |
+| 15 | **Report always generated** — even if no correlations, generate report in `<VAULT_PATH>/fleeting/` |
+| 16 | **Vault resolution first** — resolve `VAULT_PATH` before any file operation or git command — never assume CWD is the vault |
+| 17 | **All git commands use `git -C <VAULT_PATH>`** — never assume CWD is the vault |
+| 18 | **All entity paths use `<VAULT_PATH>/` prefix** — `<VAULT_PATH>/actors/`, not `actors/` |
+| 19 | **Pass --vault to /preserve** — ALWAYS include `--vault <VAULT_NAME>` when delegating to `/bedrock:preserve` |

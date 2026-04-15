@@ -26,6 +26,52 @@ Where `<base_dir>` is the path provided in "Base directory for this skill".
 
 ---
 
+## Vault Resolution
+
+Resolve which vault to compress. This skill can be invoked from any directory.
+
+**Step 1 — Parse `--vault` flag:**
+Check if the input arguments include `--vault <name>`. If found, extract the vault name and remove it from the arguments before parsing `--mode`.
+
+**Step 2 — Resolve vault path:**
+
+1. **If `--vault <name>` was provided:**
+   Read the vault registry at `<base_dir>/../../vaults.json`. Find the entry matching the name.
+   If not found: error — "Vault `<name>` is not registered. Run `/bedrock:vaults` to see available vaults."
+   If found: set `VAULT_PATH` to the entry's `path` value. Store the resolved vault name as `VAULT_NAME`.
+
+2. **If no `--vault` flag — CWD detection:**
+   Read `<base_dir>/../../vaults.json`. Check if the current working directory is inside any registered vault path
+   (CWD starts with a registered vault's absolute path). If multiple match, use the longest path (most specific).
+   If found: set `VAULT_PATH` to the matching vault's `path`. Store its name as `VAULT_NAME`.
+
+3. **If CWD detection fails — default vault:**
+   From the registry, find the vault with `"default": true`.
+   If found: set `VAULT_PATH` to the default vault's `path`. Store its name as `VAULT_NAME`.
+
+4. **If no resolution:**
+   Error — "No vault resolved. Available vaults:" followed by the registry listing.
+   "Use `--vault <name>` to specify, or run `/bedrock:setup` to register a vault."
+
+**Step 3 — Validate vault path:**
+```bash
+test -d "<VAULT_PATH>" && echo "exists" || echo "missing"
+```
+If missing: error — "Vault path `<VAULT_PATH>` does not exist on disk. Run `/bedrock:setup` to re-register."
+
+**Step 4 — Read vault config:**
+```bash
+cat <VAULT_PATH>/.bedrock/config.json 2>/dev/null
+```
+Extract `language`, `git.strategy`, and other relevant fields for use in later phases.
+
+**From this point forward, ALL vault file operations use `<VAULT_PATH>` as the root.**
+- Entity directories: `<VAULT_PATH>/actors/`, `<VAULT_PATH>/people/`, etc.
+- Git operations: `git -C <VAULT_PATH> <command>`
+- When delegating to `/bedrock:preserve`, pass `--vault <VAULT_NAME>`
+
+---
+
 ## Overview
 
 This skill scans all entities in the vault, detects 5 types of structural misalignments,
@@ -69,12 +115,12 @@ Parse the mode from the invocation arguments. If no `--mode` is specified, defau
 
 Execute:
 ```bash
-git pull --rebase origin main
+git -C <VAULT_PATH> pull --rebase origin main
 ```
 
 If it fails:
 - No remote: warn "No remote configured. Working locally." and proceed.
-- Conflict: `git rebase --abort` and warn the user. Do NOT proceed without resolving.
+- Conflict: `git -C <VAULT_PATH> rebase --abort` and warn the user. Do NOT proceed without resolving.
 
 ---
 
@@ -93,10 +139,10 @@ from each entity definition for use in detection.
 
 ### 1.1 Read all entities
 
-For each entity directory (`actors/`, `people/`, `teams/`, `concepts/`, `topics/`, `discussions/`, `projects/`, `fleeting/`):
+For each entity directory (`<VAULT_PATH>/actors/`, `<VAULT_PATH>/people/`, `<VAULT_PATH>/teams/`, `<VAULT_PATH>/concepts/`, `<VAULT_PATH>/topics/`, `<VAULT_PATH>/discussions/`, `<VAULT_PATH>/projects/`, `<VAULT_PATH>/fleeting/`):
 
 1. List all `.md` files, **excluding `_template.md` and `_template_node.md`**
-   - For actors: include both `actors/*.md` (flat) and `actors/*/*.md` (folder)
+   - For actors: include both `<VAULT_PATH>/actors/*.md` (flat) and `<VAULT_PATH>/actors/*/*.md` (folder)
 2. For each entity, read frontmatter + body
 3. Extract:
    - `type` from frontmatter
@@ -124,7 +170,7 @@ For each entity A in `vault_data`:
 
 Scan all entity bodies for recurring terms or phrases that:
 1. Appear in **3+ different entities** (across any types)
-2. Do NOT have a corresponding entity file in `concepts/` (or any other entity directory)
+2. Do NOT have a corresponding entity file in `<VAULT_PATH>/concepts/` (or any other entity directory)
 3. Are NOT already wrapped in a wikilink `[[term]]`
 
 For each candidate term, evaluate against the concept entity definition (`entities/concept.md`):
@@ -530,7 +576,8 @@ Add a consolidation callout in the secondary entity:
 
 ### 4.2 Invoke /bedrock:preserve
 
-Use the Skill tool to invoke `/bedrock:preserve` passing the compiled structured entity list as argument.
+Use the Skill tool to invoke `/bedrock:preserve --vault <VAULT_NAME>` passing the compiled structured entity list as argument.
+The `--vault <VAULT_NAME>` flag ensures preserve writes to the same vault.
 
 Include `source: "compress"` for all entities so `/bedrock:preserve` records provenance.
 
@@ -622,3 +669,7 @@ Present only the summary table with zero counts.
 | Provenance | All entities delegated to /bedrock:preserve use `source: "compress"`. |
 | MCP in main context | Do NOT use subagents for MCP calls — permissions are not inherited. |
 | Sensitive data | NEVER include credentials, tokens, passwords, PANs, CVVs. |
+| Vault resolution first | Resolve `VAULT_PATH` before any file operation or git command — never assume CWD is the vault |
+| All git commands use `git -C <VAULT_PATH>` | Never assume CWD is the vault |
+| All entity paths use `<VAULT_PATH>/` prefix | `<VAULT_PATH>/actors/`, not `actors/` |
+| Pass --vault to /preserve | ALWAYS include `--vault <VAULT_NAME>` when delegating to `/bedrock:preserve` |

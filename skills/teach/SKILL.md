@@ -26,6 +26,51 @@ Where `<base_dir>` is the path provided in "Base directory for this skill".
 
 ---
 
+## Vault Resolution
+
+Resolve which vault to teach. This skill can be invoked from any directory.
+
+**Step 1 — Parse `--vault` flag:**
+Check if the input arguments include `--vault <name>`. If found, extract the vault name and remove it from the arguments (the remaining text is the source URL/path).
+
+**Step 2 — Resolve vault path:**
+
+1. **If `--vault <name>` was provided:**
+   Read the vault registry at `<base_dir>/../../vaults.json`. Find the entry matching the name.
+   If not found: error — "Vault `<name>` is not registered. Run `/bedrock:vaults` to see available vaults."
+   If found: set `VAULT_PATH` to the entry's `path` value. Store the resolved vault name as `VAULT_NAME`.
+
+2. **If no `--vault` flag — CWD detection:**
+   Read `<base_dir>/../../vaults.json`. Check if the current working directory is inside any registered vault path
+   (CWD starts with a registered vault's absolute path). If multiple match, use the longest path (most specific).
+   If found: set `VAULT_PATH` to the matching vault's `path`. Store its name as `VAULT_NAME`.
+
+3. **If CWD detection fails — default vault:**
+   From the registry, find the vault with `"default": true`.
+   If found: set `VAULT_PATH` to the default vault's `path`. Store its name as `VAULT_NAME`.
+
+4. **If no resolution:**
+   Error — "No vault resolved. Available vaults:" followed by the registry listing.
+   "Use `--vault <name>` to specify, or run `/bedrock:setup` to register a vault."
+
+**Step 3 — Validate vault path:**
+```bash
+test -d "<VAULT_PATH>" && echo "exists" || echo "missing"
+```
+If missing: error — "Vault path `<VAULT_PATH>` does not exist on disk. Run `/bedrock:setup` to re-register."
+
+**Step 4 — Read vault config:**
+```bash
+cat <VAULT_PATH>/.bedrock/config.json 2>/dev/null
+```
+Extract `language` and other relevant fields for use in later phases.
+
+**From this point forward, ALL vault file operations use `<VAULT_PATH>` as the root.**
+- Graphify output: `<VAULT_PATH>/graphify-out/`
+- When delegating to `/bedrock:preserve`, pass `--vault <VAULT_NAME>`
+
+---
+
 ## Overview
 
 This skill receives an external source (URL or local path), fetches its content to a temporary
@@ -168,22 +213,22 @@ Report: "Phase 1 complete: Content fetched to `$TEACH_TMP`. Source type: `<sourc
 Use the Skill tool to invoke `/graphify` with the fetched content:
 
 ```
-/graphify $TEACH_TMP --mode deep --obsidian --obsidian-dir <vault_path>
+/graphify $TEACH_TMP --mode deep --obsidian --obsidian-dir <VAULT_PATH>
 ```
 
-Where `<vault_path>` is the current working directory (the vault root — where the user's Obsidian vault lives).
+Where `<VAULT_PATH>` is the resolved vault path from the Vault Resolution section.
 
 **IMPORTANT:**
 - Invoke via the Skill tool — never call graphify Python API directly
 - `/graphify` runs its full pipeline: detect → extract (AST + semantic) → build → cluster → analyze → obsidian export
-- Output lands in `<vault_path>/graphify-out/`
+- Output lands in `<VAULT_PATH>/graphify-out/`
 
 ### 2.2 Verify output
 
 After `/graphify` completes, verify the output:
 
 ```bash
-if [ -f "graphify-out/graph.json" ] && [ -s "graphify-out/graph.json" ]; then
+if [ -f "<VAULT_PATH>/graphify-out/graph.json" ] && [ -s "<VAULT_PATH>/graphify-out/graph.json" ]; then
     echo "graphify output verified: graph.json exists and is non-empty"
 else
     echo "ERROR: graphify-out/graph.json is missing or empty"
@@ -197,7 +242,7 @@ fi
 
 ### 2.3 Phase 2 result
 
-The following files should exist in `<vault_path>/graphify-out/`:
+The following files should exist in `<VAULT_PATH>/graphify-out/`:
 - `graph.json` — knowledge graph (nodes, edges, communities)
 - `GRAPH_REPORT.md` — audit report with god nodes, surprising connections
 - `obsidian/*.md` — one markdown file per node
@@ -214,7 +259,7 @@ Report: "Phase 2 complete: graphify extraction finished. Graph: N nodes, M edges
 Pass the graphify output path and provenance metadata to `/bedrock:preserve`:
 
 ```
-graphify_output_path: <vault_path>/graphify-out/
+graphify_output_path: <VAULT_PATH>/graphify-out/
 source_url: <source_url from Phase 1>
 source_type: <source_type from Phase 1>
 ```
@@ -224,8 +269,8 @@ Entity classification, filtering, matching, and user confirmation are all `/bedr
 
 ### 3.2 Invoke /preserve
 
-Use the Skill tool to invoke `/bedrock:preserve` passing the graphify output reference
-and provenance metadata as the argument.
+Use the Skill tool to invoke `/bedrock:preserve --vault <VAULT_NAME>` passing the graphify output reference
+and provenance metadata as the argument. The `--vault <VAULT_NAME>` flag ensures preserve writes to the same vault.
 
 ### 3.3 Receive result
 
@@ -307,3 +352,5 @@ Each entity above received in the `sources` frontmatter field:
 | MCP in main context | Do NOT use subagents for GitHub/Atlassian MCP calls — permissions are not inherited. |
 | Maximum 2 push attempts | After that, abort and inform (handled by /preserve). |
 | Sensitive data | NEVER include credentials, tokens, passwords, PANs, CVVs. |
+| Vault resolution first | Resolve `VAULT_PATH` before any file operation — never assume CWD is the vault |
+| Pass --vault to /preserve | ALWAYS include `--vault <VAULT_NAME>` when delegating to `/bedrock:preserve` |

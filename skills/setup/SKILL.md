@@ -57,12 +57,22 @@ ls .bedrock/config.json 2>/dev/null
    - Initialized at: <date>
    ```
 
-2. Ask the user:
+2. Check if this vault is registered in the global vault registry:
+   ```bash
+   cat <base_dir>/../../vaults.json 2>/dev/null
+   ```
+   If the registry exists, check if any entry has a `path` matching the current working directory.
+   - **If registered:** display "Registered as vault `<name>`" alongside the config above.
+   - **If NOT registered:** display "This vault is not yet registered in the global vault registry."
+
+3. Ask the user:
    > "This vault is already initialized. What would you like to do?"
    > 1. **Reconfigure** — Update language, domains, git strategy, and regenerate vault CLAUDE.md (directories and entities are NOT touched)
-   > 2. **Skip** — Exit with no changes
+   > 2. **Register only** — Register this vault in the global registry (if not already registered) without changing configuration
+   > 3. **Skip** — Exit with no changes
 
-   - **Reconfigure**: proceed to Phase 1, but set `RECONFIGURE_MODE = true`. In Phase 3, skip directory creation (3.1), template copying (3.2), Obsidian configuration (3.5), and example entity generation (3.6).
+   - **Reconfigure**: proceed to Phase 1, but set `RECONFIGURE_MODE = true`. In Phase 3, skip directory creation (3.1), template copying (3.2), Obsidian configuration (3.5), and example entity generation (3.6). Phase 3.7 (vault registration) still runs.
+   - **Register only**: skip directly to Phase 3.7 (vault registration). If already registered, display "This vault is already registered as `<name>`. No changes made." and exit.
    - **Skip**: exit with "No changes made. Vault is already initialized."
 
 **If `.bedrock/config.json` does NOT exist:** proceed to Phase 1 with `RECONFIGURE_MODE = false`.
@@ -1029,6 +1039,75 @@ Project → Topic: related_topics[] ✓ | Topic → Project: "Related Projects" 
 Use Grep to spot-check that each entity file contains the expected wikilinks
 to its connected entities. If any link is missing, fix it before proceeding.
 
+### 3.7 Register Vault in Global Registry
+
+> **This phase runs in ALL modes** — fresh setup, reconfigure, and register-only.
+
+Register this vault in the plugin's global vault registry so it can be targeted
+by name from any directory using `--vault <name>`.
+
+**Step 1:** Resolve the registry path:
+
+```
+REGISTRY_PATH = <base_dir>/../../vaults.json
+```
+
+**Step 2:** Read the existing registry (if it exists):
+
+```bash
+cat <REGISTRY_PATH> 2>/dev/null
+```
+
+If the file does not exist or is empty, initialize an empty registry:
+```json
+{
+  "vaults": []
+}
+```
+
+**Step 3:** Check if this vault is already registered (match by absolute path of CWD):
+
+- **If already registered:** display "This vault is already registered as `<name>`." and skip to Phase 4.
+- **If not registered:** continue to Step 4.
+
+**Step 4:** Prompt the user for a vault name:
+
+> "Choose a name for this vault. This name is used with `--vault <name>` to target this vault from any directory."
+> Default: `<basename of CWD>`
+
+Validate the name:
+- Must be kebab-case: lowercase, no spaces, only letters, numbers, and hyphens
+- Must be unique across all registered vaults
+- If invalid or duplicate, ask the user to choose another name
+
+**Step 5:** Determine default status:
+
+- If the registry has no other vaults (empty `vaults` array), mark this vault as default (`"default": true`)
+- If other vaults exist, ask the user:
+  > "Set this vault as the default? (current default: `<current_default_name>`) [y/N]"
+  - If yes: set `"default": true` on this vault and `"default": false` on all others
+  - If no: set `"default": false`
+
+**Step 6:** Append the vault entry and write the registry:
+
+```json
+{
+  "name": "<vault_name>",
+  "path": "<absolute path of CWD>",
+  "default": true | false
+}
+```
+
+Write the updated registry to `REGISTRY_PATH` using the Write tool. Format with 2-space indentation.
+
+**Step 7:** Confirm:
+
+```
+Vault registered as `<vault_name>` (<path>).
+<if default:> This is your default vault.
+<if not default:> Default vault is `<current_default_name>`. Use `/bedrock:vaults --set-default <vault_name>` to change.
+```
+
 ---
 
 ## Phase 4 — Next Steps Guide
@@ -1043,6 +1122,7 @@ After all files are created, present the user with a summary and next steps.
 **Language:** <language>
 **Preset:** <preset label>
 **Domains:** <comma-separated domains>
+**Vault name:** <vault_name> <if default: "(default)">
 
 ### Files Created
 
@@ -1091,6 +1171,10 @@ After all files are created, present the user with a summary and next steps.
 6. **Replace example content** — The example entities are there to show you how Bedrock works.
    Edit or delete them as you start adding real content.
 
+7. **Manage vaults** — Run `/bedrock:vaults` to list all registered vaults, set a default,
+   or remove a vault. Use `--vault <name>` on any skill to target a specific vault from
+   any directory.
+
 > **Tip:** The graph view is preconfigured with 7 colors — one for each entity type.
 > Open Graph View (Ctrl/Cmd+G) to see your entities color-coded by type.
 > Customize colors in Graph View → Groups if you prefer different colors.
@@ -1117,4 +1201,6 @@ Adapt the language of this guide to `VAULT_LANGUAGE`.
 | 7 | **ALWAYS use hierarchical tags** — `type/actor`, never `actor` |
 | 8 | **ALWAYS use bare wikilinks** — `[[name]]`, never `[[dir/name]]` |
 | 9 | **ALWAYS write entity content in VAULT_LANGUAGE** — adapt example text to the chosen language |
-| 10 | **Idempotency** — respect `.bedrock/config.json` existence and offer reconfigure/skip |
+| 10 | **Idempotency** — respect `.bedrock/config.json` existence and offer reconfigure/register/skip |
+| 11 | **ALWAYS register vault** in the global registry during setup — prompt for name, validate kebab-case and uniqueness |
+| 12 | **First vault is auto-default** — if the registry is empty, mark the new vault as default without asking |

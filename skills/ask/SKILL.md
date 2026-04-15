@@ -29,6 +29,51 @@ Where `<base_dir>` is the path provided in "Base directory for this skill".
 
 ---
 
+## Vault Resolution
+
+Resolve which vault to query. This skill can be invoked from any directory.
+
+**Step 1 — Parse `--vault` flag:**
+Check if the input arguments include `--vault <name>`. If found, extract the vault name and remove it from the arguments (the remaining text is the question).
+
+**Step 2 — Resolve vault path:**
+
+1. **If `--vault <name>` was provided:**
+   Read the vault registry at `<base_dir>/../../vaults.json`. Find the entry matching the name.
+   If not found: error — "Vault `<name>` is not registered. Run `/bedrock:vaults` to see available vaults."
+   If found: set `VAULT_PATH` to the entry's `path` value.
+
+2. **If no `--vault` flag — CWD detection:**
+   Read `<base_dir>/../../vaults.json`. Check if the current working directory is inside any registered vault path
+   (CWD starts with a registered vault's absolute path). If multiple match, use the longest path (most specific).
+   If found: set `VAULT_PATH` to the matching vault's `path`.
+
+3. **If CWD detection fails — default vault:**
+   From the registry, find the vault with `"default": true`.
+   If found: set `VAULT_PATH` to the default vault's `path`.
+
+4. **If no resolution:**
+   Error — "No vault resolved. Available vaults:" followed by the registry listing.
+   "Use `--vault <name>` to specify, or run `/bedrock:setup` to register a vault."
+
+**Step 3 — Validate vault path:**
+```bash
+test -d "<VAULT_PATH>" && echo "exists" || echo "missing"
+```
+If missing: error — "Vault path `<VAULT_PATH>` does not exist on disk. Run `/bedrock:setup` to re-register."
+
+**Step 4 — Read vault config:**
+```bash
+cat <VAULT_PATH>/.bedrock/config.json 2>/dev/null
+```
+Extract `language` and other relevant fields for use in later phases.
+
+**From this point forward, ALL vault file operations use `<VAULT_PATH>` as the root.**
+- Entity directories: `<VAULT_PATH>/actors/`, `<VAULT_PATH>/people/`, etc.
+- Graphify output: `<VAULT_PATH>/graphify-out/`
+
+---
+
 ## Overview
 
 This skill receives a natural language question and answers it using an adaptive,
@@ -130,15 +175,15 @@ For each search term identified in Phase 1:
 
 **Step 1 — Search by filename:**
 ```
-Glob: actors/<term>*.md, people/<term>*.md, teams/<term>*.md,
-      topics/*<term>*.md, discussions/*<term>*.md, projects/<term>*.md,
-      fleeting/*<term>*.md
+Glob: <VAULT_PATH>/actors/<term>*.md, <VAULT_PATH>/people/<term>*.md, <VAULT_PATH>/teams/<term>*.md,
+      <VAULT_PATH>/topics/*<term>*.md, <VAULT_PATH>/discussions/*<term>*.md, <VAULT_PATH>/projects/<term>*.md,
+      <VAULT_PATH>/fleeting/*<term>*.md
 ```
 
 **Step 2 — Search by alias in frontmatter:**
 ```
-Grep: pattern="aliases:.*<term>" in directories: actors/, people/, teams/,
-      topics/, discussions/, projects/
+Grep: pattern="aliases:.*<term>" in directories: <VAULT_PATH>/actors/, <VAULT_PATH>/people/, <VAULT_PATH>/teams/,
+      <VAULT_PATH>/topics/, <VAULT_PATH>/discussions/, <VAULT_PATH>/projects/
       (case-insensitive)
 ```
 
@@ -183,8 +228,8 @@ For each extracted wikilink that is relevant to the question:
 
 1. Resolve the file: search for `<wikilink-name>.md` in entity directories
    ```
-   Glob: actors/<name>.md, people/<name>.md, teams/<name>.md,
-         topics/*<name>*.md, discussions/*<name>*.md, projects/<name>.md
+   Glob: <VAULT_PATH>/actors/<name>.md, <VAULT_PATH>/people/<name>.md, <VAULT_PATH>/teams/<name>.md,
+         <VAULT_PATH>/topics/*<name>*.md, <VAULT_PATH>/discussions/*<name>*.md, <VAULT_PATH>/projects/<name>.md
    ```
 
 2. Read the found file (frontmatter + body)
@@ -262,7 +307,7 @@ Execute only when the self-assessment determines `needs_graphify`.
 #### 3-G.0 Check graph availability
 
 ```bash
-if [ -f "graphify-out/graph.json" ] && [ -s "graphify-out/graph.json" ]; then
+if [ -f "<VAULT_PATH>/graphify-out/graph.json" ] && [ -s "<VAULT_PATH>/graphify-out/graph.json" ]; then
     echo "graph_available"
 else
     echo "graph_not_available"
@@ -272,7 +317,7 @@ fi
 **If `graph_not_available`:** Display the following warning and skip to Phase 4 with vault-only content:
 
 > [!warning] Knowledge graph unavailable
-> The knowledge graph is not available (`graphify-out/graph.json` missing or empty).
+> The knowledge graph is not available (`<VAULT_PATH>/graphify-out/graph.json` missing or empty).
 > The answer below is based on vault content only — it may be incomplete for this type of question.
 > Run `/graphify build` to rebuild the graph from the vault's actor repositories.
 
@@ -483,3 +528,5 @@ When appropriate, suggest actions to the user:
 | Fleeting notes with disclaimer | ALWAYS flag information from fleeting notes with `(source: fleeting note — unconsolidated information)` |
 | Promotion as side-effect | When a relevant fleeting note meets promotion criteria, flag with callout. Do NOT promote automatically. |
 | Weight hierarchy | permanent > bridge > index > fleeting. Use as guideline, not mathematical formula. |
+| Vault resolution first | Resolve `VAULT_PATH` before any file operation — never assume CWD is the vault |
+| All entity paths use `<VAULT_PATH>/` prefix | `<VAULT_PATH>/actors/`, not `actors/` |

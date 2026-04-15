@@ -25,6 +25,51 @@ Where `<base_dir>` is the path provided in "Base directory for this skill".
 
 ---
 
+## Vault Resolution
+
+Resolve which vault to diagnose. This skill can be invoked from any directory.
+
+**Step 1 — Parse `--vault` flag:**
+Check if the input arguments include `--vault <name>`. If found, extract the vault name.
+
+**Step 2 — Resolve vault path:**
+
+1. **If `--vault <name>` was provided:**
+   Read the vault registry at `<base_dir>/../../vaults.json`. Find the entry matching the name.
+   If not found: error — "Vault `<name>` is not registered. Run `/bedrock:vaults` to see available vaults."
+   If found: set `VAULT_PATH` to the entry's `path` value.
+
+2. **If no `--vault` flag — CWD detection:**
+   Read `<base_dir>/../../vaults.json`. Check if the current working directory is inside any registered vault path
+   (CWD starts with a registered vault's absolute path). If multiple match, use the longest path (most specific).
+   If found: set `VAULT_PATH` to the matching vault's `path`.
+
+3. **If CWD detection fails — default vault:**
+   From the registry, find the vault with `"default": true`.
+   If found: set `VAULT_PATH` to the default vault's `path`.
+
+4. **If no resolution:**
+   Error — "No vault resolved. Available vaults:" followed by the registry listing.
+   "Use `--vault <name>` to specify, or run `/bedrock:setup` to register a vault."
+
+**Step 3 — Validate vault path:**
+```bash
+test -d "<VAULT_PATH>" && echo "exists" || echo "missing"
+```
+If missing: error — "Vault path `<VAULT_PATH>` does not exist on disk. Run `/bedrock:setup` to re-register."
+
+**Step 4 — Read vault config:**
+```bash
+cat <VAULT_PATH>/.bedrock/config.json 2>/dev/null
+```
+Extract `language` and other relevant fields for use in later phases.
+
+**From this point forward, ALL vault file operations use `<VAULT_PATH>` as the root.**
+- Entity directories: `<VAULT_PATH>/actors/`, `<VAULT_PATH>/people/`, etc.
+- Graphify output: `<VAULT_PATH>/graphify-out/`
+
+---
+
 ## Overview
 
 This skill produces a diagnostic report of vault health without modifying any files.
@@ -58,11 +103,11 @@ Read all entity files once and store the data for use across all 5 checks.
 
 ### 1.1 Enumerate entity files
 
-For each entity directory (`actors/`, `people/`, `teams/`, `concepts/`, `topics/`, `discussions/`, `projects/`, `fleeting/`):
+For each entity directory (`<VAULT_PATH>/actors/`, `<VAULT_PATH>/people/`, `<VAULT_PATH>/teams/`, `<VAULT_PATH>/concepts/`, `<VAULT_PATH>/topics/`, `<VAULT_PATH>/discussions/`, `<VAULT_PATH>/projects/`, `<VAULT_PATH>/fleeting/`):
 
 1. List all `.md` files using Glob, **excluding `_template.md` and `_template_node.md`**
-   - For actors: include both `actors/*.md` (flat) and `actors/*/*.md` (folder)
-   - Include code entities: `actors/*/nodes/*.md`
+   - For actors: include both `<VAULT_PATH>/actors/*.md` (flat) and `<VAULT_PATH>/actors/*/*.md` (folder)
+   - Include code entities: `<VAULT_PATH>/actors/*/nodes/*.md`
 2. Record the directory and filename for each entity
 
 ### 1.2 Read entity data
@@ -93,9 +138,9 @@ Also collect: `all_entity_slugs` — set of all entity slugs in the vault (for r
 
 ### 2.1 Check 1 — graphify-out
 
-1. Check if directory `graphify-out/` exists:
+1. Check if directory `<VAULT_PATH>/graphify-out/` exists:
    ```bash
-   ls -d graphify-out/ 2>/dev/null && echo "EXISTS" || echo "MISSING"
+   ls -d <VAULT_PATH>/graphify-out/ 2>/dev/null && echo "EXISTS" || echo "MISSING"
    ```
 
 2. If MISSING:
@@ -103,9 +148,9 @@ Also collect: `all_entity_slugs` — set of all entity slugs in the vault (for r
    - Details: "graphify-out/ directory not found. Run `/bedrock:teach` on an actor repository to generate."
    - Skip remaining sub-checks.
 
-3. If EXISTS, check `graphify-out/graph.json`:
+3. If EXISTS, check `<VAULT_PATH>/graphify-out/graph.json`:
    ```bash
-   test -f graphify-out/graph.json && echo "EXISTS" || echo "MISSING"
+   test -f <VAULT_PATH>/graphify-out/graph.json && echo "EXISTS" || echo "MISSING"
    ```
 
 4. If graph.json MISSING:
@@ -119,10 +164,10 @@ Also collect: `all_entity_slugs` — set of all entity slugs in the vault (for r
    import json, os, time
    from pathlib import Path
 
-   g = json.loads(Path('graphify-out/graph.json').read_text())
+   g = json.loads(Path('<VAULT_PATH>/graphify-out/graph.json').read_text())
    nodes = g.get('nodes', [])
    code_nodes = [n for n in nodes if n.get('file_type') == 'code']
-   mtime = os.path.getmtime('graphify-out/graph.json')
+   mtime = os.path.getmtime('<VAULT_PATH>/graphify-out/graph.json')
    mod_date = time.strftime('%Y-%m-%d', time.localtime(mtime))
    days_old = (time.time() - mtime) / 86400
 
@@ -151,7 +196,7 @@ Verify the vault structure and plugin dependencies.
 #### 2.2.1 Entity directories
 
 Check that each expected directory exists:
-- `actors/`, `people/`, `teams/`, `concepts/`, `topics/`, `discussions/`, `projects/`, `fleeting/`
+- `<VAULT_PATH>/actors/`, `<VAULT_PATH>/people/`, `<VAULT_PATH>/teams/`, `<VAULT_PATH>/concepts/`, `<VAULT_PATH>/topics/`, `<VAULT_PATH>/discussions/`, `<VAULT_PATH>/projects/`, `<VAULT_PATH>/fleeting/`
 
 For each directory, check if `_template.md` exists inside it.
 
@@ -331,3 +376,5 @@ Based on findings, append actionable suggestions:
 | 30-day threshold | Stale graph is defined as graph.json modification date > 30 days. Hardcoded. |
 | Bare wikilinks | Parse wikilinks as `[[name]]` only. Never path-qualified (`[[dir/name]]`). |
 | Sensitive data | NEVER include credentials, tokens, passwords, PANs, CVVs in the report. |
+| Vault resolution first | Resolve `VAULT_PATH` before any file operation — never assume CWD is the vault |
+| All entity paths use `<VAULT_PATH>/` prefix | `<VAULT_PATH>/actors/`, not `actors/` |

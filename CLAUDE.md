@@ -112,6 +112,51 @@ These are the Claude Code skills provided by the Bedrock plugin:
 | `/bedrock:compress` | Vault alignment engine — fixes broken backlinks, concept fragmentation, entity miscategorization, duplicated entities, misnamed entities. Supports `--mode cron` for scheduled execution |
 | `/bedrock:healthcheck` | Read-only vault health diagnostic — checks graphify-out integrity, setup, orphan entities, dangling content, old content (>15 days). Safe to run at any frequency |
 | `/bedrock:sync` | Re-sync entities with external sources. Flags: `--people` (sync contributors), `--github` (sync PRs/activity) |
+| `/bedrock:vaults` | Manage registered vaults — list, set default (`--set-default <name>`), remove (`--remove <name>`) |
+
+---
+
+## Vault Resolution
+
+Bedrock supports multiple vaults. Each vault is registered by name in a global registry
+(`vaults.json` in the plugin directory) during `/bedrock:setup`. Skills can target any
+registered vault using the `--vault <name>` flag, regardless of the current working directory.
+
+### Registry
+
+The vault registry lives at `<plugin_dir>/vaults.json` with this schema:
+
+```json
+{
+  "vaults": [
+    { "name": "my-vault", "path": "/absolute/path/to/vault", "default": true },
+    { "name": "team-vault", "path": "/absolute/path/to/team-vault", "default": false }
+  ]
+}
+```
+
+- Vault names are **kebab-case**, lowercase, unique
+- Exactly one vault is marked as `"default": true`
+- The registry is created automatically during `/bedrock:setup`
+- Manage vaults with `/bedrock:vaults` (list, set-default, remove)
+
+### Resolution Precedence
+
+When a skill needs to determine which vault to operate on, it follows this chain:
+
+1. **Explicit flag** — `--vault <name>` targets the named vault from the registry
+2. **CWD detection** — if the current directory is inside a registered vault path, use that vault
+3. **Default vault** — use the vault marked as default in the registry
+4. **Error** — no vault resolved; display available vaults and ask the user to specify
+
+This keeps full backward compatibility — users already working inside a vault directory
+don't need to change anything.
+
+### Plugin Reinstall Note
+
+If the Bedrock plugin is reinstalled, the `vaults.json` registry file may be lost.
+Vault data on disk is unaffected. Re-run `/bedrock:setup` inside each vault to
+re-register it.
 
 ---
 
