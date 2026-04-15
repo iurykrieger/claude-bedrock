@@ -106,7 +106,7 @@ These are the Claude Code skills provided by the Bedrock plugin:
 
 | Skill | Purpose |
 |---|---|
-| `/bedrock:query` | Smart vault reader — answers questions by searching and cross-referencing entities |
+| `/bedrock:ask` | Orchestrated vault reader — decomposes questions, searches graph and vault, cross-references entities |
 | `/bedrock:teach` | Ingest external sources (Confluence, GDocs, GitHub, CSV) — extracts entities — delegates to `/bedrock:preserve` |
 | `/bedrock:preserve` | Single write point — entity detection, matching, create/update, bidirectional links, git commit |
 | `/bedrock:compress` | Deduplication and vault health — broken links, orphan entities, stale content |

@@ -537,7 +537,7 @@ New domains can be added as the vault grows.
 
 | Action | Skill |
 |---|---|
-| Search and query the vault | `/bedrock:query` |
+| Search and query the vault | `/bedrock:ask` |
 | Ingest external sources (Confluence, Google Docs, GitHub) | `/bedrock:teach` |
 | Create or update entities manually | `/bedrock:preserve` |
 | Deduplicate and check vault health | `/bedrock:compress` |
@@ -1079,8 +1079,8 @@ After all files are created, present the user with a summary and next steps.
    - A Google Docs URL
    - A local markdown or CSV file path
 
-3. **Query your vault** — Run `/bedrock:query <question>` to search across all entities.
-   Example: `/bedrock:query what do we know about <actor>?`
+3. **Ask your vault** — Run `/bedrock:ask <question>` to search across all entities.
+   Example: `/bedrock:ask what do we know about <actor>?`
 
 4. **Create entities manually** — Run `/bedrock:preserve` with free-form text or structured input
    to add new entities to the vault.

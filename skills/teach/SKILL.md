@@ -251,7 +251,7 @@ echo "Temporary directory cleaned up: $TEACH_TMP"
 
 **IMPORTANT:** Clean up AFTER /preserve confirms, not after graphify finishes.
 The graphify output in `graphify-out/` is NOT cleaned up — it lives in the vault
-and is used by `/bedrock:query` for graph traversal.
+and is used by `/bedrock:ask` for graph traversal.
 
 ### 4.2 Report
 

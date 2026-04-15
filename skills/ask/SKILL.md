@@ -1,18 +1,19 @@
 ---
-name: query
+name: ask
 description: >
-  Smart vault reader skill. Receives a natural language question,
-  searches the vault for the information, cross-references context between entities via wikilinks,
-  prioritizes recent information, and optionally fetches external sources by delegating to
-  known skills (/confluence-to-markdown, /gdoc-to-markdown, GitHub MCP).
-  Use when: "bedrock query", "bedrock-query", "/bedrock:query", any question about the vault, "what do we know about",
-  "who owns", "what's the status of", "tell me about", "how does it work", or any
-  Second Brain query.
+  Orchestrated vault reader skill. Receives a natural language question,
+  decomposes it into sub-queries, executes multiple /graphify calls to search the knowledge graph,
+  blends graph results with direct vault reads (frontmatter, wikilinks, body prose),
+  cross-references context between entities, prioritizes recent information,
+  and optionally fetches external sources by delegating to known skills.
+  Use when: "bedrock ask", "bedrock-ask", "/bedrock:ask", any question about the vault,
+  "what do we know about", "who owns", "what's the status of", "tell me about",
+  "how does it work", or any Second Brain query.
 user_invocable: true
 allowed-tools: Bash, Read, Glob, Grep, Skill, Agent, mcp__plugin_github_github__get_file_contents, mcp__plugin_github_github__list_commits, mcp__plugin_github_github__list_pull_requests
 ---
 
-# /bedrock:query — Smart Vault Reader
+# /bedrock:ask — Orchestrated Vault Reader
 
 ## Plugin Paths
 
@@ -29,14 +30,34 @@ Where `<base_dir>` is the path provided in "Base directory for this skill".
 
 ## Overview
 
-This skill receives a natural language question, searches the vault to find the answer,
-cross-references context between entities via wikilinks, prioritizes recent information, and optionally
-fetches external sources when local information is insufficient.
+This skill receives a natural language question, decomposes it into one or more sub-queries,
+executes them against the knowledge graph via `/graphify`, and blends the results with direct
+vault reads to produce rich, contextualized answers.
 
-**You are a query agent. You only READ — never write, edit, or delete files.**
+**You are a query orchestrator agent. You only READ — never write, edit, or delete files.**
 
 If the query reveals outdated or missing information, suggest that the user run
 `/bedrock:preserve` or `/bedrock:teach` to update the vault. Never perform the update yourself.
+
+---
+
+## Phase 0 — Read Configuration
+
+### 0.1 Load config
+
+Read `.bedrock/config.json` from the vault root:
+
+```bash
+if [ -f ".bedrock/config.json" ]; then
+    cat .bedrock/config.json
+else
+    echo "config_not_found"
+fi
+```
+
+- **If config exists:** extract the value of `query.max_graphify_calls`. Store as `max_graphify_calls`.
+- **If config does not exist or field is absent:** set `max_graphify_calls = 3` (default).
+- **Valid range:** 1–5. If the value is outside this range, clamp to the nearest bound and log a warning.
 
 ---
 
@@ -74,7 +95,7 @@ If the question is too ambiguous to produce a targeted search (e.g.: "tell me ev
 If the question mentions something that clearly isn't part of the vault (e.g.: something personal,
 unrelated technology), inform: "I didn't find anything in the vault about this."
 
-### 1.3 Phase 1 Result
+### 1.3 Phase 1 classification result
 
 At the end, you should have:
 - **search_terms**: list of names, aliases, and keywords to search for
@@ -82,9 +103,40 @@ At the end, you should have:
 - **info_type**: classification of the type of information sought
 - **explicit_entities**: entities mentioned directly by name (if any)
 
+### 1.4 Decompose into sub-queries
+
+Based on the classification from 1.1–1.3, produce a **sub-query plan**: a list of 1–N graphify
+invocations, each with a mode and a prompt. The plan must not exceed `max_graphify_calls`.
+
+Use the following decomposition rules:
+
+| Question shape | Sub-query plan |
+|---|---|
+| Single entity, simple question ("what is X?", "explain X") | 1 call: `explain "<entity>"` |
+| Two entities, relationship question ("how does X relate to Y?", "what connects X and Y?") | 1 call: `path "<entityA>" "<entityB>"` |
+| Broad domain question ("tell me about the payments domain", "overview of processing") | 1 call: `query "<question>"` |
+| Single entity + context ("what is X and what depends on it?") | 2 calls: `explain "<entity>"` + `query "what depends on <entity>?"` |
+| Two entities + broad context ("how do X and Y relate, and what's the status of their domain?") | 2–3 calls: `path "<X>" "<Y>"` + `query "<domain context question>"` |
+| Complex multi-entity question (3+ entities or multiple domains) | Decompose into 2–3 focused calls, each targeting a different angle. Prioritize by relevance to the original question. |
+| Simple factual question ("who owns X?", "what team manages Y?") | 1 call: `query "<question>"` |
+
+**Rules:**
+- Never exceed `max_graphify_calls`
+- Prefer fewer calls when possible — 1 call is better than 2 if it covers the question
+- Each sub-query must have a clear, distinct purpose (no redundant calls)
+- If the question is simple enough for 1 call, use 1 call
+
+**Output of Phase 1.4:**
+```
+sub_query_plan:
+  - mode: explain | query | path
+    prompt: "<the prompt for this graphify call>"
+    purpose: "<why this call is needed>"
+```
+
 ---
 
-## Phase 2 — Local Vault Search
+## Phase 2 — Orchestrated Search
 
 ### 2.0 Check graph availability
 
@@ -96,65 +148,85 @@ else
 fi
 ```
 
-- **If `graph_available`:** use Phase 2-G (graphify delegation) below.
-- **If `graph_not_available`:** skip to Phase 2-S (sequential search).
+- **If `graph_available`:** use Phase 2-G (orchestrated graphify delegation) below.
+- **If `graph_not_available`:** use Phase 2-S (sequential fallback with warning).
 
-### Phase 2-G — Graphify Delegation (when graph available)
+### Phase 2-G — Orchestrated Graphify Delegation (when graph available)
 
-The graphify query engine handles all graph traversal (BFS, DFS, path-finding, node explanation).
-`/bedrock:query` delegates to `/graphify` via the Skill tool and receives structured JSON,
-then post-processes the result with vault-specific logic in Phase 2.5.
+Execute the sub-query plan produced in Phase 1.4. Each sub-query is a separate `/graphify`
+invocation via the Skill tool. Results are accumulated across calls.
 
-#### 2-G.1 Route question type to graphify mode
+#### 2-G.1 Execute sub-queries sequentially
 
-From the Phase 1 results (search_terms, info_type, explicit_entities), select the graphify command:
+For each sub-query in `sub_query_plan` (in order):
 
-| Phase 1 info_type | Graphify invocation |
-|---|---|
-| Relationship, status, overview, history, deprecation | `/graphify query "<original_question>"` |
-| Path-finding ("how does X connect to Y", with 2 explicit entities) | `/graphify path "<entityA>" "<entityB>"` |
-| Single-entity deep dive ("what is X?", "explain X", 1 explicit entity) | `/graphify explain "<entity>"` |
-| Broad domain ("tell me about the payments domain") | `/graphify query "<question>"` |
+1. **Invoke graphify via Skill tool.** Use the Skill tool to invoke the graphify command
+   matching the sub-query's mode:
 
-#### 2-G.2 Invoke graphify via Skill tool
+   | Mode | Skill invocation |
+   |---|---|
+   | `explain` | `/graphify explain "<prompt>"` |
+   | `query` | `/graphify query "<prompt>"` |
+   | `path` | `/graphify path "<entityA>" "<entityB>"` |
 
-Use the Skill tool to invoke the selected graphify command. Append the following structured output
-instruction to the invocation prompt:
+   Append the following structured output instruction to every invocation prompt:
 
-```
-After completing the traversal, return ONLY a JSON object with this structure (no prose, no markdown fences):
-{
-  "mode": "query|path|explain",
-  "start_nodes": ["node_id1", "node_id2"],
-  "nodes": [
-    {"id": "node_id", "label": "Human Readable Name", "source_file": "relative/path", "community": 0, "source_location": "file:line"}
-  ],
-  "edges": [
-    {"source": "node_id", "target": "node_id", "relation": "calls|references|...", "confidence": "EXTRACTED|INFERRED|AMBIGUOUS", "confidence_score": 0.9}
-  ],
-  "communities": {
-    "0": {"label": "Community Name", "node_ids": ["id1", "id2"]}
-  },
-  "traversal": {"mode": "bfs|dfs", "depth": 3, "budget_used": 1200}
-}
-```
+   ```
+   After completing the traversal, return ONLY a JSON object with this structure (no prose, no markdown fences):
+   {
+     "mode": "query|path|explain",
+     "start_nodes": ["node_id1", "node_id2"],
+     "nodes": [
+       {"id": "node_id", "label": "Human Readable Name", "source_file": "relative/path", "community": 0, "source_location": "file:line"}
+     ],
+     "edges": [
+       {"source": "node_id", "target": "node_id", "relation": "calls|references|...", "confidence": "EXTRACTED|INFERRED|AMBIGUOUS", "confidence_score": 0.9}
+     ],
+     "communities": {
+       "0": {"label": "Community Name", "node_ids": ["id1", "id2"]}
+     },
+     "traversal": {"mode": "bfs|dfs", "depth": 3, "budget_used": 1200}
+   }
+   ```
+
+2. **Parse the response.** Extract the JSON object from the Skill tool response.
+   - **If JSON parses successfully:** accumulate the `nodes`, `edges`, and `communities`
+     into a running `graphify_results` aggregate.
+   - **If parsing fails** (graphify returned prose, error, or timeout): log warning
+     "Sub-query N failed (mode: <mode>) — skipping." Continue with the next sub-query.
+
+3. **Report progress:** After each successful call, log:
+   "Sub-query N/<total> (mode: <mode>) returned M nodes, K edges."
 
 **IMPORTANT:**
-- Invoke via the Skill tool — never call graphify Python API directly (`graphify.query`, `graphify.build`, etc.)
+- Invoke via the Skill tool — never call graphify Python API directly
 - This follows the same delegation pattern as `/bedrock:teach` → `/graphify`
+- If ALL sub-queries fail, fall back to Phase 2-S (sequential search)
 
-#### 2-G.3 Parse graphify response
+#### 2-G.2 Deduplicate accumulated results
 
-Extract the JSON object from the graphify Skill tool response.
+After all sub-queries complete:
 
-- **If JSON parses successfully:** store as `graphify_result` for Phase 2.5. Report: "Graphify query returned N nodes, M edges."
-- **If parsing fails** (graphify returned prose, error, or timeout): log warning "Graphify delegation failed — falling back to sequential search." Then execute Phase 2-S instead.
+1. **Deduplicate nodes** by `id` — if the same node appears in multiple results, keep the first occurrence
+2. **Deduplicate edges** by `source` + `target` + `relation` — keep the first occurrence
+3. **Merge communities** — union community node sets; if two results name the same community differently, keep both labels
 
-### Phase 2-S — Sequential Search (when graph not available or graphify delegation failed)
+Store the deduplicated result as `graphify_result` for Phase 2.5.
 
-When the graph is not available or graphify delegation failed, use sequential search:
+Report: "Orchestration complete: N sub-queries executed, M unique nodes, K unique edges collected."
 
-### 2.1 Read entity definitions
+### Phase 2-S — Sequential Search (when graph not available or all graphify calls failed)
+
+**Before searching, display this warning to the user:**
+
+> [!warning] Knowledge graph unavailable
+> The knowledge graph is not available (`graphify-out/graph.json` missing or empty).
+> Results will be limited to sequential vault search — answers may be less complete.
+> Run `/graphify build` to rebuild the graph from the vault's actor repositories.
+
+Then proceed with sequential search:
+
+### 2-S.1 Read entity definitions
 
 Use Read to read the entity definition files from the plugin (see "Plugin Paths" section):
 - If the question is about a system → read `<base_dir>/../../entities/actor.md`
@@ -165,7 +237,7 @@ Use Read to read the entity definition files from the plugin (see "Plugin Paths"
 - If the question is about a project/initiative → read `<base_dir>/../../entities/project.md`
 - If you don't know the type → read all entity definitions from the plugin to classify correctly
 
-### 2.2 Search entities by name and alias
+### 2-S.2 Search entities by name and alias
 
 For each search term identified in Phase 1:
 
@@ -195,7 +267,7 @@ If steps 1-3 did not return sufficient results:
 Grep: pattern="<term>" in entity directories (case-insensitive)
 ```
 
-### 2.3 Filter by domain
+### 2-S.3 Filter by domain
 
 If domains were identified in Phase 1, filter results:
 ```
@@ -204,7 +276,7 @@ Grep: pattern="domain/<domain>" in the found files (tags field of frontmatter)
 
 Keep all results, but prioritize those matching the domain.
 
-### 2.4 Read found entities
+### 2-S.4 Read found entities
 
 For each entity found (limit: 15 entities):
 
@@ -220,10 +292,10 @@ Record for each entity read:
 
 ---
 
-## Phase 2.5 — Vault-Specific Post-Processing
+## Phase 2.5 — Blend and Post-Process
 
-This phase applies to both graphify delegation results (Phase 2-G) and sequential search results (Phase 2-S).
-When coming from Phase 2-G, consume `graphify_result`. When coming from Phase 2-S, consume the entity list
+This phase applies to both orchestrated graphify results (Phase 2-G) and sequential search results (Phase 2-S).
+When coming from Phase 2-G, consume the deduplicated `graphify_result`. When coming from Phase 2-S, consume the entity list
 found via Glob/Grep. In both cases, the output is a list of resolved vault `.md` entities for Phase 3.
 
 ### 2.5.1 Resolve graphify nodes to vault .md files (only when coming from Phase 2-G)
@@ -409,7 +481,7 @@ Build the response following these rules:
      - Corroboration (confirmed by an existing permanent)
    - If any criterion is met, add at the end of the response:
      `> [!info] Promotion suggested: [[fleeting-note-name]] can be promoted to permanent/bridge`
-   - `/bedrock:query` does NOT promote automatically — it only flags. Promotion happens when
+   - `/bedrock:ask` does NOT promote automatically — it only flags. Promotion happens when
      `/bedrock:preserve` is invoked with the instruction to promote.
 
 ### 6.2 Post-response suggestions
@@ -427,8 +499,11 @@ When appropriate, suggest actions to the user:
 | Rule | Detail |
 |---|---|
 | Read-only | NEVER write, edit, or delete files. Only Read, Glob, Grep, Skill (graphify delegation + external fetch), Agent (parallel search), and GitHub MCP (reading) |
-| Invoke graphify via Skill tool | NEVER call graphify Python API directly (`graphify.query`, `graphify.build`, etc.). Always invoke via the Skill tool. This follows the same delegation pattern as `/bedrock:teach` → `/graphify`. |
-| Graphify fallback to sequential | If graphify delegation fails (parse error, timeout, no graph.json), fall back to Phase 2-S. Never block the query. |
+| Orchestrated graphify delegation | Decompose the question in Phase 1.4, then execute sub-queries sequentially in Phase 2-G. Each call via the Skill tool — NEVER call graphify Python API directly |
+| Max graphify calls | Read `query.max_graphify_calls` from `.bedrock/config.json` (default: 3, valid range: 1–5). Never exceed this limit |
+| Deduplicate across calls | After all sub-queries, deduplicate nodes by `id` and edges by `source+target+relation` before resolving to vault files |
+| Graph unavailable warning | When `graphify-out/graph.json` is missing or empty, display `> [!warning]` callout telling the user to run `/graphify build`, then proceed with sequential fallback |
+| Graphify fallback to sequential | If all graphify calls fail (parse error, timeout, no graph.json), fall back to Phase 2-S. Never block the query |
 | No fabrication | Respond ONLY with information found in the vault or consulted external sources. Never fabricate data |
 | Clarification before guessing | If the question is ambiguous, ask for clarification. Do not assume |
 | Limit of 15 entities | Do not read more than 15 entities per query (Phase 2.5 + Phase 3) |
