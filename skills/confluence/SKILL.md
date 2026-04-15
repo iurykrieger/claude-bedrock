@@ -1,3 +1,13 @@
+---
+name: confluence
+description: >
+  Internal fetcher module for Confluence pages. Fetches content via REST API (primary)
+  or browser DOM extraction via Claude in Chrome (fallback) and returns Markdown.
+  Used by /bedrock:teach Phase 1 — not intended for direct user invocation.
+user_invocable: false
+allowed-tools: Bash, Read, WebFetch, ToolSearch, mcp__claude-in-chrome__*
+---
+
 # Confluence Fetcher
 
 Internal module — invoked by `/bedrock:teach` Phase 1, not user-invocable.
@@ -5,7 +15,7 @@ Internal module — invoked by `/bedrock:teach` Phase 1, not user-invocable.
 Fetches a Confluence page and returns its content as Markdown. Two strategies in order:
 Confluence REST API with Basic Auth (primary), browser DOM extraction via Claude in Chrome (fallback).
 
-**Dependency:** Browser fallback requires `fetchers/scripts/extract.js` (relative to plugin root).
+**Dependency:** Browser fallback requires `scripts/extract.js` (relative to this skill directory).
 
 ---
 
@@ -129,7 +139,7 @@ mcp__claude-in-chrome__navigate(url: "<full confluence URL>", tabId: <id>)
 
 ### B.4 Execute extraction script
 
-Read `fetchers/scripts/extract.js` from the plugin directory using the Read tool. Then execute it:
+Read `scripts/extract.js` from this skill's directory using the Read tool. Then execute it:
 
 ```
 mcp__claude-in-chrome__javascript_tool(

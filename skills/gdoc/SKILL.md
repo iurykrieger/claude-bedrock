@@ -1,3 +1,13 @@
+---
+name: gdoc
+description: >
+  Internal fetcher module for Google Docs and Sheets. Fetches content via Google API
+  (primary) or public URL export (fallback) and returns Markdown.
+  Used by /bedrock:teach Phase 1 — not intended for direct user invocation.
+user_invocable: false
+allowed-tools: Bash, Read, Write, WebFetch
+---
+
 # Google Docs & Sheets Fetcher
 
 Internal module — invoked by `/bedrock:teach` Phase 1, not user-invocable.
