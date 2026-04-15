@@ -64,7 +64,7 @@ The setup creates all entity directories, copies templates, generates a vault-le
 | Skill | Purpose |
 |---|---|
 | `/bedrock:setup` | Interactive vault initialization and configuration |
-| `/bedrock:query` | Smart vault reader — search and cross-reference entities |
+| `/bedrock:ask` | Orchestrated vault reader — decomposes questions, searches graph and vault, cross-references entities |
 | `/bedrock:teach` | Ingest external sources — extract and create entities |
 | `/bedrock:preserve` | Single write point — detect, match, create/update entities with bidirectional links |
 | `/bedrock:compress` | Deduplication and vault health — broken links, orphans, stale content |
@@ -92,7 +92,7 @@ Bedrock follows a **skill delegation model** where all write operations flow thr
 ```
 External Source → /bedrock:teach → entity detection → /bedrock:preserve → vault
 GitHub/Confluence → /bedrock:sync  → diff analysis  → /bedrock:preserve → vault
-User question   → /bedrock:query → search + graph  → read-only response
+User question   → /bedrock:ask   → search + graph  → read-only response
 Vault health    → /bedrock:compress → dedup/merge   → vault updates
 ```
 
