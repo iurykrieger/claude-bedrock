@@ -89,16 +89,17 @@ Store the selected language as `VAULT_LANGUAGE`. This determines:
 
 ### 1.2 Dependency Check
 
-Check for external tools and skills that enhance the Bedrock experience.
-Use Glob to probe known installation paths. **Never block initialization.**
+Check for external tools, environment variables, and MCP servers that enhance the Bedrock experience.
+**Never block initialization.**
 
 **Dependencies to check:**
 
 | Dependency | Check method | What it unlocks |
 |---|---|---|
-| graphify | Glob: `~/.claude/skills/graphify/SKILL.md` | **Required.** Extraction engine for all `/bedrock:teach` ingestion. Processes code, docs, PDFs, and any content into a knowledge graph. Without it, /teach cannot function. |
-| confluence-to-markdown | Glob: `~/.claude/skills/confluence-to-markdown/SKILL.md` | Confluence page ingestion via `/bedrock:teach`. Converts Confluence pages to markdown for entity extraction. |
-| gdoc-to-markdown | Glob: `~/.claude/skills/gdoc-to-markdown/SKILL.md` | Google Docs ingestion via `/bedrock:teach`. Converts Google Docs to markdown for entity extraction. |
+| graphify | Glob: `~/.claude/skills/graphify/SKILL.md` | **Required.** Extraction engine for all `/bedrock:teach` ingestion. Without it, /teach cannot function. |
+| CONFLUENCE_API_TOKEN + CONFLUENCE_USER_EMAIL | Bash: `test -n "$CONFLUENCE_API_TOKEN" && test -n "$CONFLUENCE_USER_EMAIL"` | Confluence page ingestion via `/bedrock:teach` (API strategy). |
+| GOOGLE_ACCESS_TOKEN | Bash: `test -n "$GOOGLE_ACCESS_TOKEN"` | Google Docs and Sheets ingestion via `/bedrock:teach` (API strategy). |
+| claude-in-chrome MCP | ToolSearch: `select:mcp__claude-in-chrome__tabs_context_mcp` (succeeds = available) | **Optional.** Browser fallback for Confluence pages when API credentials are unavailable. |
 
 **Report format:**
 
@@ -107,31 +108,53 @@ Use Glob to probe known installation paths. **Never block initialization.**
 
 | Dependency | Status | What it unlocks |
 |---|---|---|
-| graphify | installed / NOT FOUND | Semantic code extraction for GitHub repos |
-| confluence-to-markdown | installed / NOT FOUND | Confluence page ingestion |
-| gdoc-to-markdown | installed / NOT FOUND | Google Docs ingestion |
+| graphify | installed / NOT FOUND | Extraction engine for /teach |
+| Confluence API credentials | configured / NOT SET | Confluence page ingestion (API) |
+| Google API token | configured / NOT SET | Google Docs/Sheets ingestion (API) |
+| claude-in-chrome MCP | available / NOT FOUND | Browser fallback for Confluence |
+
+### Source availability summary
+| Source type | Status | Requirements |
+|---|---|---|
+| Confluence | ready / partial / unavailable | API credentials or Chrome extension |
+| Google Docs | ready / limited / unavailable | API token or public documents only |
+| Google Sheets | ready / limited / unavailable | API token (all tabs) or public (first tab only) |
+| GitHub | ready | git CLI |
+| Remote URL | ready | WebFetch |
+| Local files | ready | filesystem access |
 ```
 
 For **graphify** specifically (required):
 
 ```
-> ⚠️ graphify is not installed. This is REQUIRED for /bedrock:teach to work.
+> graphify is not installed. This is REQUIRED for /bedrock:teach to work.
 > To install, check https://github.com/iurykrieger/graphify for instructions.
 >
 > Your vault will initialize, but /bedrock:teach will not function until graphify is installed.
 ```
 
-For other missing dependencies (optional):
+For missing environment variables (optional):
 
 ```
-> <dependency> is not installed. To install:
-> Check the skill's repository for instructions.
+> CONFLUENCE_API_TOKEN and CONFLUENCE_USER_EMAIL are not set.
+> To ingest Confluence pages, generate an API token at:
+> https://id.atlassian.com/manage-profile/security/api-tokens
+> Then set: CONFLUENCE_API_TOKEN=<token> and CONFLUENCE_USER_EMAIL=<your-email>
 >
-> This is optional — your vault will work without it. You can install it later.
+> Alternative: If you have the Claude in Chrome extension with Confluence logged in, browser extraction will work as a fallback.
+> This is optional — your vault will work without Confluence ingestion.
 ```
 
-> **Note:** Detection may not find skills installed via non-standard paths.
-> If a dependency is reported as missing but you know it is installed, you can safely ignore the warning.
+```
+> GOOGLE_ACCESS_TOKEN is not set.
+> To ingest Google Docs/Sheets, generate an access token at:
+> https://developers.google.com/oauthplayground/
+> Select scope: https://www.googleapis.com/auth/drive.readonly
+> Then set: GOOGLE_ACCESS_TOKEN=<token>
+>
+> Public Google Docs/Sheets can still be ingested without a token (limited).
+> This is optional — your vault will work without Google ingestion.
+```
 
 **Proceed regardless of results.** Never block initialization for missing dependencies.
 
