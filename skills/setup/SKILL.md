@@ -53,12 +53,13 @@ ls .bedrock/config.json 2>/dev/null
    - Language: <language>
    - Preset: <preset>
    - Domains: <domains>
+   - Git strategy: <git.strategy or "commit-push" if absent>
    - Initialized at: <date>
    ```
 
 2. Ask the user:
    > "This vault is already initialized. What would you like to do?"
-   > 1. **Reconfigure** — Update language, domains, and regenerate vault CLAUDE.md (directories and entities are NOT touched)
+   > 1. **Reconfigure** — Update language, domains, git strategy, and regenerate vault CLAUDE.md (directories and entities are NOT touched)
    > 2. **Skip** — Exit with no changes
 
    - **Reconfigure**: proceed to Phase 1, but set `RECONFIGURE_MODE = true`. In Phase 3, skip directory creation (3.1), template copying (3.2), Obsidian configuration (3.5), and example entity generation (3.6).
@@ -363,6 +364,39 @@ If the user selects **Custom**:
 Build a custom preset object following the same structure as the named presets.
 For fields not provided by the user, use sensible generic defaults.
 
+### 2.4 Git Strategy Selection
+
+Ask the user:
+
+> "How should Bedrock handle git commits and pushes?"
+>
+> 1. **commit-push** *(default)* — Commit and push directly to `main` (trunk-based)
+> 2. **commit-push-pr** — Commit to a branch, push, and open a pull request targeting `main`
+> 3. **commit-only** — Commit locally without pushing (for offline or local-only vaults)
+>
+> Press Enter for default (commit-push).
+
+Store the selected strategy as `GIT_STRATEGY`.
+
+**If the user selects `commit-push-pr`:**
+
+Check if the `gh` CLI is available:
+
+```bash
+which gh 2>/dev/null
+```
+
+If `gh` is not found, warn:
+
+```
+> ⚠️ The `gh` CLI is not installed. The `commit-push-pr` strategy requires it to create pull requests.
+> Install it from https://cli.github.com/ before using /bedrock:preserve, /bedrock:compress, or /bedrock:sync.
+>
+> You can still select this strategy — skills will fall back to `commit-push` if `gh` is not available at runtime.
+```
+
+Proceed regardless — never block initialization for missing tools.
+
 ---
 
 ## Phase 3 — Scaffold
@@ -424,6 +458,9 @@ Write `.bedrock/config.json` with this schema:
   "language": "<VAULT_LANGUAGE>",
   "preset": "<selected preset name>",
   "domains": ["<domain1>", "<domain2>", "..."],
+  "git": {
+    "strategy": "<GIT_STRATEGY>"
+  },
   "initialized_at": "<today's date YYYY-MM-DD>",
   "initialized_by": "init@agent"
 }
@@ -434,6 +471,7 @@ Write `.bedrock/config.json` with this schema:
 - `language`: The language code from Phase 1 (e.g., `"en-US"`, `"pt-BR"`)
 - `preset`: The selected preset name (e.g., `"engineering"`, `"personal"`, `"custom"`)
 - `domains`: Array of domain strings resolved from the preset
+- `git.strategy`: The git strategy from Phase 2.3. Valid values: `"commit-push"`, `"commit-push-pr"`, `"commit-only"`. If omitted, defaults to `"commit-push"`.
 - `initialized_at`: Today's date in `YYYY-MM-DD` format
 - `initialized_by`: Always `"init@agent"`
 

@@ -387,32 +387,114 @@ If graph.json is stale: add warning "Suggestion: run /bedrock:teach or /sync to 
 
 ## Phase 5 — Git Commit + Report
 
-### 5.1 Commit
+### 5.1 Stage
 
 ```bash
 git add actors/ people/ teams/ topics/ discussions/ projects/ fleeting/
-# Message includes removed orphan code entities (if any)
-git commit -m "vault: compress N entities [source: compress]"
-# If orphan code entities were removed, use:
-# git commit -m "vault: compress N entities, remove M orphan code entities [source: compress]"
+
+# Check if there is anything to commit
+git diff --cached --quiet && echo "Nothing to commit" && exit 0
+```
+
+### 5.2 Read git strategy
+
+Read the vault's git strategy from `.bedrock/config.json`:
+
+```bash
+cat .bedrock/config.json 2>/dev/null
+```
+
+Extract the `git.strategy` field. If the file does not exist or has no `git` key, default to `"commit-push"`.
+
+Valid values: `"commit-push"`, `"commit-push-pr"`, `"commit-only"`.
+
+Prepare the commit message following the convention:
+```
+vault: compress N entities [source: compress]
+```
+If orphan code entities were removed, use:
+```
+vault: compress N entities, remove M orphan code entities [source: compress]
 ```
 
 Where N = total number of entities touched.
 
-### 5.2 Push
+### 5.3 Dispatch by strategy
+
+**Strategy: `commit-push`** (default)
 
 ```bash
+git commit -m "<message per convention>"
 git push origin main
 ```
 
-If it fails:
+If push fails (conflict):
 ```bash
-git pull --rebase origin main && git push origin main
+git pull --rebase origin main
+git push origin main
 ```
 
-Max 2 attempts. If it fails after 2: warn the user that the push failed.
+If it fails 2x: STOP and inform the user.
+If there is no remote: commit locally and warn.
 
-### 5.3 Final Report
+---
+
+**Strategy: `commit-push-pr`**
+
+First, check that `gh` is available:
+
+```bash
+which gh 2>/dev/null
+```
+
+If `gh` is not found: warn the user and **fall back to `commit-push`** strategy (above).
+
+If `gh` is available:
+
+1. **Create a branch.** Derive the branch name from the commit message:
+
+   `vault/<YYYY-MM-DD>-compress-<N>-entities` (e.g., `vault/2026-04-15-compress-25-entities`)
+
+   Check for collisions:
+   ```bash
+   git branch --list "vault/<YYYY-MM-DD>-compress*"
+   ```
+   If the branch already exists, append a counter: `vault/2026-04-15-compress-25-entities-2`.
+
+   ```bash
+   git checkout -b <branch-name>
+   ```
+
+2. **Commit and push the branch:**
+   ```bash
+   git commit -m "<message per convention>"
+   git push origin <branch-name>
+   ```
+
+3. **Open a pull request:**
+   ```bash
+   gh pr create --title "<commit message>" --body "Automated by /bedrock:compress" --base main
+   ```
+
+4. **Return to main:**
+   ```bash
+   git checkout main
+   ```
+
+---
+
+**Strategy: `commit-only`**
+
+```bash
+git commit -m "<message per convention>"
+```
+
+Do not push. Output:
+```
+Git strategy: commit-only — changes committed locally. Use `git push` manually when ready.
+```
+
+### 5.4 Final Report
 
 Present to the user:
 

@@ -116,7 +116,18 @@ These are the Claude Code skills provided by the Bedrock plugin:
 
 ## Git Workflow
 
-- **Trunk-based**: push directly to `main`
+Bedrock supports 3 git strategies, configured via `.bedrock/config.json` (`git.strategy` field):
+
+| Strategy | Behavior | When to use |
+|---|---|---|
+| `commit-push` (default) | Commit + push to `main` + rebase retry (max 2 attempts) | Solo vaults, trusted contributors |
+| `commit-push-pr` | Commit to branch + push + open PR targeting `main` via `gh` CLI | Team vaults requiring review |
+| `commit-only` | Commit locally, no push | Offline or local-only vaults |
+
+When `git.strategy` is absent from config (or `.bedrock/config.json` does not exist), all skills default to `commit-push` for backwards compatibility.
+
+**Branch naming for `commit-push-pr`:** `vault/<YYYY-MM-DD>-<slug>` where `<slug>` is derived from the commit message (entity name, `batch-N-entities`, `compress-N-entities`, etc.). If the branch already exists, a counter is appended (e.g., `-2`).
+
 - **Pull before write**: `git pull --rebase origin main`
 - **Commit convention**: `vault(<type>): <verb> <name> [source: <origin>]`
 

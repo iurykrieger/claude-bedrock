@@ -903,18 +903,99 @@ After `/bedrock:preserve` completes, update the frontmatter of EACH processed ac
 ```bash
 git add actors/
 git diff --cached --quiet && echo "Nothing to commit" && exit 0
-git commit -m "vault(source): syncs github activity for N actors [source: github]"
+```
+
+#### Read git strategy
+
+Read the vault's git strategy from `.bedrock/config.json`:
+
+```bash
+cat .bedrock/config.json 2>/dev/null
+```
+
+Extract the `git.strategy` field. If the file does not exist or has no `git` key, default to `"commit-push"`.
+
+Valid values: `"commit-push"`, `"commit-push-pr"`, `"commit-only"`.
+
+Prepare the commit message following the convention:
+```
+vault(source): syncs github activity for N actors [source: github]
+```
+
+#### Dispatch by strategy
+
+**Strategy: `commit-push`** (default)
+
+```bash
+git commit -m "<message per convention>"
 git push origin main
 ```
 
-**If push fails (conflict):**
+If push fails (conflict):
 ```bash
 git pull --rebase origin main
 git push origin main
 ```
 
-**If fails 2x:** Log the error and continue to the report.
-**If no remote:** Local commit and log.
+If it fails 2x: log the error and continue to the report.
+If there is no remote: commit locally and log.
+
+---
+
+**Strategy: `commit-push-pr`**
+
+First, check that `gh` is available:
+
+```bash
+which gh 2>/dev/null
+```
+
+If `gh` is not found: warn the user and **fall back to `commit-push`** strategy (above).
+
+If `gh` is available:
+
+1. **Create a branch.** Derive the branch name from the commit message:
+
+   `vault/<YYYY-MM-DD>-sync-github-<N>-actors` (e.g., `vault/2026-04-15-sync-github-5-actors`)
+
+   Check for collisions:
+   ```bash
+   git branch --list "vault/<YYYY-MM-DD>-sync-github*"
+   ```
+   If the branch already exists, append a counter: `vault/2026-04-15-sync-github-5-actors-2`.
+
+   ```bash
+   git checkout -b <branch-name>
+   ```
+
+2. **Commit and push the branch:**
+   ```bash
+   git commit -m "<message per convention>"
+   git push origin <branch-name>
+   ```
+
+3. **Open a pull request:**
+   ```bash
+   gh pr create --title "<commit message>" --body "Automated by /bedrock:sync" --base main
+   ```
+
+4. **Return to main:**
+   ```bash
+   git checkout main
+   ```
+
+---
+
+**Strategy: `commit-only`**
+
+```bash
+git commit -m "<message per convention>"
+```
+
+Do not push. Output:
+```
+Git strategy: commit-only — changes committed locally. Use `git push` manually when ready.
+```
 
 ---
 
@@ -1011,11 +1092,99 @@ If the file already exists (duplicate execution on the same day): overwrite with
 ```bash
 git add fleeting/
 git diff --cached --quiet && echo "Nothing to commit" && exit 0
-git commit -m "vault(note): creates sync-github-report YYYY-MM-DD [source: github]"
+```
+
+#### Read git strategy
+
+Read the vault's git strategy from `.bedrock/config.json`:
+
+```bash
+cat .bedrock/config.json 2>/dev/null
+```
+
+Extract the `git.strategy` field. If the file does not exist or has no `git` key, default to `"commit-push"`.
+
+Valid values: `"commit-push"`, `"commit-push-pr"`, `"commit-only"`.
+
+Prepare the commit message:
+```
+vault(note): creates sync-github-report YYYY-MM-DD [source: github]
+```
+
+#### Dispatch by strategy
+
+**Strategy: `commit-push`** (default)
+
+```bash
+git commit -m "<message per convention>"
 git push origin main
 ```
 
-**If push fails:** rebase + retry (max 2x).
+If push fails (conflict):
+```bash
+git pull --rebase origin main
+git push origin main
+```
+
+If it fails 2x: log the error and continue.
+If there is no remote: commit locally and log.
+
+---
+
+**Strategy: `commit-push-pr`**
+
+First, check that `gh` is available:
+
+```bash
+which gh 2>/dev/null
+```
+
+If `gh` is not found: warn the user and **fall back to `commit-push`** strategy (above).
+
+If `gh` is available:
+
+1. **Create a branch.** Derive the branch name:
+
+   `vault/<YYYY-MM-DD>-sync-github-report` (e.g., `vault/2026-04-15-sync-github-report`)
+
+   Check for collisions:
+   ```bash
+   git branch --list "vault/<YYYY-MM-DD>-sync-github-report*"
+   ```
+   If the branch already exists, append a counter.
+
+   ```bash
+   git checkout -b <branch-name>
+   ```
+
+2. **Commit and push the branch:**
+   ```bash
+   git commit -m "<message per convention>"
+   git push origin <branch-name>
+   ```
+
+3. **Open a pull request:**
+   ```bash
+   gh pr create --title "<commit message>" --body "Automated by /bedrock:sync" --base main
+   ```
+
+4. **Return to main:**
+   ```bash
+   git checkout main
+   ```
+
+---
+
+**Strategy: `commit-only`**
+
+```bash
+git commit -m "<message per convention>"
+```
+
+Do not push. Output:
+```
+Git strategy: commit-only — changes committed locally. Use `git push` manually when ready.
+```
 
 ---
 
