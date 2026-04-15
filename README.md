@@ -33,7 +33,8 @@ No build system. No runtime. Just markdown files, AI agents, and your Obsidian v
 ## Installation
 
 ```bash
-claude plugins add iurykrieger/claude-bedrock
+/plugin marketplace add iurykrieger/claude-bedrock
+/plugin install iurykrieger/claude-bedrock
 ```
 
 For local development:
