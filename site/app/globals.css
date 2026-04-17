@@ -1,0 +1,99 @@
+@import "tailwindcss";
+
+/* ============================================
+   DESIGN TOKENS — Obsidian Purple x Claude Orange
+   ============================================ */
+:root {
+  /* Primary — Obsidian Purple */
+  --purple-400: #c4a8ff;
+  --purple-500: #a882ff;
+  --purple-600: #7c3aed;
+
+  /* Secondary — Claude Orange */
+  --orange-400: #f09070;
+  --orange-500: #e8754a;
+  --orange-600: #cc5a30;
+
+  /* Gradients */
+  --gradient-hero: linear-gradient(135deg, #a882ff 0%, #e8754a 100%);
+  --gradient-subtle: linear-gradient(135deg, #a882ff 0%, #c4a8ff 100%);
+
+  /* Surfaces */
+  --bg-base: #09090b;
+  --bg-card: #111113;
+  --bg-elevated: #18181b;
+
+  /* Borders */
+  --border: #27272a;
+  --border-hover: #3f3f46;
+
+  /* Text */
+  --text-primary: #fafafa;
+  --text-secondary: #a1a1aa;
+  --text-muted: #71717a;
+
+  /* Semantic */
+  --success: #34d399;
+}
+
+@theme inline {
+  --color-bg-base: var(--bg-base);
+  --color-bg-card: var(--bg-card);
+  --color-bg-elevated: var(--bg-elevated);
+  --color-border: var(--border);
+  --color-border-hover: var(--border-hover);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+  --color-purple-400: var(--purple-400);
+  --color-purple-500: var(--purple-500);
+  --color-purple-600: var(--purple-600);
+  --color-orange-400: var(--orange-400);
+  --color-orange-500: var(--orange-500);
+  --color-orange-600: var(--orange-600);
+  --color-success: var(--success);
+  --font-sans: var(--font-inter);
+  --font-mono: var(--font-jetbrains-mono);
+}
+
+/* ============================================
+   BASE STYLES
+   ============================================ */
+body {
+  background: var(--bg-base);
+  color: var(--text-secondary);
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  color: var(--text-primary);
+  font-weight: 600;
+  letter-spacing: -0.025em;
+}
+
+code, pre, .font-mono {
+  font-family: var(--font-mono), ui-monospace, monospace;
+}
+
+::selection {
+  background: rgba(168, 130, 255, 0.3);
+  color: var(--text-primary);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-base);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--border-hover);
+}
