@@ -10,13 +10,33 @@ export function SkillsShowcase() {
     <section id="skills" className="py-24 bg-bg-card border-t border-border">
       <div className="max-w-5xl mx-auto px-6">
         <SectionHeader
-          label="Skills"
-          title="Everything you need to manage knowledge"
-          subtitle="Each skill is a specialized agent that reads your vault conventions and acts accordingly."
+          label="Commands"
+          title="Six skills, one toolkit"
+          subtitle="Every skill is a specialized agent. Set up your vault, ingest sources, query knowledge, and keep everything in sync."
         />
 
-        <Tabs defaultValue="setup" className="mt-14">
-          {/* Sidebar on desktop, horizontal tab bar on mobile */}
+        {/* Quick reference */}
+        <div className="mt-10 grid grid-cols-2 md:grid-cols-3 gap-2">
+          {skills.map((skill) => (
+            <div
+              key={skill.id}
+              className="flex items-center gap-2.5 rounded-lg border border-border/50 bg-bg-base/50 px-3 py-2"
+            >
+              <span className="text-sm">{skill.icon}</span>
+              <div className="min-w-0">
+                <code className="text-xs font-mono text-purple-400 truncate block">
+                  {skill.command}
+                </code>
+                <p className="text-[11px] text-text-muted truncate">
+                  {skill.shortDescription}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Detailed tabs */}
+        <Tabs defaultValue="setup" className="mt-12">
           <div className="flex flex-col md:flex-row gap-8">
             {/* Tab list */}
             <TabsList className="flex md:flex-col md:w-56 shrink-0 overflow-x-auto md:overflow-x-visible gap-1 pb-2 md:pb-0">

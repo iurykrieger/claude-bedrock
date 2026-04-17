@@ -1,73 +1,116 @@
 "use client";
 
-import { useState } from "react";
-import { cn } from "@/lib/utils";
 import { SectionHeader } from "@/components/section-header";
-import { skills } from "@/data/skills";
+import { AnimateIn } from "@/components/animate-in";
+
+const NARRATIVE_STEPS = [
+  {
+    number: "01",
+    title: "Teach it your sources",
+    description:
+      "Point Bedrock at a Confluence page, a GitHub repo, a Google Doc, or a CSV. It reads the source, extracts entities — people, systems, teams, topics — and classifies them automatically.",
+    command: "/bedrock:teach",
+    videoPath: "/videos/teach.mp4",
+    accent: "purple" as const,
+  },
+  {
+    number: "02",
+    title: "It preserves the knowledge",
+    description:
+      "Every entity is written to your vault with structured YAML frontmatter, hierarchical tags, and bidirectional wikilinks. One single write point — no conflicts, no duplicates, no orphans.",
+    command: "/bedrock:preserve",
+    videoPath: "/videos/preserve.mp4",
+    accent: "orange" as const,
+  },
+  {
+    number: "03",
+    title: "Compress and maintain",
+    description:
+      "Over time, knowledge drifts. Compress scans your vault for duplicates, broken links, stale content, and entity misalignment — then heals it. Your Second Brain stays clean.",
+    command: "/bedrock:compress",
+    videoPath: "/videos/compress.mp4",
+    accent: "purple" as const,
+  },
+];
 
 export function HowItWorks() {
-  const [activeStep, setActiveStep] = useState(0);
-  const active = skills[activeStep];
-
   return (
     <section id="how-it-works" className="py-24 border-t border-border">
       <div className="max-w-5xl mx-auto px-6">
         <SectionHeader
           label="How It Works"
-          title="Six skills, one workflow"
-          subtitle="Set up your vault, ingest knowledge from any source, and let Bedrock keep it organized."
+          title="Teach, preserve, compress"
+          subtitle="Three steps to turn scattered knowledge into a living, linked graph."
         />
 
-        {/* Stepper */}
-        <div className="mt-14 overflow-x-auto pb-2 -mx-6 px-6">
-          <div className="flex items-center gap-0 min-w-max">
-            {skills.map((skill, i) => (
-              <div key={skill.id} className="flex items-center">
-                <button
-                  onClick={() => setActiveStep(i)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      setActiveStep(i);
-                    }
-                  }}
-                  className={cn(
-                    "flex flex-col items-center text-center px-5 py-3 rounded-xl transition-all duration-200 min-w-[120px]",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-base",
-                    i === activeStep
-                      ? "bg-purple-500/10 border border-purple-500/25 text-purple-400"
-                      : "border border-transparent text-text-muted hover:text-text-secondary hover:bg-bg-elevated"
-                  )}
-                >
-                  <span className="text-xl mb-1.5">{skill.icon}</span>
-                  <span className="text-xs font-mono font-medium">
-                    {skill.name}
-                  </span>
-                </button>
-                {i < skills.length - 1 && (
-                  <span className="text-text-muted/30 mx-1 text-sm select-none">
-                    &rarr;
-                  </span>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
+        <div className="mt-16 space-y-20">
+          {NARRATIVE_STEPS.map((step, i) => (
+            <AnimateIn key={step.number} delay={i * 0.1}>
+              <div
+                className={`flex flex-col gap-8 ${
+                  i % 2 === 1 ? "md:flex-row-reverse" : "md:flex-row"
+                } items-center`}
+              >
+                {/* Text */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-3 mb-4">
+                    <span
+                      className={`text-xs font-mono font-bold tracking-wider ${
+                        step.accent === "purple"
+                          ? "text-purple-500"
+                          : "text-orange-500"
+                      }`}
+                    >
+                      {step.number}
+                    </span>
+                    <div
+                      className={`h-px flex-1 ${
+                        step.accent === "purple"
+                          ? "bg-purple-500/20"
+                          : "bg-orange-500/20"
+                      }`}
+                    />
+                  </div>
 
-        {/* Panel */}
-        <div className="mt-6 rounded-xl border border-border bg-bg-card p-6 md:p-8">
-          <div className="flex items-start gap-4">
-            <span className="text-2xl flex-shrink-0 mt-0.5">{active.icon}</span>
-            <div>
-              <h3 className="text-lg font-semibold mb-2">{active.shortDescription}</h3>
-              <p className="text-text-secondary text-sm leading-relaxed mb-4">
-                {active.description}
-              </p>
-              <code className="inline-block px-3 py-1.5 rounded-md bg-bg-base border border-border text-purple-400 text-sm font-mono">
-                {active.command}
-              </code>
-            </div>
-          </div>
+                  <h3 className="text-2xl font-bold mb-3">{step.title}</h3>
+
+                  <p className="text-text-secondary leading-relaxed mb-5 max-w-md">
+                    {step.description}
+                  </p>
+
+                  <code
+                    className={`inline-block px-3 py-1.5 rounded-md bg-bg-base border text-sm font-mono ${
+                      step.accent === "purple"
+                        ? "border-purple-500/20 text-purple-400"
+                        : "border-orange-500/20 text-orange-400"
+                    }`}
+                  >
+                    {step.command}
+                  </code>
+                </div>
+
+                {/* Video */}
+                <div className="flex-1 min-w-0 w-full">
+                  <div
+                    className={`rounded-xl border overflow-hidden ${
+                      step.accent === "purple"
+                        ? "border-purple-500/15"
+                        : "border-orange-500/15"
+                    }`}
+                  >
+                    <video
+                      src={step.videoPath}
+                      autoPlay
+                      loop
+                      muted
+                      playsInline
+                      className="w-full"
+                    />
+                  </div>
+                </div>
+              </div>
+            </AnimateIn>
+          ))}
         </div>
       </div>
     </section>
