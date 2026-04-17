@@ -31,6 +31,15 @@ const NARRATIVE_STEPS = [
     videoPath: "/videos/compress.mp4",
     accent: "purple" as const,
   },
+  {
+    number: "04",
+    title: "Ask anything, anytime",
+    description:
+      "Once your Second Brain is established, query it from any Claude session. Ask about systems, people, decisions, or dependencies — Bedrock searches the graph, cross-references entities, and answers with linked context.",
+    command: "/bedrock:ask",
+    videoPath: "/videos/ask.mp4",
+    accent: "orange" as const,
+  },
 ];
 
 export function HowItWorks() {
@@ -39,8 +48,8 @@ export function HowItWorks() {
       <div className="max-w-5xl mx-auto px-6">
         <SectionHeader
           label="How It Works"
-          title="Teach, preserve, compress"
-          subtitle="Three steps to turn scattered knowledge into a living, linked graph."
+          title="Teach, preserve, compress, ask"
+          subtitle="Four steps to turn scattered knowledge into a living, queryable graph."
         />
 
         <div className="mt-16 space-y-20">
