@@ -16,6 +16,36 @@ export function VaultDemo() {
           <VaultSidebar />
           <VaultPreview />
         </div>
+
+        {/* Videos: vault navigation + graph view */}
+        <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="rounded-lg border border-border bg-bg-base overflow-hidden">
+            <div className="px-3 py-2 bg-bg-elevated border-b border-border text-xs text-text-muted">
+              Navigating entities
+            </div>
+            <video
+              src="/videos/vault-navigation.mp4"
+              autoPlay
+              loop
+              muted
+              playsInline
+              className="w-full"
+            />
+          </div>
+          <div className="rounded-lg border border-border bg-bg-base overflow-hidden">
+            <div className="px-3 py-2 bg-bg-elevated border-b border-border text-xs text-text-muted">
+              Knowledge graph
+            </div>
+            <video
+              src="/videos/graph-view.mp4"
+              autoPlay
+              loop
+              muted
+              playsInline
+              className="w-full"
+            />
+          </div>
+        </div>
       </div>
     </section>
   );

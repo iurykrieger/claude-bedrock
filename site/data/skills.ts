@@ -5,7 +5,7 @@ export interface Skill {
   shortDescription: string;
   description: string;
   icon: string;
-  gifPath: string;
+  videoPath: string;
 }
 
 export const skills: Skill[] = [
@@ -17,7 +17,7 @@ export const skills: Skill[] = [
     description:
       "Interactive vault initialization and configuration. Guides you through language selection, dependency checks, vault objective, and scaffolds directories, templates, config, and connected example entities.",
     icon: "\u2699",
-    gifPath: "/gifs/setup.gif",
+    videoPath: "/videos/setup.mp4",
   },
   {
     id: "teach",
@@ -27,7 +27,7 @@ export const skills: Skill[] = [
     description:
       "Ingest external sources — feed it a Confluence page, Google Doc, GitHub repo, or CSV. It extracts entities and writes them to your vault via /bedrock:preserve.",
     icon: "\uD83D\uDCDA",
-    gifPath: "/gifs/teach.gif",
+    videoPath: "/videos/teach.mp4",
   },
   {
     id: "preserve",
@@ -37,7 +37,7 @@ export const skills: Skill[] = [
     description:
       "Single write point for all entities. Detects type, matches existing files, creates or updates with bidirectional wikilinks and structured frontmatter.",
     icon: "\uD83D\uDD17",
-    gifPath: "/gifs/preserve.gif",
+    videoPath: "/videos/preserve.mp4",
   },
   {
     id: "ask",
@@ -47,7 +47,7 @@ export const skills: Skill[] = [
     description:
       "Orchestrated vault reader — decomposes questions, searches the graph and vault, cross-references entities, and builds structured answers with wikilinks.",
     icon: "\uD83D\uDD0D",
-    gifPath: "/gifs/ask.gif",
+    videoPath: "/videos/ask.mp4",
   },
   {
     id: "compress",
@@ -57,7 +57,7 @@ export const skills: Skill[] = [
     description:
       "Deduplication and vault health. Finds duplicates, orphan entities, broken links, and stale content. Consolidates and reports vault health.",
     icon: "\u2696",
-    gifPath: "/gifs/compress.gif",
+    videoPath: "/videos/compress.mp4",
   },
   {
     id: "sync",
@@ -67,6 +67,6 @@ export const skills: Skill[] = [
     description:
       "Re-sync entities with their external sources. Supports GitHub activity, contributor profiles, and source metadata updates.",
     icon: "\uD83D\uDD04",
-    gifPath: "/gifs/sync.gif",
+    videoPath: "/videos/sync.mp4",
   },
 ];
