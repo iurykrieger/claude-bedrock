@@ -112,6 +112,56 @@ Check for external tools, environment variables, and MCP servers that enhance th
 | GOOGLE_ACCESS_TOKEN | Bash: `test -n "$GOOGLE_ACCESS_TOKEN"` | Google Docs and Sheets ingestion via `/bedrock:teach` (API strategy). |
 | claude-in-chrome MCP | ToolSearch: `select:mcp__claude-in-chrome__tabs_context_mcp` (succeeds = available) | **Optional.** Browser fallback for Confluence pages when API credentials are unavailable. |
 
+### 1.2.1 Auto-install graphify if missing
+
+If the graphify probe in the table above returns no file, attempt to install graphify silently before generating the dependency report. Execute this fallback chain in order, stopping at the first successful re-probe.
+
+**Step 1 — pipx (preferred, isolated):**
+
+```bash
+command -v pipx >/dev/null 2>&1 && pipx install graphifyy && graphify install
+```
+
+Re-probe: `Glob: ~/.claude/skills/graphify/SKILL.md`. If the file now exists, stop — graphify is installed.
+
+**Step 2 — pip (if pipx unavailable or Step 1 failed):**
+
+Only if Step 1's re-probe still finds nothing, and Python 3.10+ is available:
+
+```bash
+{ command -v pip3 >/dev/null 2>&1 || command -v pip >/dev/null 2>&1; } && \
+  python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)' 2>/dev/null && \
+  { pip3 install graphifyy 2>/dev/null || pip install graphifyy; } && graphify install
+```
+
+Re-probe. If found, stop.
+
+**Step 3 — curl (Python 3.10+ not available):**
+
+If Steps 1 and 2 were both unrunnable because `pipx`, `pip`, and Python 3.10+ are all missing, **warn the user explicitly before falling back:**
+
+> ⚠️ Python 3.10+ is not available on this system. Falling back to manual skill install via `curl`. To receive graphify updates through the official installer, install Python 3.10+ and re-run `/bedrock:setup`.
+
+Then:
+
+```bash
+mkdir -p ~/.claude/skills/graphify && \
+  curl -fsSL https://raw.githubusercontent.com/safishamsi/graphify/v1/skills/graphify/skill.md \
+    > ~/.claude/skills/graphify/SKILL.md
+```
+
+Re-probe. If found, stop.
+
+**Step 4 — Manual instructions (last resort):**
+
+If all prior steps failed (no network, upstream unavailable, or all tooling missing), print the graphify warning shown in Section 1.2.2 below. Do not abort — setup continues regardless.
+
+**Note on package name:** The PyPI package is currently published as `graphifyy` — temporary while the upstream project reclaims the `graphify` name. When that flip happens, update Steps 1 and 2 to `pip install graphify && graphify install`.
+
+**After the chain completes**, run one final `Glob: ~/.claude/skills/graphify/SKILL.md`. The graphify row in the dependency-report table (Section 1.2.2 below) MUST reflect this post-install status — `installed` if the file now exists, `NOT FOUND` otherwise. Proceed to Section 1.2.2 regardless of outcome. **Never block initialization.**
+
+### 1.2.2 Report status
+
 **Report format:**
 
 ```
@@ -139,7 +189,7 @@ For **graphify** specifically (required):
 
 ```
 > graphify is not installed. This is REQUIRED for /bedrock:teach to work.
-> To install, check https://github.com/iurykrieger/graphify for instructions.
+> To install, check https://github.com/safishamsi/graphify for instructions.
 >
 > Your vault will initialize, but /bedrock:teach will not function until graphify is installed.
 ```

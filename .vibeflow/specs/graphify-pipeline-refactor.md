@@ -182,7 +182,7 @@ Update the missing-dependency message from "This is optional — your vault will
 
 ```
 > ⚠️ graphify is not installed. This is REQUIRED for /bedrock:teach to work.
-> To install, check https://github.com/iurykrieger/graphify for instructions.
+> To install, check https://github.com/safishamsi/graphify for instructions.
 >
 > Your vault will initialize, but /bedrock:teach will not function until graphify is installed.
 ```
