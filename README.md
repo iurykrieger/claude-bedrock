@@ -34,7 +34,7 @@ No build system. No runtime. Just markdown files, AI agents, and your Obsidian v
 
 ```bash
 /plugin marketplace add iurykrieger/claude-bedrock
-/plugin install iurykrieger/claude-bedrock
+/plugin install bedrock@claude-bedrock
 ```
 
 For local development:
@@ -54,7 +54,7 @@ After installing, run the setup wizard:
 This will guide you through:
 
 1. **Language selection** — choose the vault content language (default: English)
-2. **Dependency check** — verify optional tools (`graphify`, `confluence-to-markdown`, `gdoc-to-markdown`)
+2. **Dependency check** — verify `graphify` is installed (required)
 3. **Vault objective** — pick a preset (engineering team, product management, company wiki, personal second brain, open source project, or custom)
 4. **Scaffold** — create directories, templates, config, and connected example entities
 
@@ -88,24 +88,33 @@ Each directory contains a `_template.md` defining the frontmatter schema for tha
 
 ## How It Works
 
-Bedrock follows a **skill delegation model** where all write operations flow through `/bedrock:preserve` as the single write point:
+Bedrock turns your vault into a living knowledge graph by combining **8 skills** you invoke from Claude Code. You never write entities by hand — skills detect, create, and link them for you, with Obsidian rendering the result as a graph.
 
-```
-External Source → /bedrock:teach → entity detection → /bedrock:preserve → vault
-GitHub/Confluence → /bedrock:sync  → diff analysis  → /bedrock:preserve → vault
-User question   → /bedrock:ask   → search + graph  → read-only response
-Vault health    → /bedrock:compress → dedup/merge   → vault updates
-```
+### First-time use
 
-Every entity includes structured frontmatter, hierarchical tags, and bidirectional wikilinks — making the Obsidian graph view a living map of your knowledge.
+1. Open a folder you want to turn into a vault (or an existing Obsidian vault).
+2. Run `/bedrock:setup` — answers a few questions and scaffolds directories, templates, and example entities.
+3. Open the folder in Obsidian. You'll already see a connected graph.
 
-## Optional Dependencies
+### Day-to-day loops
+
+- **Capture knowledge from a source** — paste a Confluence page, Google Doc, GitHub repo, or local file into `/bedrock:teach`. Bedrock extracts entities and writes them to the vault with bidirectional links.
+- **Ask the vault questions** — use `/bedrock:ask` for anything like *"who owns the billing API?"* or *"what's the status of project X?"*. It searches the graph, follows wikilinks, and answers with citations.
+- **Keep sources fresh** — run `/bedrock:sync` to re-pull external sources, or `/bedrock:sync --github` / `--people` to surface recent activity and contributors.
+- **Clean up drift** — run `/bedrock:compress` to fix broken backlinks, merge duplicates, and consolidate fragmented concepts. Run `/bedrock:healthcheck` for a read-only report.
+- **Manage multiple vaults** — register several vaults with `/bedrock:vaults`; target a specific one with `--vault <name>`.
+
+### What you get in Obsidian
+
+Every entity has YAML frontmatter (type, status, domain, sources), hierarchical tags (`type/actor`, `status/active`, `domain/payments`), and bidirectional wikilinks. The graph view becomes a navigable map of people, systems, teams, topics, and projects — updated automatically as you teach Bedrock new content.
+
+## Dependencies
 
 | Tool | Purpose | Required? |
 |---|---|---|
-| [graphify](https://github.com/iurykrieger/graphify) | Semantic code extraction for GitHub repos | No |
-| [confluence-to-markdown](https://github.com/mk-nickyang/confluence-to-markdown) | Confluence page ingestion | No |
-| [gdoc-to-markdown](https://github.com/mr-fcharles/gdoc-to-markdown) | Google Docs ingestion | No |
+| [graphify](https://github.com/iurykrieger/graphify) | Semantic code extraction and knowledge-graph pipeline used by `/bedrock:teach` and `/bedrock:sync` | Yes |
+
+Confluence and Google Docs ingestion are built into the plugin as internal skills (`/bedrock:confluence-to-markdown`, `/bedrock:gdoc-to-markdown`) invoked by `/bedrock:teach` and `/bedrock:sync` — no external installation required.
 
 ## Configuration
 
