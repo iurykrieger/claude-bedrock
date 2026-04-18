@@ -103,7 +103,7 @@ Every entity includes structured frontmatter, hierarchical tags, and bidirection
 
 | Tool | Purpose | Required? |
 |---|---|---|
-| [graphify](https://github.com/iurykrieger/graphify) | Semantic code extraction for GitHub repos | No |
+| [graphify](https://github.com/safishamsi/graphify) | Semantic code extraction for GitHub repos | No |
 | [confluence-to-markdown](https://github.com/mk-nickyang/confluence-to-markdown) | Confluence page ingestion | No |
 | [gdoc-to-markdown](https://github.com/mr-fcharles/gdoc-to-markdown) | Google Docs ingestion | No |
 
