@@ -1,6 +1,20 @@
 # Decision Log
 > Newest first. Updated automatically by the architect agent.
 
+## 2026-04-18 — docling promoted to core `/bedrock:teach` dependency (alongside graphify)
+- **Context:** `teach-docling-integration-part-2` added docling (https://github.com/docling-project/docling) as the universal file → markdown converter inside `/teach`'s new Phase 1.5. Without docling, `/teach` is limited to markdown / text-native / CSV inputs; with it, `/teach` accepts DOCX, PPTX, XLSX, PDF, HTML, EPUB, and images.
+- **Install model:** silent auto-install via `pipx` (preferred) → `pip --user` (fallback) → abort. No user confirmation prompt, matching the graphify autoinstall precedent from §1.2.1. `/bedrock:setup` installs docling at vault-init time (new §1.2.1.1); `/teach`'s Phase 0 lazily re-installs for vaults that predate this change.
+- **Routing:** docling runs on every file whose extension is in docling's supported list, EXCEPT GitHub repos (which flow through clone → graphify directly). Text-native types (`.md`/`.txt`/`.csv`) and docling-unsupported types fall through as raw passthrough.
+- **Failure policy:** on docling non-zero exit, raw passthrough for text-native types; abort + cleanup `$TEACH_TMP` for binary types. This deliberately breaks the "best-effort for external sources" convention because docling is a *local* dependency, not an external source.
+- **Pitfall recorded:** `skills/setup/SKILL.md` Critical Rule #3 ("NEVER auto-install dependencies") is now stale — contradicted by both the graphify and docling auto-install sections. Flag for a follow-up cleanup.
+
+## 2026-04-18 — `graphify-out/` writes route through `/bedrock:preserve` (single-write-point strengthened)
+- **Context:** `teach-docling-integration-part-1` added a Phase 0.2 merge inside `/preserve` that appends incoming graphify output into the vault's cumulative `graphify-out/`. Previously `/graphify` wrote to the vault directory directly, bypassing the single-write-point pattern.
+- **Decision:** all writes to `<VAULT_PATH>/graphify-out/` flow through `/bedrock:preserve`. Callers (currently `/teach`, later `/sync` if it needs append semantics) pass a `graphify_output_path` pointing at a temp directory; `/preserve` merges it into the vault.
+- **Backward compat:** if `graphify_output_path` resolves to `<VAULT_PATH>/graphify-out/` itself, Phase 0.2 is a no-op. Lets legacy `/sync` callers keep working without modification.
+- **Append semantics:** node-id collision unions `sources` (dedup by URL), takes most-recent `updated_at`, unions labels/tags. Edge collision keyed by `(source, target, type)` drops the duplicate. `obsidian/*.md` and `GRAPH_REPORT.md` are appended, never overwritten.
+- **Stale-flag pattern:** `.graphify_analysis.json` receives a top-level `stale: true` after merge. `/preserve` never recomputes analysis inline; recomputation is delegated to `/bedrock:compress` on its next run. Keeps `/preserve` fast; accepts transient staleness in community assignments.
+
 ## 2026-04-18 — Pitfall: "zero literal matches" DoDs conflict with self-referential PRD/spec files
 - **Context:** audit of `graphify-setup-autoinstall` returned PARTIAL because DoD #1 ("zero matches of `iurykrieger/graphify`") fails literally — the spec and PRD files for this feature name the bad URL to describe the bug.
 - **Pitfall:** when a bug is about a literal string (bad URL, misspelled identifier, wrong constant), a DoD that demands "zero matches of `<literal>`" is structurally unsatisfiable if the spec/PRD uses that literal in its Problem/Context sections and the anti-scope forbids editing those files.

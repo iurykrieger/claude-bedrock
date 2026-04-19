@@ -83,7 +83,11 @@ which handles people/teams via GitHub API).
 
 ---
 
-## Phase 0 — Sync the Vault
+## Phase 0 — Pre-Write Setup
+
+Two pre-flight steps run before any input parsing: synchronize the vault with its remote, then (when applicable) merge an incoming graphify output directory into the vault's cumulative `graphify-out/`.
+
+### 0.1 Vault Sync
 
 Execute:
 ```bash
@@ -94,6 +98,209 @@ If the pull fails:
 - No remote configured: warn "No remote configured. Working locally." and proceed.
 - Pull conflict: `git -C <VAULT_PATH> rebase --abort` and warn the user. DO NOT proceed without resolving.
 - Otherwise: proceed.
+
+### 0.2 Merge Incoming Graphify Output
+
+**When this runs:** Only when the skill was invoked with a `graphify_output_path` argument pointing at a graphify output directory (e.g., `/bedrock:teach` passes `$TEACH_TMP/graphify-out-new/`). Free-form text input and structured entity-list input skip this sub-phase entirely.
+
+**Skip condition (backward compat):** If the input's `graphify_output_path` resolves to the same absolute path as `<VAULT_PATH>/graphify-out/`, skip this sub-phase. Legacy callers (and `/bedrock:sync` in its current form) point at the vault's own output directory — there is nothing to merge. Use `realpath` (or equivalent) to compare:
+
+```bash
+incoming_real=$(cd "<graphify_output_path>" 2>/dev/null && pwd -P)
+vault_real=$(cd "<VAULT_PATH>/graphify-out" 2>/dev/null && pwd -P)
+if [ "$incoming_real" = "$vault_real" ]; then
+  echo "Phase 0.2: graphify_output_path already points at the vault — skipping merge."
+  # proceed to Phase 1 with graphify_output_path unchanged
+fi
+```
+
+**Skip condition (no graphify input):** If the input is free-form text, structured entity list, or otherwise does not include `graphify_output_path`, skip.
+
+---
+
+**Step 1 — Validate incoming directory.** Verify that `<graphify_output_path>/graph.json` exists, is non-empty, and parses as valid JSON. If invalid, abort with a clear error and do NOT mutate the vault:
+
+```bash
+if [ ! -s "<graphify_output_path>/graph.json" ]; then
+  echo "ERROR: graph.json missing or empty in <graphify_output_path>. Aborting before vault mutation."
+  exit 1
+fi
+python3 -c "import json,sys; json.load(open('<graphify_output_path>/graph.json'))" || { echo "ERROR: graph.json is not valid JSON."; exit 1; }
+```
+
+**Step 2 — First-ingestion edge case.** If `<VAULT_PATH>/graphify-out/` does not exist, promote the incoming directory wholesale (no re-merge pass) and record stats, then skip to Step 7:
+
+```bash
+if [ ! -d "<VAULT_PATH>/graphify-out" ]; then
+  mkdir -p "<VAULT_PATH>"
+  cp -R "<graphify_output_path>" "<VAULT_PATH>/graphify-out"
+  echo "Phase 0.2: first ingestion — promoted incoming graphify output to <VAULT_PATH>/graphify-out/."
+  # record: nodes_added = <count of nodes in graph.json>, nodes_merged = 0, edges_added = <count of edges>, stale_flag_set = false
+  # skip to Step 7 (record stats) then exit sub-phase
+fi
+```
+
+**Step 3 — Merge `graph.json` (nodes + edges).** Both files follow NetworkX node-link format (`{"nodes": [...], "edges": [...]}` or `"links"` — accept either key). Run the merge via an inline Python block to avoid hand-merging JSON in the prompt. Write the merged graph to a staging file, then atomically swap:
+
+```bash
+python3 - <<'PY'
+import json, os, pathlib, shutil, sys
+
+existing_path = pathlib.Path("<VAULT_PATH>/graphify-out/graph.json")
+incoming_path = pathlib.Path("<graphify_output_path>/graph.json")
+staging_path = existing_path.with_suffix(".json.staging")
+
+with existing_path.open() as f:
+    existing = json.load(f)
+with incoming_path.open() as f:
+    incoming = json.load(f)
+
+# Accept both "edges" and "links" keys — normalize to "edges".
+def _edges(g):
+    return g.get("edges", g.get("links", []))
+
+# --- Node merge keyed by id ---
+def _union(a, b):
+    # Preserve order; dedup by string representation.
+    seen, out = set(), []
+    for item in (a or []) + (b or []):
+        key = json.dumps(item, sort_keys=True) if not isinstance(item, str) else item
+        if key not in seen:
+            seen.add(key)
+            out.append(item)
+    return out
+
+def _dedup_sources_by_url(a, b):
+    seen, out = set(), []
+    for item in (a or []) + (b or []):
+        if isinstance(item, dict) and "url" in item:
+            if item["url"] in seen:
+                continue
+            seen.add(item["url"])
+        out.append(item)
+    return out
+
+existing_nodes = {n["id"]: n for n in existing.get("nodes", [])}
+nodes_added = 0
+nodes_merged = 0
+for inc in incoming.get("nodes", []):
+    nid = inc["id"]
+    if nid not in existing_nodes:
+        existing_nodes[nid] = inc
+        nodes_added += 1
+    else:
+        cur = existing_nodes[nid]
+        # Union sources by URL
+        if "sources" in inc or "sources" in cur:
+            cur["sources"] = _dedup_sources_by_url(cur.get("sources"), inc.get("sources"))
+        # Most-recent updated_at (YYYY-MM-DD lexical compare works)
+        cur_ua, inc_ua = cur.get("updated_at"), inc.get("updated_at")
+        if inc_ua and (not cur_ua or inc_ua > cur_ua):
+            cur["updated_at"] = inc_ua
+        # Union labels and tags
+        for key in ("labels", "tags"):
+            if key in inc or key in cur:
+                cur[key] = _union(cur.get(key), inc.get(key))
+        nodes_merged += 1
+
+# --- Edge dedup keyed by (source, target, type/relation) ---
+def _edge_key(e):
+    return (e.get("source"), e.get("target"), e.get("type") or e.get("relation"))
+
+existing_edges = _edges(existing)
+seen_edges = {_edge_key(e) for e in existing_edges}
+edges_added = 0
+for inc_edge in _edges(incoming):
+    k = _edge_key(inc_edge)
+    if k in seen_edges:
+        continue
+    existing_edges.append(inc_edge)
+    seen_edges.add(k)
+    edges_added += 1
+
+merged = dict(existing)
+merged["nodes"] = list(existing_nodes.values())
+# Preserve the key naming the existing file used.
+merged_key = "edges" if "edges" in existing else ("links" if "links" in existing else "edges")
+merged[merged_key] = existing_edges
+
+with staging_path.open("w") as f:
+    json.dump(merged, f, indent=2, ensure_ascii=False)
+
+# Emit stats to stdout for capture.
+print(json.dumps({"nodes_added": nodes_added, "nodes_merged": nodes_merged, "edges_added": edges_added}))
+PY
+```
+
+Atomic swap after the Python block succeeds:
+```bash
+mv "<VAULT_PATH>/graphify-out/graph.json.staging" "<VAULT_PATH>/graphify-out/graph.json"
+```
+
+If the Python block exits non-zero, abort without running the `mv` — the vault's `graph.json` stays untouched.
+
+**Step 4 — Append `obsidian/*.md` files.** For each markdown file in `<graphify_output_path>/obsidian/`:
+
+- If the corresponding file exists in `<VAULT_PATH>/graphify-out/obsidian/`: append the incoming content to the existing file, separated by `\n\n---\n\n`. Existing content is preserved verbatim.
+- If it does not exist: copy the file into `<VAULT_PATH>/graphify-out/obsidian/`.
+
+```bash
+mkdir -p "<VAULT_PATH>/graphify-out/obsidian"
+for src in "<graphify_output_path>/obsidian/"*.md; do
+  [ -e "$src" ] || continue
+  dest="<VAULT_PATH>/graphify-out/obsidian/$(basename "$src")"
+  if [ -e "$dest" ]; then
+    printf '\n\n---\n\n' >> "$dest"
+    cat "$src" >> "$dest"
+  else
+    cp "$src" "$dest"
+  fi
+done
+```
+
+**Step 5 — Append `GRAPH_REPORT.md`.** If `<graphify_output_path>/GRAPH_REPORT.md` exists:
+
+- If `<VAULT_PATH>/graphify-out/GRAPH_REPORT.md` exists: append a new dated section.
+- If it does not exist: copy.
+
+```bash
+if [ -f "<graphify_output_path>/GRAPH_REPORT.md" ]; then
+  dest="<VAULT_PATH>/graphify-out/GRAPH_REPORT.md"
+  if [ -e "$dest" ]; then
+    {
+      printf '\n\n---\n\n# Merge on %s\n\n' "$(date +%Y-%m-%d)"
+      cat "<graphify_output_path>/GRAPH_REPORT.md"
+    } >> "$dest"
+  else
+    cp "<graphify_output_path>/GRAPH_REPORT.md" "$dest"
+  fi
+fi
+```
+
+**Step 6 — Mark `.graphify_analysis.json` stale.** If `<VAULT_PATH>/graphify-out/.graphify_analysis.json` exists, set a top-level `"stale": true` field. Other content is untouched:
+
+```bash
+analysis="<VAULT_PATH>/graphify-out/.graphify_analysis.json"
+stale_flag_set=false
+if [ -f "$analysis" ]; then
+  python3 - <<PY
+import json, pathlib
+p = pathlib.Path("$analysis")
+with p.open() as f:
+    data = json.load(f)
+data["stale"] = True
+with p.open("w") as f:
+    json.dump(data, f, indent=2, ensure_ascii=False)
+PY
+  stale_flag_set=true
+fi
+```
+
+If the file does not exist, skip (nothing to mark).
+
+**Step 7 — Record merge stats for the Phase 7 report.** Capture `nodes_added`, `nodes_merged`, `edges_added` (from Step 3's Python stdout) and `stale_flag_set` (from Step 6). These values are threaded through to Phase 7's report block under a new **"Graphify merge"** section and returned in the skill's result payload to the caller (e.g., `/bedrock:teach`).
+
+**Step 8 — Point subsequent phases at the merged location.** After the merge succeeds, set `graphify_output_path := <VAULT_PATH>/graphify-out/` for all downstream phases. Phase 1.3 (graphify-output parsing), Phase 2 (matching), and the rest of the flow read from the merged vault location — not from the original temp input.
 
 ---
 
@@ -696,6 +903,26 @@ Present to the user:
 | [[billing-new-api]] | [[squad-payments]] | frontmatter: actors[] |
 | [[squad-payments]] | [[billing-new-api]] | frontmatter: team |
 
+### Graphify merge (only when Phase 0.2 ran)
+| Metric | Value |
+|---|---|
+| Nodes added | N |
+| Nodes merged | M |
+| Edges added | P |
+| Analysis marked stale | true / false |
+
+Omit this section entirely when Phase 0.2 was skipped (no `graphify_output_path`, or backward-compat path match).
+
+The same four fields are included in the skill's return payload (e.g., consumed by `/bedrock:teach`):
+
+```yaml
+graphify_merge:
+  nodes_added: N
+  nodes_merged: M
+  edges_added: P
+  stale_flag_set: true | false
+```
+
 ### Sources consulted
 - ✅ Local vault
 - ✅ / ❌ GitHub MCP
@@ -733,3 +960,7 @@ Present to the user:
 | 16 | **Vault resolution first** — resolve `VAULT_PATH` before any file operation or git command |
 | 17 | **All git commands use `git -C <VAULT_PATH>`** — never assume CWD is the vault |
 | 18 | **All entity paths use `<VAULT_PATH>/` prefix** — `<VAULT_PATH>/actors/`, not `actors/` |
+| 19 | **Graphify merge is append-only** — Phase 0.2 never deletes nodes, edges, obsidian content, or GRAPH_REPORT sections. On node-id collision: union `sources` by URL, take most-recent `updated_at`, union labels/tags. On edge collision by `(source, target, type)`: drop the incoming duplicate. |
+| 20 | **Graphify merge backward-compat** — if `graphify_output_path` resolves to the same absolute path as `<VAULT_PATH>/graphify-out/`, Phase 0.2 is a no-op. Legacy callers and `/bedrock:sync` continue to work unchanged. |
+| 21 | **Graphify merge is atomic** — `graph.json` is merged into a `.staging` file and atomically renamed. If validation or merge fails, the vault's `graph.json` is untouched. |
+| 22 | **`.graphify_analysis.json` is marked stale, never recomputed** — Phase 0.2 sets `stale: true` on merge. `/bedrock:compress` owns recomputation. |

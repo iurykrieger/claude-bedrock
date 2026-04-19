@@ -24,7 +24,7 @@ No build system. No runtime. Just markdown files, AI agents, and your Obsidian v
 
 - **6 AI-powered skills** — query, teach, preserve, compress, sync, and setup
 - **7 entity types** — actors, people, teams, topics, discussions, projects, and fleeting notes
-- **External source ingestion** — Confluence, Google Docs, GitHub, CSV
+- **External source ingestion** — Confluence, Google Docs, GitHub repositories, and any file format supported by [docling](https://github.com/docling-project/docling) (DOCX, PPTX, XLSX, PDF, HTML, EPUB, images, and more)
 - **Bidirectional wikilinks** — automatic cross-referencing with Obsidian graph view
 - **Hierarchical tags** — multi-dimensional filtering (`type/`, `status/`, `domain/`, `scope/`)
 - **Zettelkasten structure** — permanent, bridge, index, and fleeting note roles
@@ -98,7 +98,7 @@ Bedrock turns your vault into a living knowledge graph by combining **8 skills**
 
 ### Day-to-day loops
 
-- **Capture knowledge from a source** — paste a Confluence page, Google Doc, GitHub repo, or local file into `/bedrock:teach`. Bedrock extracts entities and writes them to the vault with bidirectional links.
+- **Capture knowledge from a source** — paste a Confluence page, Google Doc, GitHub repo, remote URL, or any local file (DOCX, PPTX, XLSX, PDF, HTML, EPUB, images, and any other docling-supported format) into `/bedrock:teach`. Bedrock extracts entities and writes them to the vault with bidirectional links.
 - **Ask the vault questions** — use `/bedrock:ask` for anything like *"who owns the billing API?"* or *"what's the status of project X?"*. It searches the graph, follows wikilinks, and answers with citations.
 - **Keep sources fresh** — run `/bedrock:sync` to re-pull external sources, or `/bedrock:sync --github` / `--people` to surface recent activity and contributors.
 - **Clean up drift** — run `/bedrock:compress` to fix broken backlinks, merge duplicates, and consolidate fragmented concepts. Run `/bedrock:healthcheck` for a read-only report.
@@ -113,6 +113,9 @@ Every entity has YAML frontmatter (type, status, domain, sources), hierarchical 
 | Tool | Purpose | Required? |
 |---|---|---|
 | [graphify](https://github.com/iurykrieger/graphify) | Semantic code extraction and knowledge-graph pipeline used by `/bedrock:teach` and `/bedrock:sync` | Yes |
+| [docling](https://github.com/docling-project/docling) | Universal file → markdown converter used by `/bedrock:teach` to ingest DOCX, PPTX, XLSX, PDF, HTML, EPUB, images, and other non-markdown formats | Yes |
+
+Both `graphify` and `docling` are auto-installed by `/bedrock:setup` (and lazily by `/bedrock:teach` on first use if missing). You can also install them manually via `pipx install graphify` / `pipx install docling`.
 
 Confluence and Google Docs ingestion are built into the plugin as internal skills (`/bedrock:confluence-to-markdown`, `/bedrock:gdoc-to-markdown`) invoked by `/bedrock:teach` and `/bedrock:sync` — no external installation required.
 

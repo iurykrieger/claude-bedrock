@@ -108,6 +108,7 @@ Check for external tools, environment variables, and MCP servers that enhance th
 | Dependency | Check method | What it unlocks |
 |---|---|---|
 | graphify | Glob: `~/.claude/skills/graphify/SKILL.md` | **Required.** Extraction engine for all `/bedrock:teach` ingestion. Without it, /teach cannot function. |
+| docling | Bash: `command -v docling >/dev/null 2>&1` | **Required.** Universal file → markdown converter used by `/bedrock:teach` to ingest DOCX, PPTX, XLSX, HTML, EPUB, PDF, images, and other non-markdown formats. Without it, /teach can only ingest text-native formats. |
 | CONFLUENCE_API_TOKEN + CONFLUENCE_USER_EMAIL | Bash: `test -n "$CONFLUENCE_API_TOKEN" && test -n "$CONFLUENCE_USER_EMAIL"` | Confluence page ingestion via `/bedrock:teach` (API strategy). |
 | GOOGLE_ACCESS_TOKEN | Bash: `test -n "$GOOGLE_ACCESS_TOKEN"` | Google Docs and Sheets ingestion via `/bedrock:teach` (API strategy). |
 | claude-in-chrome MCP | ToolSearch: `select:mcp__claude-in-chrome__tabs_context_mcp` (succeeds = available) | **Optional.** Browser fallback for Confluence pages when API credentials are unavailable. |
@@ -160,6 +161,35 @@ If all prior steps failed (no network, upstream unavailable, or all tooling miss
 
 **After the chain completes**, run one final `Glob: ~/.claude/skills/graphify/SKILL.md`. The graphify row in the dependency-report table (Section 1.2.2 below) MUST reflect this post-install status — `installed` if the file now exists, `NOT FOUND` otherwise. Proceed to Section 1.2.2 regardless of outcome. **Never block initialization.**
 
+### 1.2.1.1 Auto-install docling if missing
+
+If the docling probe (`command -v docling`) returns nothing, attempt a silent install using the same fallback chain as graphify. Emit a one-line status message before starting — no interactive prompt.
+
+> docling not found — installing silently (one-time setup; first run may take several minutes to download ML models).
+
+**Step 1 — pipx (preferred, isolated):**
+
+```bash
+command -v pipx >/dev/null 2>&1 && pipx install docling
+```
+
+Re-probe: `command -v docling`. If found, stop.
+
+**Step 2 — pip (if pipx unavailable or Step 1 failed):**
+
+```bash
+{ command -v pip3 >/dev/null 2>&1 || command -v pip >/dev/null 2>&1; } && \
+  { pip3 install --user docling 2>/dev/null || pip install --user docling; }
+```
+
+Re-probe. If found, stop.
+
+**Step 3 — Manual instructions (last resort):**
+
+If both steps failed (no `pipx`/`pip`, no network, or a permissions error), print the docling warning shown in Section 1.2.2 below. Do not abort — setup continues regardless.
+
+**After the chain completes**, run one final `command -v docling` probe. The docling row in the dependency-report table (Section 1.2.2 below) MUST reflect this post-install status — `installed` if the command is now on PATH, `NOT FOUND` otherwise. Proceed to Section 1.2.2 regardless of outcome. **Never block initialization.**
+
 ### 1.2.2 Report status
 
 **Report format:**
@@ -170,6 +200,7 @@ If all prior steps failed (no network, upstream unavailable, or all tooling miss
 | Dependency | Status | What it unlocks |
 |---|---|---|
 | graphify | installed / NOT FOUND | Extraction engine for /teach |
+| docling | installed / NOT FOUND | Universal file → markdown converter for /teach |
 | Confluence API credentials | configured / NOT SET | Confluence page ingestion (API) |
 | Google API token | configured / NOT SET | Google Docs/Sheets ingestion (API) |
 | claude-in-chrome MCP | available / NOT FOUND | Browser fallback for Confluence |
@@ -181,8 +212,9 @@ If all prior steps failed (no network, upstream unavailable, or all tooling miss
 | Google Docs | ready / limited / unavailable | API token or public documents only |
 | Google Sheets | ready / limited / unavailable | API token (all tabs) or public (first tab only) |
 | GitHub | ready | git CLI |
-| Remote URL | ready | WebFetch |
+| Remote URL | ready | WebFetch or curl |
 | Local files | ready | filesystem access |
+| Non-markdown files (DOCX, PPTX, XLSX, PDF, HTML, EPUB, images) | ready / unavailable | docling installed |
 ```
 
 For **graphify** specifically (required):
@@ -192,6 +224,19 @@ For **graphify** specifically (required):
 > To install, check https://github.com/safishamsi/graphify for instructions.
 >
 > Your vault will initialize, but /bedrock:teach will not function until graphify is installed.
+```
+
+For **docling** specifically (required for non-markdown ingestion):
+
+```
+> docling is not installed. This is REQUIRED for /bedrock:teach to ingest non-markdown files
+> (DOCX, PPTX, XLSX, PDF, HTML, EPUB, images, etc.).
+> To install manually: pipx install docling  (or: pip install --user docling)
+> More info: https://github.com/docling-project/docling
+>
+> Your vault will initialize, but /bedrock:teach will only handle markdown/text inputs until
+> docling is installed. /teach also attempts a silent auto-install on first invocation if the
+> dependency is still missing.
 ```
 
 For missing environment variables (optional):
@@ -598,7 +643,7 @@ New domains can be added as the vault grows.
 | Action | Skill |
 |---|---|
 | Search and query the vault | `/bedrock:ask` |
-| Ingest external sources (Confluence, Google Docs, GitHub) | `/bedrock:teach` |
+| Ingest external sources (Confluence, Google Docs, GitHub repositories, remote URLs, and any docling-supported file format — DOCX, PPTX, XLSX, PDF, HTML, EPUB, images, and more) | `/bedrock:teach` |
 | Create or update entities manually | `/bedrock:preserve` |
 | Deduplicate and check vault health | `/bedrock:compress` |
 | Re-sync entities with external sources | `/bedrock:sync` |
