@@ -22,7 +22,7 @@ No build system. No runtime. Just markdown files, AI agents, and your Obsidian v
 
 ## Features
 
-- **6 AI-powered skills** — query, teach, preserve, compress, sync, and setup
+- **8 AI-powered skills** — setup, ask, teach, preserve, compress, sync, healthcheck, and vaults
 - **7 entity types** — actors, people, teams, topics, discussions, projects, and fleeting notes
 - **External source ingestion** — Confluence, Google Docs, GitHub repositories, and any file format supported by [docling](https://github.com/docling-project/docling) (DOCX, PPTX, XLSX, PDF, HTML, EPUB, images, and more)
 - **Bidirectional wikilinks** — automatic cross-referencing with Obsidian graph view
@@ -70,6 +70,8 @@ The setup creates all entity directories, copies templates, generates a vault-le
 | `/bedrock:preserve` | Single write point — detect, match, create/update entities with bidirectional links |
 | `/bedrock:compress` | Deduplication and vault health — broken links, orphans, stale content |
 | `/bedrock:sync` | Re-sync entities with external sources |
+| `/bedrock:healthcheck` | Read-only vault health diagnostic — graphify-out integrity, orphans, dangling content, stale entries |
+| `/bedrock:vaults` | Manage registered vaults — list, set default, remove |
 
 ## Vault Structure
 
