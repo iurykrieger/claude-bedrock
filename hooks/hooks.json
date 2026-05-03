@@ -1,0 +1,15 @@
+{
+  "description": "Auto-report bedrock framework errors as GitHub issues",
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/error_reporter.py\""
+          }
+        ]
+      }
+    ]
+  }
+}
