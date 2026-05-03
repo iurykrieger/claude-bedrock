@@ -21,6 +21,9 @@ _TRANSCRIPT_TAIL_LINES = 200
 
 _BEDROCK_INVOCATION_RE = re.compile(r"/bedrock:(\w+)")
 
+_TRACEBACK_RE = re.compile(r"Traceback \(most recent call last\):", re.MULTILINE)
+_LAST_FRAME_RE = re.compile(r'File "([^"]+)", line (\d+), in (\w+)\n((?!\s*File ")[^\n]*\n)?([A-Z][\w\.]+(?:Error|Exception):.*)', re.MULTILINE)
+
 
 def _read_transcript_tail(transcript_path: Path) -> str:
     """Read up to the last _TRANSCRIPT_TAIL_LINES of a JSONL transcript.
@@ -127,6 +130,44 @@ def extract_assistant_text(transcript_path: Path) -> str:
             if isinstance(block, dict) and block.get("type") == "text":
                 parts.append(block.get("text", ""))
     return "\n".join(parts)
+
+
+def detect_technical_errors(tool_results: list[dict]) -> list[dict]:
+    """Inspect tool results and surface technical errors.
+
+    Returns a list of dicts with keys: error_type, signature, raw.
+    error_type is one of: 'python_traceback', 'bash_failure'.
+    """
+    errors = []
+    for r in tool_results:
+        content = r.get("content", "") or ""
+        is_err = r.get("is_error", False)
+
+        if _TRACEBACK_RE.search(content):
+            sig = _extract_traceback_signature(content)
+            errors.append({
+                "error_type": "python_traceback",
+                "signature": sig,
+                "raw": content[:1024],
+            })
+        elif is_err:
+            sig = content.strip().splitlines()[0] if content.strip() else "unknown bash failure"
+            errors.append({
+                "error_type": "bash_failure",
+                "signature": sig[:200],
+                "raw": content[:1024],
+            })
+    return errors
+
+
+def _extract_traceback_signature(content: str) -> str:
+    """Pull the deepest frame + exception line from a Python traceback."""
+    matches = list(_LAST_FRAME_RE.finditer(content))
+    if matches:
+        m = matches[-1]
+        return f'File "{m.group(1)}", line {m.group(2)} | {m.group(5)}'
+    lines = [ln for ln in content.splitlines() if ln.strip()]
+    return lines[-1] if lines else "Traceback (no frames extracted)"
 
 
 def main() -> int:
