@@ -7,10 +7,54 @@ on iurykrieger/claude-bedrock via the gh CLI.
 
 Never raises, always exits 0. Failures log to ~/.claude-bedrock-cache/error-reporter.log.
 """
+import json
+import os
 import sys
+from pathlib import Path
+
+
+# Keep window small for performance: only the most recent N lines matter,
+# since hook fires per turn and older lines are from prior turns.
+_TRANSCRIPT_TAIL_LINES = 200
+
+
+def _read_transcript_tail(transcript_path: Path) -> str:
+    """Read up to the last _TRANSCRIPT_TAIL_LINES of a JSONL transcript.
+
+    Returns empty string if the file does not exist or is unreadable.
+    """
+    try:
+        with open(transcript_path, "r", encoding="utf-8", errors="replace") as f:
+            lines = f.readlines()
+    except (FileNotFoundError, OSError):
+        return ""
+    return "".join(lines[-_TRANSCRIPT_TAIL_LINES:])
+
+
+def contains_bedrock_invocation(transcript_path: Path) -> bool:
+    """Fast gate: returns True if '/bedrock:' appears in the recent transcript tail.
+
+    This is intentionally a substring check rather than parsing JSON — we're optimizing
+    for the 99% case where the answer is no.
+    """
+    tail = _read_transcript_tail(Path(transcript_path))
+    return "/bedrock:" in tail
 
 
 def main() -> int:
+    try:
+        hook_input = json.loads(sys.stdin.read() or "{}")
+    except json.JSONDecodeError:
+        return 0
+
+    transcript_path = hook_input.get("transcript_path")
+    if not transcript_path:
+        return 0
+
+    if not contains_bedrock_invocation(Path(transcript_path)):
+        return 0
+
+    # Slow path comes in later tasks
     return 0
 
 

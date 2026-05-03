@@ -1,0 +1,2 @@
+{"role":"user","message":{"content":[{"type":"text","text":"/bedrock:ask what is the auth flow"}]}}
+{"role":"assistant","message":{"content":[{"type":"text","text":"The auth flow uses OAuth."}]}}
