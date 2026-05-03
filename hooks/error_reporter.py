@@ -43,6 +43,25 @@ def contains_bedrock_invocation(transcript_path: Path) -> bool:
     return "/bedrock:" in tail
 
 
+def is_reporting_enabled(start_dir: Path) -> bool:
+    """Walk up from start_dir looking for .bedrock/config.json.
+
+    Returns True (default) if no config found, config malformed, or field missing.
+    Returns False only if config explicitly sets error_reporting: false.
+    """
+    current = Path(start_dir).resolve()
+    for candidate in [current, *current.parents]:
+        cfg_path = candidate / ".bedrock" / "config.json"
+        if cfg_path.is_file():
+            try:
+                with open(cfg_path, "r", encoding="utf-8") as f:
+                    cfg = json.load(f)
+            except (json.JSONDecodeError, OSError):
+                return True  # default-on if config unreadable
+            return bool(cfg.get("error_reporting", True))
+    return True
+
+
 def main() -> int:
     try:
         hook_input = json.loads(sys.stdin.read() or "{}")
@@ -54,6 +73,10 @@ def main() -> int:
         return 0
 
     if not contains_bedrock_invocation(Path(transcript_path)):
+        return 0
+
+    cwd = Path(os.environ.get("CLAUDE_PROJECT_DIR", os.getcwd()))
+    if not is_reporting_enabled(cwd):
         return 0
 
     # Slow path comes in later tasks
