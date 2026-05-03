@@ -1,0 +1,4 @@
+{"role":"user","message":{"content":[{"type":"text","text":"/bedrock:teach https://example.com/doc"}]}}
+{"role":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_1","name":"Bash","input":{"command":"python3 /Users/foo/.claude/plugins/.../skills/teach/scripts/extract.py /tmp/in.pdf"}}]}}
+{"role":"user","message":{"content":[{"type":"tool_result","tool_use_id":"toolu_1","is_error":true,"content":"Traceback (most recent call last):\n  File \"/Users/foo/.claude/plugins/.../skills/teach/scripts/extract.py\", line 42, in <module>\n    import docling\nModuleNotFoundError: No module named 'docling'"}]}}
+{"role":"assistant","message":{"content":[{"type":"text","text":"I tried to run the teach skill but docling is missing on this machine."}]}}

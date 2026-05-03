@@ -9,13 +9,17 @@ Never raises, always exits 0. Failures log to ~/.claude-bedrock-cache/error-repo
 """
 import json
 import os
+import re
 import sys
 from pathlib import Path
+from typing import Iterable
 
 
 # Keep window small for performance: only the most recent N lines matter,
 # since hook fires per turn and older lines are from prior turns.
 _TRANSCRIPT_TAIL_LINES = 200
+
+_BEDROCK_INVOCATION_RE = re.compile(r"/bedrock:(\w+)")
 
 
 def _read_transcript_tail(transcript_path: Path) -> str:
@@ -63,6 +67,66 @@ def is_reporting_enabled(start_dir: Path) -> bool:
             val = cfg.get("error_reporting", True)
             return val if isinstance(val, bool) else True
     return True
+
+
+def _iter_transcript_lines(transcript_path: Path) -> Iterable[dict]:
+    """Yield parsed JSON objects from each non-empty JSONL line. Skips malformed lines."""
+    try:
+        with open(transcript_path, "r", encoding="utf-8", errors="replace") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    yield json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+    except (FileNotFoundError, OSError):
+        return
+
+
+def extract_skill_invocation(transcript_path: Path) -> str | None:
+    """Return the most recent /bedrock:<skill> reference, e.g. 'bedrock:teach'."""
+    last = None
+    for entry in _iter_transcript_lines(transcript_path):
+        for block in entry.get("message", {}).get("content", []) or []:
+            text = block.get("text") if isinstance(block, dict) else None
+            if not text:
+                continue
+            for match in _BEDROCK_INVOCATION_RE.finditer(text):
+                last = f"bedrock:{match.group(1)}"
+    return last
+
+
+def extract_tool_results(transcript_path: Path) -> list[dict]:
+    """Return all tool_result blocks from the transcript with their is_error flag and content."""
+    results = []
+    for entry in _iter_transcript_lines(transcript_path):
+        for block in entry.get("message", {}).get("content", []) or []:
+            if not isinstance(block, dict):
+                continue
+            if block.get("type") == "tool_result":
+                content = block.get("content", "")
+                if isinstance(content, list):
+                    content = "".join(c.get("text", "") for c in content if isinstance(c, dict))
+                results.append({
+                    "tool_use_id": block.get("tool_use_id", ""),
+                    "is_error": bool(block.get("is_error", False)),
+                    "content": str(content),
+                })
+    return results
+
+
+def extract_assistant_text(transcript_path: Path) -> str:
+    """Concatenate all text blocks from assistant messages."""
+    parts = []
+    for entry in _iter_transcript_lines(transcript_path):
+        if entry.get("role") != "assistant":
+            continue
+        for block in entry.get("message", {}).get("content", []) or []:
+            if isinstance(block, dict) and block.get("type") == "text":
+                parts.append(block.get("text", ""))
+    return "\n".join(parts)
 
 
 def main() -> int:

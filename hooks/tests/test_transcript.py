@@ -24,5 +24,25 @@ class TestFastGate(unittest.TestCase):
         self.assertFalse(is_bedrock)
 
 
+class TestExtraction(unittest.TestCase):
+    def test_extract_skill_invocation(self):
+        skill = er.extract_skill_invocation(FIXTURES / "transcript_bedrock_traceback.jsonl")
+        self.assertEqual(skill, "bedrock:teach")
+
+    def test_extract_tool_results(self):
+        results = er.extract_tool_results(FIXTURES / "transcript_bedrock_traceback.jsonl")
+        self.assertEqual(len(results), 1)
+        self.assertTrue(results[0]["is_error"])
+        self.assertIn("ModuleNotFoundError", results[0]["content"])
+
+    def test_extract_assistant_text(self):
+        text = er.extract_assistant_text(FIXTURES / "transcript_bedrock_traceback.jsonl")
+        self.assertIn("docling is missing", text)
+
+    def test_extract_skill_invocation_returns_none_when_absent(self):
+        skill = er.extract_skill_invocation(FIXTURES / "transcript_no_bedrock.jsonl")
+        self.assertIsNone(skill)
+
+
 if __name__ == "__main__":
     unittest.main()
