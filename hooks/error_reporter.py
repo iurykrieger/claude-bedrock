@@ -11,7 +11,9 @@ import hashlib
 import json
 import os
 import re
+import subprocess
 import sys
+import time
 from pathlib import Path
 from typing import Iterable
 
@@ -251,6 +253,66 @@ def dedupe_by_hash(errors: list[dict], skill: str) -> list[dict]:
         err = {**err, "hash": h}
         seen[h] = err
     return list(seen.values())
+
+
+_REPO = "iurykrieger/claude-bedrock"
+_CACHE_TTL_SECONDS = 300
+_DEFAULT_CACHE_DIR = Path.home() / ".claude-bedrock-cache"
+
+
+def _run_gh(args: list[str], timeout: int = 5) -> tuple[int, str, str]:
+    """Run gh CLI. Returns (exit_code, stdout, stderr). Never raises on subprocess errors."""
+    try:
+        proc = subprocess.run(
+            ["gh", *args],
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+        return proc.returncode, proc.stdout, proc.stderr
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return 127, "", "gh not available or timed out"
+
+
+def find_existing_issue(error_hash: str, cache_dir: Path | None = None) -> dict | None:
+    """Look up an existing auto-reported issue by hash, with file-based 5-min cache.
+
+    Returns None if no matching issue, or if gh is unavailable.
+    """
+    cache_dir = cache_dir or _DEFAULT_CACHE_DIR
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    cache_path = cache_dir / f"issues-{error_hash}.json"
+
+    if cache_path.is_file():
+        age = time.time() - cache_path.stat().st_mtime
+        if age < _CACHE_TTL_SECONDS:
+            try:
+                payload = json.loads(cache_path.read_text())
+                return payload.get("issue")
+            except (json.JSONDecodeError, OSError):
+                pass
+
+    code, stdout, _ = _run_gh([
+        "issue", "list",
+        "--repo", _REPO,
+        "--label", "auto-reported",
+        "--search", f"[bedrock][{error_hash}] in:title",
+        "--state", "all",
+        "--json", "number,state",
+        "--limit", "1",
+    ])
+    if code != 0:
+        return None
+    try:
+        issues = json.loads(stdout)
+    except json.JSONDecodeError:
+        return None
+    issue = issues[0] if issues else None
+    try:
+        cache_path.write_text(json.dumps({"issue": issue}))
+    except OSError:
+        pass
+    return issue
 
 
 def main() -> int:
