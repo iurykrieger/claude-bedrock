@@ -1,0 +1,2 @@
+{"role":"user","message":{"content":[{"type":"text","text":"/bedrock:teach https://example.com/x"}]}}
+{"role":"assistant","message":{"content":[{"type":"text","text":"I tried to run /bedrock:teach but graphify returned an invalid structure. Failed to persist entity 'foo-service'."}]}}

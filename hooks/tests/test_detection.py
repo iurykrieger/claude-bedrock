@@ -40,5 +40,34 @@ class TestTechnicalErrors(unittest.TestCase):
         self.assertEqual(len(errors), 1)
 
 
+class TestLogicalErrors(unittest.TestCase):
+    def test_graphify_invalid_pattern_matches(self):
+        text = "I ran the skill but graphify returned invalid output."
+        errors = er.detect_logical_errors(text)
+        self.assertEqual(len(errors), 1)
+        self.assertEqual(errors[0]["error_type"], "logical_graphify_invalid")
+
+    def test_entity_unwritable_pattern_matches(self):
+        text = "Failed to persist entity 'billing-api'."
+        errors = er.detect_logical_errors(text)
+        self.assertEqual(len(errors), 1)
+        self.assertEqual(errors[0]["error_type"], "logical_entity_unwritable")
+
+    def test_multiple_distinct_patterns_produce_multiple_errors(self):
+        text = "graphify returned invalid output. Failed to write entity 'x'."
+        errors = er.detect_logical_errors(text)
+        self.assertEqual(len(errors), 2)
+
+    def test_no_match_no_errors(self):
+        text = "Everything went fine."
+        errors = er.detect_logical_errors(text)
+        self.assertEqual(errors, [])
+
+    def test_signature_includes_match_text(self):
+        text = "graphify returned an invalid structure here"
+        errors = er.detect_logical_errors(text)
+        self.assertIn("invalid", errors[0]["signature"].lower())
+
+
 if __name__ == "__main__":
     unittest.main()

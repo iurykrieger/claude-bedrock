@@ -24,6 +24,15 @@ _BEDROCK_INVOCATION_RE = re.compile(r"/bedrock:(\w+)")
 _TRACEBACK_RE = re.compile(r"Traceback \(most recent call last\):", re.MULTILINE)
 _LAST_FRAME_RE = re.compile(r'File "([^"]+)", line (\d+), in (\w+)\n((?!\s*File ")[^\n]*\n)?([A-Z][\w\.]+(?:Error|Exception):.*)', re.MULTILINE)
 
+# Regex catalog. ID -> compiled regex. Keep small to avoid false positives.
+_LOGICAL_ERROR_CATALOG = {
+    "graphify_invalid": re.compile(r"graphify.{0,40}(returned|gave|produced).{0,20}invalid", re.IGNORECASE),
+    "vault_corrupt": re.compile(r"vault\.json.{0,30}corrupt", re.IGNORECASE),
+    "skill_failure": re.compile(r"bedrock\s+\w+\s+(skill\s+)?failed", re.IGNORECASE),
+    "entity_unwritable": re.compile(r"failed\s+to\s+(write|persist)\s+entity", re.IGNORECASE),
+    "sync_unauthorized": re.compile(r"(sync.{0,30}unauthorized|auth(?:entication)?\s+failed.{0,30}sync)", re.IGNORECASE),
+}
+
 
 def _read_transcript_tail(transcript_path: Path) -> str:
     """Read up to the last _TRANSCRIPT_TAIL_LINES of a JSONL transcript.
@@ -168,6 +177,28 @@ def _extract_traceback_signature(content: str) -> str:
         return f'File "{m.group(1)}", line {m.group(2)} | {m.group(5)}'
     lines = [ln for ln in content.splitlines() if ln.strip()]
     return lines[-1] if lines else "Traceback (no frames extracted)"
+
+
+def detect_logical_errors(assistant_text: str) -> list[dict]:
+    """Scan the assistant's narrative for known framework-failure phrasings.
+
+    Each matched pattern produces one error entry. Multiple distinct patterns produce
+    multiple errors; multiple matches of the same pattern collapse to one.
+    """
+    errors = []
+    for pattern_id, regex in _LOGICAL_ERROR_CATALOG.items():
+        match = regex.search(assistant_text)
+        if not match:
+            continue
+        start = max(0, match.start() - 20)
+        end = min(len(assistant_text), match.end() + 60)
+        snippet = assistant_text[start:end].replace("\n", " ").strip()
+        errors.append({
+            "error_type": f"logical_{pattern_id}",
+            "signature": snippet[:200],
+            "raw": snippet[:1024],
+        })
+    return errors
 
 
 def main() -> int:
