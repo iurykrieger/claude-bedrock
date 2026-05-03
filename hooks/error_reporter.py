@@ -7,6 +7,7 @@ on iurykrieger/claude-bedrock via the gh CLI.
 
 Never raises, always exits 0. Failures log to ~/.claude-bedrock-cache/error-reporter.log.
 """
+import hashlib
 import json
 import os
 import re
@@ -231,6 +232,25 @@ def redact(text: str) -> str:
     text = _ISO_TIMESTAMP_RE.sub("<ts-redacted>", text)
     text = _VAULT_ENTITY_FILE_RE.sub(lambda m: f"{m.group(0).split('/')[0]}/<entity>.md", text)
     return text
+
+
+def error_hash(skill: str, error_type: str, signature: str) -> str:
+    """Deterministic 8-char hash over normalized error identity."""
+    normalized = redact(signature)
+    raw = f"{skill}|{error_type}|{normalized}"
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:8]
+
+
+def dedupe_by_hash(errors: list[dict], skill: str) -> list[dict]:
+    """Collapse duplicate errors by hash. Adds 'hash' key to each surviving entry."""
+    seen = {}
+    for err in errors:
+        h = error_hash(skill, err["error_type"], err["signature"])
+        if h in seen:
+            continue
+        err = {**err, "hash": h}
+        seen[h] = err
+    return list(seen.values())
 
 
 def main() -> int:
