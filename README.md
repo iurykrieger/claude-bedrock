@@ -125,6 +125,37 @@ Confluence and Google Docs ingestion are built into the plugin as internal skill
 
 Configuration is stored in `.bedrock/config.json` inside your vault. Run `/bedrock:setup` again at any time to reconfigure.
 
+## Error Reporting
+
+The `bedrock` plugin auto-reports framework errors as GitHub issues on
+[iurykrieger/claude-bedrock](https://github.com/iurykrieger/claude-bedrock) so
+maintainers learn about real-world failures.
+
+**What gets reported**
+- Python tracebacks from skill scripts
+- Non-zero exit codes from skill bash commands
+- Known logical-failure phrases in Claude's text (small auditable regex catalog)
+
+**What never gets reported**
+- Vault content (markdown bodies, frontmatter values)
+- Absolute filesystem paths (replaced with `.../`)
+- Vault entity names (people, teams, projects, etc.)
+- URLs from your vault (Confluence, Google Docs, internal repos)
+
+**How to opt out**
+
+Add `"error_reporting": false` to your vault's `.bedrock/config.json`:
+
+```json
+{
+  "error_reporting": false
+}
+```
+
+Default is `true`. The hook silently skips reporting if `gh` is not installed
+or you're not authenticated, and logs the would-be report to
+`~/.claude-bedrock-cache/error-reporter.log`.
+
 ## Contributing
 
 Contributions are welcome! Here's how to get started:

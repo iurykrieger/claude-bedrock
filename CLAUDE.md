@@ -190,6 +190,12 @@ vault: teaches roadmap-26q1, creates 7 topics [source: confluence]
 vault: compresses 25 entities across 8 clusters [source: compress]
 ```
 
+### Error Reporting
+
+The plugin includes a `Stop` hook (`hooks/error_reporter.py`) that auto-creates
+GitHub issues on framework errors. Disable per-vault with
+`"error_reporting": false` in `.bedrock/config.json`. Default: `true`.
+
 ---
 
 ## Zettelkasten Principles
