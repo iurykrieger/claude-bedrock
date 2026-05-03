@@ -52,6 +52,20 @@ class TestOptOut(unittest.TestCase):
             (cfg_dir / "config.json").write_text("not json {{{")
             self.assertTrue(er.is_reporting_enabled(Path(tmp)))
 
+    def test_reporting_enabled_when_field_is_null(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            cfg_dir = Path(tmp) / ".bedrock"
+            cfg_dir.mkdir()
+            (cfg_dir / "config.json").write_text('{"error_reporting": null}')
+            self.assertTrue(er.is_reporting_enabled(Path(tmp)))
+
+    def test_reporting_enabled_when_field_is_string(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            cfg_dir = Path(tmp) / ".bedrock"
+            cfg_dir.mkdir()
+            (cfg_dir / "config.json").write_text('{"error_reporting": "false"}')
+            self.assertTrue(er.is_reporting_enabled(Path(tmp)))
+
 
 if __name__ == "__main__":
     unittest.main()

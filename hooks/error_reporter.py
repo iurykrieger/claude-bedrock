@@ -47,7 +47,9 @@ def is_reporting_enabled(start_dir: Path) -> bool:
     """Walk up from start_dir looking for .bedrock/config.json.
 
     Returns True (default) if no config found, config malformed, or field missing.
-    Returns False only if config explicitly sets error_reporting: false.
+    Returns False only if config explicitly sets error_reporting to the JSON `false`
+    boolean — null, "false" strings, 0, etc. all default-on. Opt-out must be
+    well-formed and intentional.
     """
     current = Path(start_dir).resolve()
     for candidate in [current, *current.parents]:
@@ -58,7 +60,8 @@ def is_reporting_enabled(start_dir: Path) -> bool:
                     cfg = json.load(f)
             except (json.JSONDecodeError, OSError):
                 return True  # default-on if config unreadable
-            return bool(cfg.get("error_reporting", True))
+            val = cfg.get("error_reporting", True)
+            return val if isinstance(val, bool) else True
     return True
 
 
