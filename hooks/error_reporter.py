@@ -10,10 +10,12 @@ Never raises, always exits 0. Failures log to ~/.claude-bedrock-cache/error-repo
 import hashlib
 import json
 import os
+import platform
 import re
 import subprocess
 import sys
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable
 
@@ -313,6 +315,91 @@ def find_existing_issue(error_hash: str, cache_dir: Path | None = None) -> dict 
     except OSError:
         pass
     return issue
+
+
+def _plugin_version() -> str:
+    plugin_json = Path(__file__).resolve().parent.parent / ".claude-plugin" / "plugin.json"
+    try:
+        with open(plugin_json, "r", encoding="utf-8") as f:
+            return json.load(f).get("version", "unknown")
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        return "unknown"
+
+
+def _build_issue_title(error: dict, skill: str) -> str:
+    short_skill = skill.replace("bedrock:", "")
+    sig = redact(error["signature"])
+    if len(sig) > 80:
+        sig = sig[:77] + "..."
+    return f"[bedrock][{error['hash']}] {short_skill}: {sig}"
+
+
+def _build_issue_body(error: dict, skill: str) -> str:
+    redacted_sig = redact(error["signature"])
+    redacted_raw = redact(error.get("raw", ""))
+    return (
+        "## Auto-reported error\n\n"
+        f"**Skill:** `{skill}`\n"
+        f"**Error type:** `{error['error_type']}`\n"
+        f"**Plugin version:** `{_plugin_version()}`\n"
+        f"**OS:** `{platform.system().lower()} {platform.release()}`\n"
+        f"**Hash:** `{error['hash']}`\n\n"
+        "### Error signature\n"
+        "```\n"
+        f"{redacted_sig}\n"
+        "```\n\n"
+        "### Raw context (redacted)\n"
+        "```\n"
+        f"{redacted_raw}\n"
+        "```\n\n"
+        f"### First seen\n"
+        f"{datetime.now(timezone.utc).isoformat()}\n\n"
+        "---\n"
+        "<sub>Auto-reported by Bedrock error hook. To opt out, set "
+        "`error_reporting: false` in `.bedrock/config.json`.</sub>\n"
+    )
+
+
+def _build_comment_body(prefix: str = "") -> str:
+    return (
+        f"{prefix}Reoccurred at {datetime.now(timezone.utc).isoformat()}. "
+        f"Plugin v{_plugin_version()}, {platform.system().lower()} {platform.release()}.\n"
+    )
+
+
+def handle_error(error: dict, skill: str) -> None:
+    """Create / comment / reopen the GitHub issue for this error.
+
+    Never raises. Failures are silent (caller already exits 0).
+    """
+    existing = find_existing_issue(error["hash"])
+
+    if existing is None:
+        labels = ["auto-reported", "auto-bug", skill]
+        cmd = [
+            "issue", "create",
+            "--repo", _REPO,
+            "--title", _build_issue_title(error, skill),
+            "--body", _build_issue_body(error, skill),
+        ]
+        for label in labels:
+            cmd.extend(["--label", label])
+        _run_gh(cmd, timeout=10)
+        return
+
+    issue_num = str(existing["number"])
+    if existing.get("state") == "closed":
+        _run_gh(["issue", "reopen", "--repo", _REPO, issue_num], timeout=5)
+        comment_body = _build_comment_body(prefix="**Regression:** ")
+    else:
+        comment_body = _build_comment_body()
+
+    _run_gh([
+        "issue", "comment",
+        "--repo", _REPO,
+        issue_num,
+        "--body", comment_body,
+    ], timeout=10)
 
 
 def main() -> int:

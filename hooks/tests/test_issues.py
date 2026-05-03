@@ -59,5 +59,61 @@ class TestIssueLookup(unittest.TestCase):
         self.assertIsNone(issue)
 
 
+class TestIssueDispatch(unittest.TestCase):
+    def setUp(self):
+        self.err = {
+            "hash": "abcdef12",
+            "error_type": "python_traceback",
+            "signature": 'File "x.py", line 1 | ValueError: oops',
+            "raw": 'Traceback ...\n  File "x.py", line 1\nValueError: oops',
+        }
+        self.skill = "bedrock:teach"
+
+    def test_creates_new_issue_when_none_exists(self):
+        with patch("error_reporter.find_existing_issue", return_value=None), \
+             patch("error_reporter._run_gh") as mock_gh:
+            mock_gh.return_value = (0, "https://github.com/iurykrieger/claude-bedrock/issues/100", "")
+            er.handle_error(self.err, self.skill)
+            args = mock_gh.call_args.args[0]
+            self.assertIn("create", args)
+            self.assertIn("--title", args)
+            title = args[args.index("--title") + 1]
+            self.assertIn("[bedrock][abcdef12]", title)
+            self.assertIn("teach", title)
+
+    def test_comments_when_open_issue_exists(self):
+        with patch("error_reporter.find_existing_issue", return_value={"number": 42, "state": "open"}), \
+             patch("error_reporter._run_gh") as mock_gh:
+            mock_gh.return_value = (0, "", "")
+            er.handle_error(self.err, self.skill)
+            args = mock_gh.call_args.args[0]
+            self.assertIn("comment", args)
+            self.assertIn("42", args)
+
+    def test_reopens_and_comments_when_closed(self):
+        with patch("error_reporter.find_existing_issue", return_value={"number": 42, "state": "closed"}), \
+             patch("error_reporter._run_gh") as mock_gh:
+            mock_gh.return_value = (0, "", "")
+            er.handle_error(self.err, self.skill)
+            calls = [c.args[0] for c in mock_gh.call_args_list]
+            self.assertIn("reopen", calls[0])
+            self.assertIn("comment", calls[1])
+
+    def test_issue_body_contains_redacted_signature(self):
+        err = {**self.err, "signature": '/Users/alice/.claude/plugins/x/y/skills/teach/extract.py | ValueError'}
+        with patch("error_reporter.find_existing_issue", return_value=None), \
+             patch("error_reporter._run_gh") as mock_gh:
+            mock_gh.return_value = (0, "https://...", "")
+            er.handle_error(err, self.skill)
+            args = mock_gh.call_args.args[0]
+            body = args[args.index("--body") + 1]
+            self.assertNotIn("/Users/alice", body)
+
+    def test_handle_error_swallows_gh_failures(self):
+        with patch("error_reporter.find_existing_issue", return_value=None), \
+             patch("error_reporter._run_gh", return_value=(1, "", "auth failed")):
+            er.handle_error(self.err, self.skill)
+
+
 if __name__ == "__main__":
     unittest.main()
