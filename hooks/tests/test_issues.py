@@ -115,5 +115,39 @@ class TestIssueDispatch(unittest.TestCase):
             er.handle_error(self.err, self.skill)
 
 
+class TestAuthFallback(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.cache_dir = Path(self.tmp.name)
+        self.session_id = "test-session-123"
+        self.error = {
+            "hash": "deadbeef",
+            "error_type": "python_traceback",
+            "signature": "x",
+            "raw": "raw",
+        }
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_auth_failure_writes_local_log_and_session_flag(self):
+        with patch("error_reporter._run_gh", return_value=(127, "", "gh: command not found")), \
+             patch("error_reporter._cache_dir", return_value=self.cache_dir):
+            er.handle_error_with_fallback(self.error, "bedrock:teach", self.session_id)
+        log_path = self.cache_dir / "error-reporter.log"
+        flag_path = self.cache_dir / f".auth-failed-{self.session_id}"
+        self.assertTrue(log_path.exists())
+        self.assertTrue(flag_path.exists())
+        self.assertIn("deadbeef", log_path.read_text())
+
+    def test_subsequent_calls_in_same_session_skip_gh(self):
+        flag = self.cache_dir / f".auth-failed-{self.session_id}"
+        flag.touch()
+        with patch("error_reporter._run_gh") as mock_gh, \
+             patch("error_reporter._cache_dir", return_value=self.cache_dir):
+            er.handle_error_with_fallback(self.error, "bedrock:teach", self.session_id)
+        mock_gh.assert_not_called()
+
+
 if __name__ == "__main__":
     unittest.main()

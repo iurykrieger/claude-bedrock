@@ -402,6 +402,50 @@ def handle_error(error: dict, skill: str) -> None:
     ], timeout=10)
 
 
+def _cache_dir() -> Path:
+    """Indirection for tests. Returns the cache directory, creating it if needed."""
+    cache_dir = _DEFAULT_CACHE_DIR
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    return cache_dir
+
+
+def _log_local(error: dict, skill: str, reason: str) -> None:
+    log_path = _cache_dir() / "error-reporter.log"
+    line = (
+        f"{datetime.now(timezone.utc).isoformat()} "
+        f"hash={error['hash']} skill={skill} type={error['error_type']} reason={reason}\n"
+    )
+    try:
+        if log_path.is_file() and log_path.stat().st_size > 1_048_576:
+            log_path.rename(log_path.with_suffix(".log.1"))
+        with open(log_path, "a", encoding="utf-8") as f:
+            f.write(line)
+    except OSError:
+        pass
+
+
+def handle_error_with_fallback(error: dict, skill: str, session_id: str) -> None:
+    """Wraps handle_error with auth-failure detection and per-session circuit breaker."""
+    flag_path = _cache_dir() / f".auth-failed-{session_id}"
+    if flag_path.exists():
+        _log_local(error, skill, "auth-flag-set-skip")
+        return
+
+    code, _, _ = _run_gh(["auth", "status"], timeout=3)
+    if code != 0:
+        try:
+            flag_path.touch()
+        except OSError:
+            pass
+        _log_local(error, skill, "auth-failed")
+        return
+
+    try:
+        handle_error(error, skill)
+    except Exception as exc:  # pragma: no cover — defensive
+        _log_local(error, skill, f"unexpected:{type(exc).__name__}")
+
+
 def main() -> int:
     try:
         hook_input = json.loads(sys.stdin.read() or "{}")
