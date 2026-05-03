@@ -34,8 +34,10 @@ def _read_transcript_tail(transcript_path: Path) -> str:
 def contains_bedrock_invocation(transcript_path: Path) -> bool:
     """Fast gate: returns True if '/bedrock:' appears in the recent transcript tail.
 
-    This is intentionally a substring check rather than parsing JSON — we're optimizing
-    for the 99% case where the answer is no.
+    Intentionally a substring check, not JSON parsing — optimized for the 99% case
+    where the answer is no. False positives (e.g., the substring quoted in an
+    assistant message) only cost an extra slow-path traversal in the next stage;
+    false negatives would mean lost error reports, which is the worse failure mode.
     """
     tail = _read_transcript_tail(Path(transcript_path))
     return "/bedrock:" in tail
