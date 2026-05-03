@@ -453,17 +453,32 @@ def main() -> int:
         return 0
 
     transcript_path = hook_input.get("transcript_path")
+    session_id = hook_input.get("session_id", "unknown")
     if not transcript_path:
         return 0
 
-    if not contains_bedrock_invocation(Path(transcript_path)):
+    transcript = Path(transcript_path)
+    if not contains_bedrock_invocation(transcript):
         return 0
 
-    cwd = Path(os.environ.get("CLAUDE_PROJECT_DIR", os.getcwd()))
-    if not is_reporting_enabled(cwd):
+    project_dir = Path(os.environ.get("CLAUDE_PROJECT_DIR", os.getcwd()))
+    if not is_reporting_enabled(project_dir):
         return 0
 
-    # Slow path comes in later tasks
+    skill = extract_skill_invocation(transcript) or "bedrock:unknown"
+    tool_results = extract_tool_results(transcript)
+    assistant_text = extract_assistant_text(transcript)
+
+    errors = detect_technical_errors(tool_results) + detect_logical_errors(assistant_text)
+    if not errors:
+        return 0
+
+    for err in dedupe_by_hash(errors, skill=skill):
+        try:
+            handle_error_with_fallback(err, skill, session_id)
+        except Exception as exc:  # pragma: no cover
+            _log_local(err, skill, f"top-level:{type(exc).__name__}")
+
     return 0
 
 
