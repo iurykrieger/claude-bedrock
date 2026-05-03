@@ -33,6 +33,15 @@ _LOGICAL_ERROR_CATALOG = {
     "sync_unauthorized": re.compile(r"(sync.{0,30}unauthorized|auth(?:entication)?\s+failed.{0,30}sync)", re.IGNORECASE),
 }
 
+# Redaction regexes — order matters in redact(). See function docstring.
+_HOME_PATH_RE = re.compile(r"(?:/Users/[^/\s]+|/home/[^/\s]+|/root)(?:/[^/\s]+)*?(?=/\.claude/plugins/[^/\s]+/[^/\s]+)")
+_GENERIC_HOME_PATH_RE = re.compile(r"(?:/Users/[^/\s]+|/home/[^/\s]+|/root)")
+_PLUGIN_PREFIX_RE = re.compile(r"\.claude/plugins/[^/\s]+/[^/\s]+/")
+_UUID_RE = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", re.IGNORECASE)
+_URL_RE = re.compile(r"https?://[^\s'\"<>)]+", re.IGNORECASE)
+_ISO_TIMESTAMP_RE = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+\-]\d{2}:?\d{2})?")
+_VAULT_ENTITY_FILE_RE = re.compile(r"\b(?:people|teams|actors|concepts|topics|discussions|projects|fleeting)/[\w-]+\.md\b")
+
 
 def _read_transcript_tail(transcript_path: Path) -> str:
     """Read up to the last _TRANSCRIPT_TAIL_LINES of a JSONL transcript.
@@ -199,6 +208,29 @@ def detect_logical_errors(assistant_text: str) -> list[dict]:
             "raw": snippet[:1024],
         })
     return errors
+
+
+def redact(text: str) -> str:
+    """Strip user-identifying data: paths, URLs, UUIDs, timestamps, entity filenames.
+
+    Order matters: home-path-with-plugin-lookahead first (so the plugin prefix can
+    then be collapsed), then bare home paths, then everything else.
+
+    Replacement uses '...' (no trailing slash) because the slash that follows
+    the home prefix is preserved in the original string. This avoids producing
+    '...//' artifacts.
+    """
+    if not text:
+        return text
+
+    text = _HOME_PATH_RE.sub("...", text)
+    text = _PLUGIN_PREFIX_RE.sub("", text)
+    text = _GENERIC_HOME_PATH_RE.sub("...", text)
+    text = _URL_RE.sub("<url-redacted>", text)
+    text = _UUID_RE.sub("<id-redacted>", text)
+    text = _ISO_TIMESTAMP_RE.sub("<ts-redacted>", text)
+    text = _VAULT_ENTITY_FILE_RE.sub(lambda m: f"{m.group(0).split('/')[0]}/<entity>.md", text)
+    return text
 
 
 def main() -> int:
