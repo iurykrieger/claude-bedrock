@@ -63,10 +63,19 @@ class TestLogicalErrors(unittest.TestCase):
         errors = er.detect_logical_errors(text)
         self.assertEqual(errors, [])
 
-    def test_signature_includes_match_text(self):
+    def test_signature_includes_pattern_id(self):
         text = "graphify returned an invalid structure here"
         errors = er.detect_logical_errors(text)
-        self.assertIn("invalid", errors[0]["signature"].lower())
+        self.assertEqual(errors[0]["signature"], "matched pattern: graphify_invalid")
+
+
+class TestLogicalSignatureRedaction(unittest.TestCase):
+    def test_logical_signature_does_not_leak_user_content(self):
+        text = "graphify returned invalid output for customer acme-fintech-acquisition"
+        errors = er.detect_logical_errors(text)
+        self.assertEqual(len(errors), 1)
+        self.assertNotIn("acme-fintech", errors[0]["signature"])
+        self.assertEqual(errors[0]["signature"], "matched pattern: graphify_invalid")
 
 
 if __name__ == "__main__":

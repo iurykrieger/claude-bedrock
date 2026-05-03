@@ -43,6 +43,16 @@ class TestExtraction(unittest.TestCase):
         skill = er.extract_skill_invocation(FIXTURES / "transcript_no_bedrock.jsonl")
         self.assertIsNone(skill)
 
+    def test_extraction_scoped_to_last_turn_ignores_old_errors(self):
+        # Fixture has an old traceback in turn 1, then a clean turn 2.
+        # Extraction should only return the LAST turn's content.
+        skill = er.extract_skill_invocation(FIXTURES / "transcript_bedrock_old_turn.jsonl")
+        # Last turn is "List my files" — not a /bedrock: invocation
+        self.assertIsNone(skill)
+        results = er.extract_tool_results(FIXTURES / "transcript_bedrock_old_turn.jsonl")
+        # The old traceback in turn 1 must NOT appear in results
+        self.assertEqual(results, [])
+
 
 if __name__ == "__main__":
     unittest.main()

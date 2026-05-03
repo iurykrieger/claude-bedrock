@@ -46,6 +46,10 @@ _UUID_RE = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]
 _URL_RE = re.compile(r"https?://[^\s'\"<>)]+", re.IGNORECASE)
 _ISO_TIMESTAMP_RE = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+\-]\d{2}:?\d{2})?")
 _VAULT_ENTITY_FILE_RE = re.compile(r"\b(?:people|teams|actors|concepts|topics|discussions|projects|fleeting)/[\w-]+\.md\b")
+_EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
+_CC_LIKE_RE = re.compile(r"\b\d[\d -]{11,17}\d\b")
+_API_KEY_RE = re.compile(r"\b(?:sk_(?:live|test)|ghp|ghs|gho|ghu|ghr|xox[abps]|AKIA|ASIA|GITHUB_TOKEN)[\w_-]{10,}\b", re.IGNORECASE)
+_BARE_WIKILINK_RE = re.compile(r"\[\[[\w/-]+\]\]")
 
 
 def _read_transcript_tail(transcript_path: Path) -> str:
@@ -111,10 +115,39 @@ def _iter_transcript_lines(transcript_path: Path) -> Iterable[dict]:
         return
 
 
+def _iter_last_turn_lines(transcript_path: Path) -> list[dict]:
+    """Return parsed JSON entries from the last turn.
+
+    A turn boundary is defined by a role=user entry containing a type=text content
+    block (i.e., a user-typed message, not a tool_result). Returns the last such
+    entry and everything after it. If no boundary is found, returns all entries.
+    """
+    entries = list(_iter_transcript_lines(transcript_path))
+    if not entries:
+        return []
+
+    # Walk backwards to find the last user-typed message
+    last_user_text_idx = None
+    for idx in range(len(entries) - 1, -1, -1):
+        entry = entries[idx]
+        if entry.get("role") != "user":
+            continue
+        for block in entry.get("message", {}).get("content", []) or []:
+            if isinstance(block, dict) and block.get("type") == "text":
+                last_user_text_idx = idx
+                break
+        if last_user_text_idx is not None:
+            break
+
+    if last_user_text_idx is None:
+        return entries  # fallback: scan everything
+    return entries[last_user_text_idx:]
+
+
 def extract_skill_invocation(transcript_path: Path) -> str | None:
     """Return the most recent /bedrock:<skill> reference, e.g. 'bedrock:teach'."""
     last = None
-    for entry in _iter_transcript_lines(transcript_path):
+    for entry in _iter_last_turn_lines(transcript_path):
         for block in entry.get("message", {}).get("content", []) or []:
             text = block.get("text") if isinstance(block, dict) else None
             if not text:
@@ -127,7 +160,7 @@ def extract_skill_invocation(transcript_path: Path) -> str | None:
 def extract_tool_results(transcript_path: Path) -> list[dict]:
     """Return all tool_result blocks from the transcript with their is_error flag and content."""
     results = []
-    for entry in _iter_transcript_lines(transcript_path):
+    for entry in _iter_last_turn_lines(transcript_path):
         for block in entry.get("message", {}).get("content", []) or []:
             if not isinstance(block, dict):
                 continue
@@ -146,7 +179,7 @@ def extract_tool_results(transcript_path: Path) -> list[dict]:
 def extract_assistant_text(transcript_path: Path) -> str:
     """Concatenate all text blocks from assistant messages."""
     parts = []
-    for entry in _iter_transcript_lines(transcript_path):
+    for entry in _iter_last_turn_lines(transcript_path):
         if entry.get("role") != "assistant":
             continue
         for block in entry.get("message", {}).get("content", []) or []:
@@ -189,8 +222,7 @@ def _extract_traceback_signature(content: str) -> str:
     if matches:
         m = matches[-1]
         return f'File "{m.group(1)}", line {m.group(2)} | {m.group(5)}'
-    lines = [ln for ln in content.splitlines() if ln.strip()]
-    return lines[-1] if lines else "Traceback (no frames extracted)"
+    return "Traceback (no frames extracted)"
 
 
 def detect_logical_errors(assistant_text: str) -> list[dict]:
@@ -204,13 +236,15 @@ def detect_logical_errors(assistant_text: str) -> list[dict]:
         match = regex.search(assistant_text)
         if not match:
             continue
+        # Signature stays generic to avoid leaking user content; raw keeps a short snippet
+        # for context but will be aggressively redacted by _build_issue_body.
         start = max(0, match.start() - 20)
         end = min(len(assistant_text), match.end() + 60)
         snippet = assistant_text[start:end].replace("\n", " ").strip()
         errors.append({
             "error_type": f"logical_{pattern_id}",
-            "signature": snippet[:200],
-            "raw": snippet[:1024],
+            "signature": f"matched pattern: {pattern_id}",
+            "raw": snippet[:512],
         })
     return errors
 
@@ -232,9 +266,13 @@ def redact(text: str) -> str:
     text = _PLUGIN_PREFIX_RE.sub("", text)
     text = _GENERIC_HOME_PATH_RE.sub("...", text)
     text = _URL_RE.sub("<url-redacted>", text)
+    text = _EMAIL_RE.sub("<email-redacted>", text)
+    text = _API_KEY_RE.sub("<key-redacted>", text)
     text = _UUID_RE.sub("<id-redacted>", text)
     text = _ISO_TIMESTAMP_RE.sub("<ts-redacted>", text)
+    text = _CC_LIKE_RE.sub("<digits-redacted>", text)
     text = _VAULT_ENTITY_FILE_RE.sub(lambda m: f"{m.group(0).split('/')[0]}/<entity>.md", text)
+    text = _BARE_WIKILINK_RE.sub("[[<entity>]]", text)
     return text
 
 
@@ -337,6 +375,7 @@ def _build_issue_title(error: dict, skill: str) -> str:
 def _build_issue_body(error: dict, skill: str) -> str:
     redacted_sig = redact(error["signature"])
     redacted_raw = redact(error.get("raw", ""))
+    redacted_raw = " ".join(redacted_raw.split())[:256]  # collapse whitespace, hard cap
     return (
         "## Auto-reported error\n\n"
         f"**Skill:** `{skill}`\n"

@@ -1,0 +1,5 @@
+{"role":"user","message":{"content":[{"type":"text","text":"/bedrock:teach old-doc"}]}}
+{"role":"user","message":{"content":[{"type":"tool_result","tool_use_id":"old1","is_error":true,"content":"Traceback (most recent call last):\n  File \"old.py\", line 1, in <module>\nValueError: stale error from turn 1"}]}}
+{"role":"assistant","message":{"content":[{"type":"text","text":"Old turn done."}]}}
+{"role":"user","message":{"content":[{"type":"text","text":"List my files"}]}}
+{"role":"assistant","message":{"content":[{"type":"text","text":"Here you go."}]}}

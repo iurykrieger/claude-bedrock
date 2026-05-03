@@ -57,5 +57,37 @@ class TestRedaction(unittest.TestCase):
         self.assertEqual(once, twice)
 
 
+class TestRedactionPII(unittest.TestCase):
+    def test_email_redacted(self):
+        out = er.redact("error from user bob@example.com failed")
+        self.assertNotIn("bob@example.com", out)
+        self.assertIn("<email-redacted>", out)
+
+    def test_credit_card_like_redacted(self):
+        out = er.redact("card 4111 1111 1111 1111 declined")
+        self.assertNotIn("4111", out)
+        self.assertIn("<digits-redacted>", out)
+
+    def test_stripe_key_redacted(self):
+        out = er.redact("auth=sk_live_abcdef1234567890 failed")
+        self.assertNotIn("sk_live_abc", out)
+        self.assertIn("<key-redacted>", out)
+
+    def test_github_token_redacted(self):
+        out = er.redact("token ghp_abc123def456ghi789 invalid")
+        self.assertNotIn("ghp_abc", out)
+        self.assertIn("<key-redacted>", out)
+
+    def test_aws_key_redacted(self):
+        out = er.redact("aws AKIAIOSFODNN7EXAMPLE failed")
+        self.assertNotIn("AKIAIOSFODNN7", out)
+        self.assertIn("<key-redacted>", out)
+
+    def test_bare_wikilink_redacted(self):
+        out = er.redact("entity [[secret-customer-list]] not found")
+        self.assertNotIn("secret-customer-list", out)
+        self.assertIn("[[<entity>]]", out)
+
+
 if __name__ == "__main__":
     unittest.main()
