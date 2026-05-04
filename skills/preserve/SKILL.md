@@ -311,25 +311,34 @@ If the file does not exist, skip (nothing to mark).
 ### 1.1 Structured input
 
 When called by another skill (e.g., `/bedrock:teach`) or when the user provides an explicit list.
-The format is a list of entities, each with:
+The format is an optional top-level header followed by a list of entities:
 
 ```yaml
-- type: actor | person | team | concept | topic | discussion | project | fleeting | code
-  name: "canonical entity name"
-  action: create | update
-  content: "content to include in the entity body"
-  relations:
-    actors: ["actor-slug-1", "actor-slug-2"]
-    people: ["person-slug-1"]
-    teams: ["team-slug-1"]
-    concepts: ["concept-slug-1"]
-    topics: ["topic-slug-1"]
-    discussions: ["discussion-slug-1"]
-    projects: ["project-slug-1"]
-    code: ["node-slug-1"]
-  source: "github | confluence | jira | session | manual | gdoc | csv | graphify"
-  metadata: {}  # additional frontmatter fields specific to the type
+# Optional top-level header — applies to all entities in the batch
+actor_context: <actor-name>  # optional, kebab-case slug of an actor in the vault.
+                             # When present, /preserve treats the batch as scoped to that actor:
+                             # graphify nodes of file_type=document/paper become `code` of this actor
+                             # with node_type ∈ {concept, decision} (see Phase 1.3 step 4).
+
+entities:
+  - type: actor | person | team | concept | topic | discussion | project | fleeting | code
+    name: "canonical entity name"
+    action: create | update
+    content: "content to include in the entity body"
+    relations:
+      actors: ["actor-slug-1", "actor-slug-2"]
+      people: ["person-slug-1"]
+      teams: ["team-slug-1"]
+      concepts: ["concept-slug-1"]
+      topics: ["topic-slug-1"]
+      discussions: ["discussion-slug-1"]
+      projects: ["project-slug-1"]
+      code: ["node-slug-1"]
+    source: "github | confluence | jira | session | manual | gdoc | csv | graphify"
+    metadata: {}  # additional frontmatter fields specific to the type
 ```
+
+If the input is a bare list (no `entities:` key, no `actor_context`), accept it as a list of entities with `actor_context = null`. This preserves backward compatibility with callers that pre-date the field.
 
 If the input follows this format (or something close): parse directly and go to Phase 2.
 
@@ -373,6 +382,7 @@ OR when the user invokes `/bedrock:preserve` directly pointing at a `graphify-ou
 - `graphify_output_path`: path to `graphify-out/` directory
 - `source_url`: original external source URL/path (optional — may not be present for manual invocation)
 - `source_type`: type of external source (optional)
+- `actor_context`: kebab-case slug of an actor in the vault (optional). When present, the entire corpus is treated as belonging to that actor: `file_type=document/paper` nodes are classified as `code` of that actor with `node_type ∈ {concept, decision}` instead of as global `concept`/`topic`/`fleeting`. When absent, classification falls back to the corpus-agnostic logic (concept global / topic / fleeting).
 
 **Detection:** If the input contains a path ending in `graphify-out/` or `graphify-out`,
 or references `graph.json`, treat as graphify output input.
@@ -391,45 +401,74 @@ or references `graph.json`, treat as graphify output input.
    - If obsidian file doesn't exist for a node: fall back to graph.json metadata alone
 
 3. **Read analysis** from `graphify_output_path/.graphify_analysis.json` (if exists):
-   - Extract community assignments, god nodes, community labels
+   - Extract community assignments (`community_id` per node), god nodes (`is_god_node`), community labels
    - Use community labels to inform `domain/*` tags when creating entities
+   - If absent or `stale: true`, downstream steps fall back to graph-only signals (no community-aware grouping)
 
-4. **Classify graphify nodes into vault entity types** — /preserve owns this classification:
-   - Read ALL entity definitions from plugin (see "Plugin Paths")
-   - For each graphify node, classify:
-     - `file_type: code` → `code` (actor inferred from `source_file` path or repo name in the path)
-     - `file_type: document` or `file_type: paper` → check for concept first: if the node describes a pattern, principle, technique, protocol, or abstraction AND is self-contained AND is not specific to a single actor → `concept`
-     - `file_type: document` (non-concept) → classify using entity definitions ("When to create" / "When NOT to create" / "How to distinguish")
-     - `file_type: paper` (non-concept) → `topic` or `fleeting` depending on completeness criteria
-     - God nodes (high degree in `.graphify_analysis.json`) → consider as `actor`, `concept`, or `topic`
-     - Apply Zettelkasten classification (section 1.4): if content doesn't meet completeness criteria → `fleeting`
+4. **Read configuration** from `<VAULT_PATH>/.bedrock/config.json` (best-effort):
+   - `code.max_per_actor`: integer, default `200`. Per-actor cap on the number of `code` candidates produced from this corpus. No absolute global cap.
+   - `code.cluster_threshold`: float, default `0.85`. Minimum `semantically_similar_to.confidence_score` for two nodes to be grouped into the same `code` candidate.
+   - If `.bedrock/config.json` is missing or has no `code` block, use the defaults silently.
 
-5. **Filter relevant nodes:**
-   - For code entities: select top ~50 by relevance (degree > average, or label contains "Service", "Controller", "Client", "Factory", "Handler", "Mapper", "Gateway", "Provider"). Exclude test nodes (labels with "Test", "Tests", "Builder", "Mock", "Fake") and trivial nodes (getters, setters, simple DTOs).
-   - For document/paper nodes: include all.
+5. **Group nodes by semantic similarity** (BEFORE filtering and classification) — produces clusters that will each become at most one `code` candidate:
+   - Build clusters by union-find:
+     - Two nodes are in the same cluster if there is a `semantically_similar_to` edge between them with `confidence_score ≥ code.cluster_threshold`.
+     - OR they share the same `community_id` (from `.graphify_analysis.json`) AND at least one of them is `is_god_node` OR both have `edge_count ≥ 2`. This guards against weakly-tied community co-membership.
+   - If `.graphify_analysis.json` is absent or stale, only the `semantically_similar_to` rule applies.
+   - Singletons (nodes with no qualifying neighbor) form their own cluster of size 1.
+   - Each cluster carries: `cluster_id` (synthetic), `member_node_ids[]` (the union of node `id`s — this becomes the `graphify_node_ids` array of the resulting `code` entity), `representative` (the node with highest degree in the cluster — used for `label`, `source_file`, etc.).
+   - Hard cap: maximum 50 nodes per cluster (defensive — runaway clusters indicate bad threshold).
 
-6. **Match against existing vault** — Use existing textual matching logic from Phase 2 (filename, name, aliases, `graphify_node_id`). Mark matched nodes as `update`, unmatched as `create`.
+6. **Classify clusters into vault entity types** — /preserve owns this classification.
+   Read ALL entity definitions from the plugin (see "Plugin Paths") and apply:
 
-7. **Build internal structured format** for each classified + filtered entity:
-   - `type`: from classification (step 4)
-   - `name`: from graphify node `label` (kebab-cased for filename)
-   - `action`: `create` or `update` (from step 6 matching)
-   - `content`: from obsidian markdown file body (or generate from graph.json metadata if no obsidian file)
-   - `relations`: from graph.json edges (convert node ids to entity slugs via kebab-case)
-   - `source`: from input `source_type` (or `"graphify"` if not provided)
-   - `source_url`: from input `source_url` (if provided)
-   - `source_type`: from input `source_type` (if provided)
-   - `metadata`: for code entities, include:
-     - `graphify_node_id`: node `id` from graph.json
-     - `actor`: wikilink of the parent actor (inferred from `source_file` path)
-     - `node_type`: infer from context (`function`, `class`, `module`, `interface`, `endpoint`)
-     - `source_file`: relative path from graph.json
-     - `confidence`: from the strongest edge connected to the node (`EXTRACTED` > `INFERRED` > `AMBIGUOUS`)
-   - `metadata`: for concepts (from graphify), include:
-     - `graphify_node_id`: node `id` from graph.json
-     - `confidence`: from the strongest edge connected to the node (`EXTRACTED` > `INFERRED` > `AMBIGUOUS`)
+   **When `actor_context` is present** (single-actor corpus):
+   - `file_type: code` clusters → `code` for the actor, `node_type` ∈ {`function`, `class`, `module`, `interface`, `endpoint`} inferred from the representative node's label/edges.
+   - `file_type: document` or `file_type: paper` clusters → `code` for the actor:
+     - `node_type: decision` if the representative node has `rationale_for` edges OR the label/text contains decision markers (e.g., "ADR", "RFC", "decision", "chose", "decided").
+     - `node_type: concept` otherwise.
+   - The cluster's `actor` field is set to `[[<actor_context>]]` for all entities.
 
-8. **Proceed to Phase 3** (Change Proposal) — present the classified entity list for user confirmation, then execute writes as normal (Phases 4-7).
+   **When `actor_context` is absent** (corpus-agnostic):
+   - `file_type: code` clusters → `code` (parent actor inferred from `source_file` path or repo name in the path; if no actor can be inferred, classify as `fleeting`).
+   - `file_type: document` or `file_type: paper` clusters → check for concept first: if the representative node describes a pattern, principle, technique, protocol, or abstraction AND is self-contained AND is not specific to a single actor → `concept` (global).
+     - Non-concept document → classify using entity definitions ("When to create" / "When NOT to create" / "How to distinguish").
+     - Non-concept paper → `topic` or `fleeting` depending on completeness criteria.
+   - God nodes (`is_god_node`) → consider as `actor`, `concept`, or `topic`.
+   - Apply Zettelkasten classification (section 1.4): if content doesn't meet completeness criteria → `fleeting`.
+
+7. **Filter relevant clusters** (applied to `code` candidates only — non-code classifications keep their existing inclusion logic):
+   - **Inclusion predicate:** representative node's strongest edge has `confidence ∈ {EXTRACTED, INFERRED}` AND at least one of:
+     - `is_god_node` (from `.graphify_analysis.json`),
+     - `degree > community_average_degree` (from `.graphify_analysis.json`; if analysis absent, use overall graph average),
+     - `edge_count ≥ 2`.
+   - **Exclusion:** representative label matches trivial patterns (case-insensitive substring of `Test`, `Tests`, `Mock`, `Fake`, `Builder`, `Stub`, `Fixture`) or the cluster only contains nodes flagged trivial by graphify.
+   - **Per-actor cap:** group surviving `code` candidates by their resolved `actor`. Within each actor, rank by `is_god_node` (true first) > `degree` > `edge_count`. Keep the top `code.max_per_actor` (default `200`); discard the rest with a warning in the report listing how many were dropped per actor.
+   - **No English keyword regex.** The previous label allowlist (`Service|Controller|...`) is removed.
+   - For non-`code` classifications (concept global, topic, fleeting): include all that pass classification.
+
+8. **Match against existing vault** — Use the textual matching logic from Phase 2 (filename, name, aliases, graphify ids). For `code` entities, the graphify-id match accepts both legacy singular `graphify_node_id` and the new `graphify_node_ids` array — match if the cluster's `member_node_ids` set intersects the entity's existing id set. Mark matched clusters as `update`, unmatched as `create`.
+
+9. **Build internal structured format** for each classified + filtered cluster:
+   - `type`: from classification (step 6).
+   - `name`: kebab-cased label of the cluster's `representative` node.
+   - `action`: `create` or `update` (from step 8 matching).
+   - `content`: body of the obsidian markdown file matching the representative's id (or generate from graph.json metadata if no obsidian file). When the cluster has multiple members, include a brief "Grouped from N graphify nodes" note in the body listing the member ids — this preserves traceability.
+   - `relations`: from graph.json edges of all member nodes (convert node ids to entity slugs via kebab-case; deduplicate).
+   - `source`: from input `source_type` (or `"graphify"` if not provided).
+   - `source_url`: from input `source_url` (if provided).
+   - `source_type`: from input `source_type` (if provided).
+   - `metadata`: for `code` entities, include:
+     - `graphify_node_ids`: array — the cluster's `member_node_ids` (always written as array even when size is 1).
+     - `actor`: wikilink of the parent actor (`[[<actor_context>]]` when set; otherwise inferred).
+     - `node_type`: from step 6.
+     - `source_file`: relative path from the representative node.
+     - `confidence`: strongest edge confidence across all member nodes (`EXTRACTED` > `INFERRED` > `AMBIGUOUS`).
+   - `metadata`: for `concept` (global) entities from graphify, include:
+     - `graphify_node_ids`: array.
+     - `confidence`: strongest edge confidence across all members.
+
+10. **Proceed to Phase 3** (Change Proposal) — present the classified cluster list for user confirmation, then execute writes as normal (Phases 4-7).
 
 > **Note:** When invoked directly by the user (not via /teach), the user confirmation in Phase 3
 > is the only gate before writes. When invoked via /teach, /teach has already shown the user
@@ -442,7 +481,7 @@ Consult the plugin's entity definitions ("Completeness Criteria" section) to det
 
 **Classification rule:**
 - If the content meets the completeness criteria of a permanent type (actor, person, team) → classify as permanent
-- If the content has `graphify_node_id` and `actor` defined → classify as `code` (permanent extension, sub-entity of actor)
+- If the content has a non-empty `graphify_node_ids` array (or legacy singular `graphify_node_id`) and `actor` defined → classify as `code` (permanent extension, sub-entity of actor)
 - If the content defines a pattern, principle, technique, protocol, or abstraction that is self-contained and actor-independent → classify as `concept` (permanent)
 - If the content meets the completeness criteria of a bridge type (topic, discussion) → classify as bridge
 - If the content meets the completeness criteria of an index type (project) → classify as index
@@ -493,7 +532,7 @@ For each file found, extract:
 - `filename` (without extension) — canonical identifier
 - `name` (or `title`) from frontmatter — human-readable name
 - `aliases` from frontmatter — alternative names
-- `graphify_node_id` from frontmatter — for code entities (if present)
+- `graphify_node_ids` from frontmatter — for code entities (if present, accept both the new array form and the legacy singular `graphify_node_id` string; normalize to a set of ids per entity)
 
 ### 2.2 Textual matching
 
@@ -505,7 +544,7 @@ For each entity from the input, check if it already exists in the vault:
 2. **Match by name/title field** (case-insensitive): `"Billing API"` finds `billing-api.md`
 3. **Match by aliases** (case-insensitive): `"BillingAPI"` finds `billing-api.md` if alias contains "BillingAPI"
 4. **Match by filename without hyphens** (case-insensitive): `billing-api` → `billingapi` finds "BillingAPI"
-5. **Match by graphify_node_id** (for code entities): exact match by `graphify_node_id` in frontmatter. This is the most reliable match for code entities and takes priority over the others when present.
+5. **Match by graphify ids** (for code entities): set intersection between the input cluster's `graphify_node_ids` (array) and the vault entity's id set, where the vault entity's id set is normalized from EITHER `graphify_node_ids` (array, current schema) OR the legacy singular `graphify_node_id` (string treated as a 1-element set). Any non-empty intersection is a match. This is the most reliable match for code entities and takes priority over the others when present.
 
 **Safety rules:**
 - DO NOT match by substrings of 3 characters or fewer (e.g., "api" should not match everything)
@@ -635,7 +674,8 @@ When creating a code entity:
 3. **Create code entity:** use template `actors/_template_node.md`
    - Save to `actors/<actor>/nodes/<node-slug>.md`
    - Filename: kebab-case of the node's `name` (e.g., `ProcessTransaction` → `process-transaction.md`)
-   - Fill `graphify_node_id`, `actor`, `node_type`, `source_file`, `confidence` from the input
+   - Fill `graphify_node_ids` (array — always written as a list, even of size 1), `actor`, `node_type`, `source_file`, `confidence` from the input
+   - Backward compat at write time: if the input still carries the legacy singular `graphify_node_id` (string), normalize it to `graphify_node_ids: [<id>]` before writing. Never persist the singular form.
    - Inherit `domain/*` tags from the parent actor
    - Generate at least 1 alias (human-readable name + camelCase if applicable)
 4. **Bidirectional backlink:**
@@ -753,6 +793,123 @@ For frontmatter-based links (team↔actor, team↔person, person↔team, etc.): 
 
 ---
 
+## Phase 6.5 — Sync Graph Back-Pointers
+
+**Objective:** Propagate `vault_entity_path` to the corresponding nodes in `<VAULT_PATH>/graphify-out/graph.json`, closing the bidirectional bridge between each `code` entity touched in this run and the graphify nodes it materializes.
+
+This phase runs AFTER bidirectional linking (Phase 5) and BEFORE the git workflow (Phase 6), so the back-pointer change lands in the same commit as the entities.
+
+### 6.5.1 Defensive cleanup
+
+Remove any orphaned staging file from a prior interrupted run before doing anything else:
+
+```bash
+rm -f "<VAULT_PATH>/graphify-out/graph.json.staging" 2>/dev/null || true
+```
+
+This is idempotent and never fails the phase.
+
+### 6.5.2 Best-effort detection
+
+Locate the vault's cumulative graph file:
+
+```bash
+GRAPH_PATH="<VAULT_PATH>/graphify-out/graph.json"
+test -s "$GRAPH_PATH" && echo "EXISTS" || echo "MISSING"
+```
+
+If the path does NOT exist, OR the file is empty (`-s` returns false), OR JSON parsing fails:
+- Record `phase_6_5_status = "skipped"` and `phase_6_5_reason` (`"missing"`, `"empty"`, or `"invalid_json"`).
+- Skip directly to Phase 6 — do NOT fail `/preserve`.
+- The Phase 7 report includes a warning surface (see §6.5.6 below).
+
+If the file exists and parses, continue.
+
+### 6.5.3 Collect target node ids from touched `code` entities
+
+Iterate over every entity created or updated in Phase 4 with `type: code`. For each one, normalize the graphify ids to a set:
+
+```python
+ids = set()
+fm = entity.frontmatter
+if isinstance(fm.get("graphify_node_ids"), list):
+    ids.update(fm["graphify_node_ids"])
+if isinstance(fm.get("graphify_node_id"), str):  # legacy singular — backward compat
+    ids.add(fm["graphify_node_id"])
+```
+
+Build a working map: `id → vault_entity_path` where `vault_entity_path` is the path of the entity file relative to `<VAULT_PATH>` (e.g. `actors/billing-api/nodes/process-transaction.md`).
+
+If the touched-code-entities set is empty (run touched no `code` entities), skip directly to Phase 6 with `phase_6_5_status = "skipped"`, `phase_6_5_reason = "no_code_entities"`.
+
+### 6.5.4 Locate and update graph nodes (atomic write)
+
+Read `graph.json` and write the updated graph to a staging file:
+
+```bash
+python3 - <<'PY'
+import json, pathlib, sys
+
+graph_path = pathlib.Path("<VAULT_PATH>/graphify-out/graph.json")
+staging_path = graph_path.with_suffix(".json.staging")
+
+with graph_path.open() as f:
+    graph = json.load(f)
+
+# Map from id → vault_entity_path was prepared in §6.5.3 — passed in as JSON.
+target_map = json.loads("""<TARGET_MAP_JSON>""")
+
+nodes_updated = 0
+nodes_unmatched_ids = []
+for node in graph.get("nodes", []):
+    nid = node.get("id")
+    if nid in target_map:
+        # Idempotency by overwrite: always set, even if already present.
+        node["vault_entity_path"] = target_map[nid]
+        nodes_updated += 1
+
+# Detect ids that did not match any node (graph diverged from vault — possible re-run of /graphify).
+matched_ids = {n["id"] for n in graph.get("nodes", []) if "id" in n}
+nodes_unmatched_ids = [tid for tid in target_map.keys() if tid not in matched_ids]
+
+with staging_path.open("w") as f:
+    json.dump(graph, f, indent=2, ensure_ascii=False)
+
+print(json.dumps({
+    "nodes_updated": nodes_updated,
+    "unmatched_ids": nodes_unmatched_ids,
+}))
+PY
+```
+
+If the Python block exits non-zero (parse error, write error, etc.), do NOT run the `mv` — the original `graph.json` stays intact. Capture the error message, set `phase_6_5_status = "failed"`, `phase_6_5_reason = "<error>"`, and skip to Phase 6 without aborting `/preserve`. The vault's git state remains valid because no rename occurred.
+
+### 6.5.5 Atomic swap
+
+If the Python block succeeded:
+
+```bash
+mv "<VAULT_PATH>/graphify-out/graph.json.staging" "<VAULT_PATH>/graphify-out/graph.json"
+```
+
+`mv` on the same filesystem is atomic at the filesystem level — readers either see the old or the new file, never a half-written one. Set `phase_6_5_status = "applied"` and capture `nodes_updated`, `unmatched_ids` from the Python output.
+
+### 6.5.6 Record stats for Phase 7
+
+Capture for the Phase 7 report and the skill's return payload:
+
+```yaml
+graph_back_pointers:
+  status: "applied" | "skipped" | "failed"
+  reason: "<reason if skipped or failed, omit if applied>"
+  nodes_updated: N           # 0 when skipped
+  unmatched_ids: ["..."]     # ids in touched entities but not found in graph.json
+```
+
+These values are threaded through to Phase 7's report block under a new **"Graph back-pointers"** section and returned in the skill's result payload to callers (e.g. `/bedrock:teach`).
+
+---
+
 ## Phase 6 — Publish
 
 ### 6.1 Prepare commit
@@ -785,6 +942,12 @@ vault: teaches <source-name>, creates N updates M entities [source: <type>]
 ```bash
 # Stage touched entities (includes actor subfolders: actors/*/nodes/)
 git -C <VAULT_PATH> add actors/ people/ teams/ topics/ discussions/ projects/ fleeting/
+
+# Stage graphify back-pointer changes when Phase 6.5 ran successfully.
+# Only run when graphify-out/graph.json exists — `git add` of a non-existent path errors out.
+if [ -f "<VAULT_PATH>/graphify-out/graph.json" ]; then
+  git -C <VAULT_PATH> add graphify-out/graph.json
+fi
 
 # Check if there is anything to commit
 git -C <VAULT_PATH> diff --cached --quiet && echo "Nothing to commit" && exit 0
@@ -923,6 +1086,26 @@ graphify_merge:
   stale_flag_set: true | false
 ```
 
+### Graph back-pointers (Phase 6.5)
+| Metric | Value |
+|---|---|
+| Status | applied / skipped / failed |
+| Reason (skipped/failed) | missing / empty / invalid_json / no_code_entities / <error> |
+| Nodes updated | N (0 when skipped) |
+| Unmatched ids | list (ids present in touched entities but absent from graph.json) |
+
+When `Status = applied`, the back-pointer write is part of the same git commit as the entities (Phase 6 stages `graphify-out/graph.json` alongside the entity directories). When `Status = skipped` or `failed`, no graph mutation occurred and the vault's `graph.json` is untouched.
+
+The same fields are included in the skill's return payload:
+
+```yaml
+graph_back_pointers:
+  status: "applied" | "skipped" | "failed"
+  reason: "..."        # omit when applied
+  nodes_updated: N
+  unmatched_ids: ["..."]
+```
+
 ### Sources consulted
 - ✅ Local vault
 - ✅ / ❌ GitHub MCP
@@ -964,3 +1147,11 @@ graphify_merge:
 | 20 | **Graphify merge backward-compat** — if `graphify_output_path` resolves to the same absolute path as `<VAULT_PATH>/graphify-out/`, Phase 0.2 is a no-op. Legacy callers and `/bedrock:sync` continue to work unchanged. |
 | 21 | **Graphify merge is atomic** — `graph.json` is merged into a `.staging` file and atomically renamed. If validation or merge fails, the vault's `graph.json` is untouched. |
 | 22 | **`.graphify_analysis.json` is marked stale, never recomputed** — Phase 0.2 sets `stale: true` on merge. `/bedrock:compress` owns recomputation. |
+| 23 | **`actor_context` scopes the corpus** — when present in Phase 1.1 / 1.3 input, `file_type=document/paper` graphify nodes become `code` of that actor with `node_type ∈ {concept, decision}`; when absent, classification falls back to corpus-agnostic logic (concept global / topic / fleeting). The caller (e.g. `/teach`) decides which mode to invoke. |
+| 24 | **Semantic grouping precedes filtering** — Phase 1.3 step 5 clusters graphify nodes by `semantically_similar_to ≥ code.cluster_threshold` (default 0.85) or community co-membership BEFORE the relevance filter. Each cluster maps to at most one `code` candidate carrying every `graphify_node_ids`. |
+| 25 | **Per-actor cap, no global cap** — `code.max_per_actor` (default 200, from `.bedrock/config.json`) caps `code` candidates per actor. Ranking inside the cap: `is_god_node` > `degree` > `edge_count`. There is NO absolute global cap on the number of `code` entities in the vault. |
+| 26 | **`graphify_node_ids` is always written as an array** — even when the cluster has a single member. At read time, `/preserve` accepts both the array form and the legacy singular `graphify_node_id` (string); it always writes the array on output. There is no batch migration. |
+| 27 | **No English keyword regex for relevance** — the previous label allowlist (`Service|Controller|Client|Factory|Handler|Mapper|Gateway|Provider`) is REMOVED. Relevance comes from confidence + community signals (`is_god_node`, `degree > community average`, `edge_count ≥ 2`). Trivial label exclusion (`Test`, `Mock`, `Builder`, etc.) is preserved. |
+| 28 | **Phase 6.5 is atomic** — `graph.json` is written to a `.staging` file and atomically renamed via `mv`. If the Python block fails, `mv` does NOT run, the vault's `graph.json` stays intact. Same pattern as Phase 0.2 (Rule 21). No write to `graph.json` occurs outside Phase 0.2 and Phase 6.5. |
+| 29 | **Phase 6.5 is best-effort** — when `<VAULT_PATH>/graphify-out/graph.json` is missing, empty, invalid JSON, or no `code` entities were touched, Phase 6.5 silently skips with an explicit `status` and `reason` in the Phase 7 report. `/preserve` does NOT fail. Vaults without `graphify-out/` continue to work without the bridge. |
+| 30 | **Phase 6.5 is idempotent** — `vault_entity_path` is always overwritten with the current path, never appended. Running `/preserve` twice in a row over the same entities does not duplicate fields nor alter any other node attribute. Unmatched ids (graphify re-run, id changed) surface as a warning but never block. |

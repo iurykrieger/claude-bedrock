@@ -550,6 +550,7 @@ For each entity type, read the template from the plugin and write it to the vaul
 | Source (plugin) | Destination (vault) |
 |---|---|
 | `<base_dir>/../../templates/actors/_template.md` | `actors/_template.md` |
+| `<base_dir>/../../templates/actors/_template_node.md` | `actors/_template_node.md` |
 | `<base_dir>/../../templates/people/_template.md` | `people/_template.md` |
 | `<base_dir>/../../templates/teams/_template.md` | `teams/_template.md` |
 | `<base_dir>/../../templates/topics/_template.md` | `topics/_template.md` |
@@ -1230,6 +1231,7 @@ After all files are created, present the user with a summary and next steps.
 | Obsidian | .obsidian/graph.json |
 | Obsidian | .obsidian/core-plugins.json |
 | Template | actors/_template.md |
+| Template | actors/_template_node.md |
 | Template | people/_template.md |
 | Template | teams/_template.md |
 | Template | topics/_template.md |

@@ -29,7 +29,7 @@ Code entities are sub-entities of actors — each code entity belongs to exactly
 |---|---|---|
 | Code | Topic | If the content is a broad architectural decision affecting multiple actors, it is a topic. If it is specific to a function/class of one actor, it is a code entity |
 | Code | Actor | If it has its own repository and independent deployment, it is an actor. Code entities are internal parts of an actor |
-| Code | Fleeting | If it came from graphify with confidence EXTRACTED/INFERRED and has a `graphify_node_id`, it is a code entity. If it is a loose idea without a link to the graph, it is fleeting |
+| Code | Fleeting | If it came from graphify with confidence EXTRACTED/INFERRED and has at least one `graphify_node_ids` entry, it is a code entity. If it is a loose idea without a link to the graph, it is fleeting |
 | Code | Discussion | If it describes a decision made in a meeting/debate, it is a discussion. If it describes a design decision found in the code, it is a code entity |
 | Code | Concept | If the content describes a cross-cutting pattern, principle, or abstraction that is actor-independent, it is a concept. If it is specific to a single actor's implementation, it is a code entity |
 
@@ -44,7 +44,7 @@ Code entities are sub-entities of actors — each code entity belongs to exactly
 | `node_type` | string | `function`, `class`, `module`, `concept`, `decision`, `interface`, `endpoint` |
 | `source_file` | string | Relative path in the actor's repo (e.g., `src/Controllers/PaymentController.cs`) |
 | `description` | string | Description of this node's function/role |
-| `graphify_node_id` | string | Unique node ID in graph.json (e.g., `billing_api_processTransaction`) |
+| `graphify_node_ids` | array<string> | Unique node IDs in `graph.json` that this entity materializes (e.g., `["billing_api_processTransaction", "billing_api_processTransactionV2"]`). Multiple ids represent graphify nodes grouped by semantic similarity (`semantically_similar_to` edges or community co-membership) — one `code` entity stands in for the whole cluster. Always at least one id. |
 | `confidence` | string | `EXTRACTED`, `INFERRED`, or `AMBIGUOUS` — extraction confidence level |
 | `updated_at` | date | YYYY-MM-DD |
 | `updated_by` | string | Who updated it |
@@ -56,6 +56,31 @@ Code entities are sub-entities of actors — each code entity belongs to exactly
 |---|---|---|
 | `relations` | array | Wikilinks to other code entities or related entities |
 | `source_location` | string | Line or range in the source_file (e.g., `L42-L85`) |
+
+### Backward compatibility
+
+Legacy vaults may still carry the singular `graphify_node_id: "<id>"` (string) instead of the new `graphify_node_ids: [...]` (array). Both forms are valid for read — `/bedrock:preserve` accepts either at parse time and always writes the array form when the entity is touched. Migration is in-line: a singular field is upgraded to an array on the first update; there is no batch migration.
+
+## Graph Bridge
+
+The `code` entity is the bridge between the vault and the graphify graph. The bridge is bidirectional:
+
+- **Vault → graph:** the entity frontmatter carries `graphify_node_ids` (array of strings), each entry pointing at a node `id` in `<VAULT_PATH>/graphify-out/graph.json`.
+- **Graph → vault:** the corresponding nodes in `graph.json` carry an optional `vault_entity_path` field, a path relative to the vault root that points back at this entity file. Example:
+
+  ```json
+  {
+    "id": "billing_api_processTransaction",
+    "label": "ProcessTransaction",
+    "file_type": "code",
+    "source_file": "src/Controllers/PaymentController.cs",
+    "vault_entity_path": "actors/billing-api/nodes/process-transaction.md"
+  }
+  ```
+
+The owner of the `vault_entity_path` write is `/bedrock:preserve` Phase 6.5. The field is optional — nodes that have not yet been materialized as a `code` entity simply omit it. Vaults without `graphify-out/` continue to work without the bridge (best-effort).
+
+> **TODO:** Phase 6.5 of `/bedrock:preserve` is delivered by Part 3 of the `code-graphify-bridge` spec. Until that lands, `vault_entity_path` is documented but not yet written by any skill.
 
 ## Zettelkasten Role
 
@@ -70,7 +95,7 @@ Code entities are sub-entities of actors — each code entity belongs to exactly
 
 ### Completeness Criteria
 
-A code entity is complete when: it has a valid `graphify_node_id`, defined `actor`, defined `node_type`, identified `source_file`, and a self-contained `description`. If `graphify_node_id` or `actor` is missing, the content should go to `fleeting/`.
+A code entity is complete when: it has a non-empty `graphify_node_ids` array, defined `actor`, defined `node_type`, identified `source_file`, and a self-contained `description`. If `graphify_node_ids` is empty (or missing) or `actor` is missing, the content should go to `fleeting/`.
 
 ## Examples
 

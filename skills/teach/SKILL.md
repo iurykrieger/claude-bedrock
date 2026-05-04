@@ -392,18 +392,40 @@ Report: "Phase 2 complete: graphify extraction finished in `$GRAPHIFY_OUT_NEW`. 
 
 ### 3.1 Compile input for /preserve
 
-Pass the **temp** graphify output path and provenance metadata to `/bedrock:preserve`. The
-skill's Phase 0.2 merges this temp output into the vault's cumulative `graphify-out/`:
+#### 3.1.1 Derive `actor_context` (when applicable)
+
+`actor_context` tells `/preserve` that the entire corpus belongs to a single actor in the vault. When set, every `file_type=document/paper` graphify node is classified as `code` of that actor with `node_type ∈ {concept, decision}`, instead of as a global `concept`/`topic`/`fleeting`.
+
+Derivation rules by `source_type`:
+
+| `source_type` | `actor_context` derivation |
+|---|---|
+| `github-repo` | Use the cloned repo's `repo-name` (kebab-case) when an actor with the same slug exists in `<VAULT_PATH>/actors/`. Otherwise leave `actor_context` unset and let `/preserve` use corpus-agnostic classification. |
+| `local-dir` | Same rule as `github-repo`: use the directory's basename when it matches a vault actor; otherwise leave unset. |
+| `confluence`, `gdoc`, `remote-binary`, `local-file`, `manual` | Leave `actor_context` unset. These corpora are not scoped to a single actor by default. |
+
+**Multi-actor abort.** Before passing `actor_context`, scan the cloned repo's top-level subdirectories. If 2 or more of those subdirectory names match existing actor slugs in `<VAULT_PATH>/actors/`, abort with:
+
+> "Detected multiple actor candidates in this corpus: `<list>`. `/teach` only accepts a single-actor corpus per invocation. Run `/teach` separately against each actor, e.g.: `/teach <url>/<sub-actor-1>` and `/teach <url>/<sub-actor-2>`. If the repo is a true monorepo and you want a single ingestion, leave `actor_context` unset by passing `--no-actor-context` (graphify nodes will be classified globally instead of as `code` of one actor)."
+>
+> Do NOT proceed to /preserve.
+
+For non-`github-repo`/`local-dir` source types, no multi-actor scan is needed.
+
+#### 3.1.2 Build the input
+
+Pass the **temp** graphify output path, provenance metadata, and (optional) `actor_context` to `/bedrock:preserve`. The skill's Phase 0.2 merges this temp output into the vault's cumulative `graphify-out/`:
 
 ```
 graphify_output_path: $GRAPHIFY_OUT_NEW       # = $TEACH_TMP/graphify-out/
 source_url: <source_url from Phase 1>
 source_type: <source_type from Phase 1>
+actor_context: <derived in 3.1.1, or omitted>
 ```
 
 **IMPORTANT:**
 - `/teach` does NOT classify graphify nodes into entity types. Entity classification, filtering,
-  matching, and user confirmation are all `/bedrock:preserve`'s responsibility (Phase 1.3).
+  matching, and user confirmation are all `/bedrock:preserve`'s responsibility (Phase 1.3). `/teach`'s only contribution is the `actor_context` hint.
 - `/teach` does NOT merge the graph into the vault. That is `/bedrock:preserve`'s responsibility
   (Phase 0.2). We pass the per-run temp path; preserve merges and then reads from the merged
   `<VAULT_PATH>/graphify-out/`.
@@ -523,3 +545,5 @@ Each entity above received in the `sources` frontmatter field:
 | Sensitive data | NEVER include credentials, tokens, passwords, PANs, CVVs. |
 | Vault resolution first | Resolve `VAULT_PATH` before any file operation — never assume CWD is the vault |
 | Pass --vault to /preserve | ALWAYS include `--vault <VAULT_NAME>` when delegating to `/bedrock:preserve` |
+| Derive `actor_context` for actor corpora | For `source_type ∈ {github-repo, local-dir}`, when the repo/dir basename matches an existing vault actor slug, pass `actor_context: <slug>` to `/preserve`. For other source types, leave `actor_context` unset. |
+| Multi-actor abort | Before passing `actor_context`, scan top-level subdirectories of the cloned repo. If 2+ subdirectories match existing actor slugs in `<VAULT_PATH>/actors/`, abort with guidance to split the invocation. Never auto-partition. |
