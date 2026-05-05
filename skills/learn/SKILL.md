@@ -1,19 +1,19 @@
 ---
-name: teach
+name: learn
 description: >
-  Teaches the Second Brain to recognize a new external data source. Fetches content from
+  Ingests an external data source into the Second Brain. Fetches content from
   Confluence, Google Docs, GitHub repositories, remote URLs, or any local file format
   supported by docling (DOCX, PPTX, XLSX, PDF, HTML, EPUB, images, Markdown, CSV, and more),
   converts non-markdown formats to markdown via docling, runs the /graphify extraction pipeline,
   and delegates entity persistence (including the graphify-output merge) to /bedrock:preserve.
-  Use when: "bedrock teach", "bedrock-teach", "teach", "ingest source", "import document", "/bedrock:teach",
+  Use when: "bedrock learn", "bedrock-learn", "learn", "ingest source", "import document", "/bedrock:learn",
   or when the user provides a Confluence, Google Docs, or GitHub URL, a remote file URL, or
   a local file path to incorporate into the vault.
 user_invocable: true
 allowed-tools: Bash, Read, Write, Edit, Glob, Grep, Skill, Agent, WebFetch, mcp__plugin_github_github__*, mcp__plugin_atlassian_atlassian__*
 ---
 
-# /bedrock:teach — External Source Ingestion into the Second Brain
+# /bedrock:learn — External Source Ingestion into the Second Brain
 
 ## Plugin Paths
 
@@ -30,7 +30,7 @@ Where `<base_dir>` is the path provided in "Base directory for this skill".
 
 ## Vault Resolution
 
-Resolve which vault to teach. This skill can be invoked from any directory.
+Resolve which vault to learn. This skill can be invoked from any directory.
 
 **Step 1 — Parse `--vault` flag:**
 Check if the input arguments include `--vault <name>`. If found, extract the vault name and remove it from the arguments (the remaining text is the source URL/path).
@@ -160,16 +160,16 @@ If no argument was provided: ask the user "What source do you want to ingest? Pr
 All content is fetched to a temporary directory. This is the single input path for `/graphify`.
 
 ```bash
-TEACH_TMP="/tmp/bedrock-teach-$(date +%s)"
-mkdir -p "$TEACH_TMP"
-echo "Temporary directory: $TEACH_TMP"
+LEARN_TMP="/tmp/bedrock-learn-$(date +%s)"
+mkdir -p "$LEARN_TMP"
+echo "Temporary directory: $LEARN_TMP"
 ```
 
 Store the path for use in subsequent phases.
 
 ### 1.3 Fetch content
 
-Execute the fetch strategy for the detected type. All content lands in `$TEACH_TMP/`.
+Execute the fetch strategy for the detected type. All content lands in `$LEARN_TMP/`.
 
 #### 1.3.1 GitHub repository
 
@@ -178,13 +178,13 @@ For GitHub URLs (e.g.: `https://github.com/acme-corp/billing-api`):
 1. Extract `owner/repo` and `repo-name` from the URL
 2. Clone the repository (shallow):
    ```bash
-   git clone --depth 1 <url> "$TEACH_TMP/<repo-name>"
+   git clone --depth 1 <url> "$LEARN_TMP/<repo-name>"
    ```
 3. GitHub MCP enrichment — call directly in main context (NOT via subagent — MCP permissions are not inherited):
    - `mcp__plugin_github_github__get_file_contents` → read the repo's README.md
    - `mcp__plugin_github_github__list_commits` → last 10 commits
    - `mcp__plugin_github_github__list_pull_requests` → last 5 PRs (state=all, sort=updated)
-4. Compile MCP results into a single markdown file and save as `$TEACH_TMP/<repo-name>/_github_metadata.md`
+4. Compile MCP results into a single markdown file and save as `$LEARN_TMP/<repo-name>/_github_metadata.md`
 
 > **Best-effort:** If any MCP call fails, continue with what was obtained. Do NOT block ingestion.
 
@@ -193,7 +193,7 @@ For GitHub URLs (e.g.: `https://github.com/acme-corp/billing-api`):
 For Confluence URLs:
 1. Read the internal skill at `<base_dir>/../confluence-to-markdown/SKILL.md`
 2. Follow its instructions to parse the URL, choose layer (MCP → API → browser), and extract content
-3. Save the returned Markdown content to `$TEACH_TMP/<slug>.md`
+3. Save the returned Markdown content to `$LEARN_TMP/<slug>.md`
    - `<slug>` is derived from the page title or URL path (kebab-case, lowercase)
 
 If all three layers (MCP, API, browser) are unavailable: warn the user with the guidance message from the fetcher module and abort this source type.
@@ -204,7 +204,7 @@ For Google Docs or Sheets URLs:
 1. Read the internal skill at `<base_dir>/../gdoc-to-markdown/SKILL.md`
 2. Follow its instructions to parse the URL, detect document type (Doc vs Sheet), choose layer (MCP → API/public export → browser), and extract content
 3. The fetcher saves output to `/tmp/gdoc_{docId}.md` or `/tmp/gsheet_{docId}.md`
-4. Copy the output file to `$TEACH_TMP/<slug>.md`
+4. Copy the output file to `$LEARN_TMP/<slug>.md`
    - `<slug>` is derived from the document title or URL path (kebab-case, lowercase)
 
 If all three layers (MCP, API/public export, browser) are unavailable: warn the user with the guidance message from the fetcher module and abort this source type.
@@ -216,12 +216,12 @@ For any other HTTP/HTTPS URL, download the raw bytes so docling can operate on b
 
 1. Try `curl` first for true binary fidelity:
    ```bash
-   curl -fsSL -o "$TEACH_TMP/<filename-derived-from-url>" "<url>"
+   curl -fsSL -o "$LEARN_TMP/<filename-derived-from-url>" "<url>"
    ```
    - `<filename-derived-from-url>` preserves the URL's basename (including extension) when
      available; fall back to `<slug>.bin` if no extension is present.
 2. If `curl` is unavailable or the URL returns an HTML page (by Content-Type), fall back to
-   WebFetch and save the response text as `$TEACH_TMP/<slug>.md`.
+   WebFetch and save the response text as `$LEARN_TMP/<slug>.md`.
 
 If both attempts fail: warn "Could not fetch URL. Check if the URL is accessible." and abort.
 
@@ -233,7 +233,7 @@ For local files:
 1. Verify the file exists using Read (or `test -f`).
 2. Copy to tmp preserving the filename:
    ```bash
-   cp "<local-path>" "$TEACH_TMP/"
+   cp "<local-path>" "$LEARN_TMP/"
    ```
 
 No extension-based filtering — any existing file is accepted. Phase 1.5 decides conversion.
@@ -246,23 +246,23 @@ For local directories:
    ```bash
    rsync -a --exclude='.git' --exclude='node_modules' --exclude='bin' --exclude='obj' \
      --exclude='.vs' --exclude='TestResults' --exclude='packages' \
-     "<local-dir>/" "$TEACH_TMP/$(basename <local-dir>)/"
+     "<local-dir>/" "$LEARN_TMP/$(basename <local-dir>)/"
    ```
 
 ### 1.4 Phase 1 result
 
 At the end of this phase, you should have:
-- **`$TEACH_TMP`**: directory with all fetched content (local path for graphify)
+- **`$LEARN_TMP`**: directory with all fetched content (local path for graphify)
 - **`source_url`**: original URL or file path provided by the user
 - **`source_type`**: `confluence`, `gdoc`, `github-repo`, `remote-binary`, `local-file`, `local-dir`, or `manual`
 
-Report: "Phase 1 complete: Content fetched to `$TEACH_TMP`. Source type: `<source_type>`."
+Report: "Phase 1 complete: Content fetched to `$LEARN_TMP`. Source type: `<source_type>`."
 
 ---
 
 ## Phase 1.5 — Docling Conversion
 
-For every fetched file in `$TEACH_TMP` that is not a GitHub repo and is not already markdown
+For every fetched file in `$LEARN_TMP` that is not a GitHub repo and is not already markdown
 output from Confluence/GDoc fetchers, check whether docling supports the file type and, if so,
 convert it to markdown in place. GitHub repos (`source_type == "github-repo"`) skip this phase
 entirely and flow straight to graphify.
@@ -287,7 +287,7 @@ Phase 0 / `/bedrock:setup`). Compare by lowercase file extension:
 
 ### 1.5.2 Routing and failure rules
 
-For each file under `$TEACH_TMP` (excluding files inside `<repo-name>/` subdirectories of a
+For each file under `$LEARN_TMP` (excluding files inside `<repo-name>/` subdirectories of a
 `github-repo` source — skip those entirely):
 
 1. **Skip by type — already markdown or plain text:** if extension is `.md`, `.txt`, or `.csv`,
@@ -304,8 +304,8 @@ For each file under `$TEACH_TMP` (excluding files inside `<repo-name>/` subdirec
    to target a predictable path:
 
    ```bash
-   cd "$TEACH_TMP"
-   docling --from <auto> --to md --output "$TEACH_TMP" "<relative-file-path>"
+   cd "$LEARN_TMP"
+   docling --from <auto> --to md --output "$LEARN_TMP" "<relative-file-path>"
    ```
 
    Docling produces `<stem>.md` alongside the source. After a successful run:
@@ -317,14 +317,14 @@ For each file under `$TEACH_TMP` (excluding files inside `<repo-name>/` subdirec
      so this branch is defensive): leave the original file in place, record status
      `failed-fallback (raw passthrough)`, and continue with other files.
    - Otherwise (binary format like `.docx`, `.pdf`, etc.): **abort the entire skill**. Clean
-     up `$TEACH_TMP` (`rm -rf "$TEACH_TMP"`) and emit a clear error:
+     up `$LEARN_TMP` (`rm -rf "$LEARN_TMP"`) and emit a clear error:
      `ERROR: docling failed to convert <file>. Aborting ingestion. Temp directory cleaned up.`
      Do NOT proceed to graphify or preserve.
 
 ### 1.5.3 Phase 1.5 result
 
 At the end of Phase 1.5:
-- `$TEACH_TMP` contains markdown files (either originals or docling-converted).
+- `$LEARN_TMP` contains markdown files (either originals or docling-converted).
 - You have a per-file status map to surface in Phase 4's report:
   - `converted`: ran docling successfully
   - `passed-through`: skipped docling (markdown/plain text or unsupported type)
@@ -343,14 +343,14 @@ Use the Skill tool to invoke `/graphify`, directing its output to a per-run temp
 Phase 0 merge step, not by this skill.
 
 ```
-/graphify $TEACH_TMP --mode deep --obsidian --obsidian-dir $TEACH_TMP
+/graphify $LEARN_TMP --mode deep --obsidian --obsidian-dir $LEARN_TMP
 ```
 
-The convention used here: passing `--obsidian-dir $TEACH_TMP` makes graphify write its
-`graphify-out/` tree under `$TEACH_TMP/graphify-out/`. Store that path as:
+The convention used here: passing `--obsidian-dir $LEARN_TMP` makes graphify write its
+`graphify-out/` tree under `$LEARN_TMP/graphify-out/`. Store that path as:
 
 ```bash
-GRAPHIFY_OUT_NEW="$TEACH_TMP/graphify-out"
+GRAPHIFY_OUT_NEW="$LEARN_TMP/graphify-out"
 ```
 
 **IMPORTANT:**
@@ -373,7 +373,7 @@ fi
 
 **If graph.json is missing or empty:**
 - Warn the user: "graphify extraction failed — no graph produced. Check the content and try again."
-- Clean up tmp: `rm -rf "$TEACH_TMP"`
+- Clean up tmp: `rm -rf "$LEARN_TMP"`
 - Abort gracefully
 
 ### 2.3 Phase 2 result
@@ -406,7 +406,7 @@ Derivation rules by `source_type`:
 
 **Multi-actor abort.** Before passing `actor_context`, scan the cloned repo's top-level subdirectories. If 2 or more of those subdirectory names match existing actor slugs in `<VAULT_PATH>/actors/`, abort with:
 
-> "Detected multiple actor candidates in this corpus: `<list>`. `/teach` only accepts a single-actor corpus per invocation. Run `/teach` separately against each actor, e.g.: `/teach <url>/<sub-actor-1>` and `/teach <url>/<sub-actor-2>`. If the repo is a true monorepo and you want a single ingestion, leave `actor_context` unset by passing `--no-actor-context` (graphify nodes will be classified globally instead of as `code` of one actor)."
+> "Detected multiple actor candidates in this corpus: `<list>`. `/learn` only accepts a single-actor corpus per invocation. Run `/learn` separately against each actor, e.g.: `/learn <url>/<sub-actor-1>` and `/learn <url>/<sub-actor-2>`. If the repo is a true monorepo and you want a single ingestion, leave `actor_context` unset by passing `--no-actor-context` (graphify nodes will be classified globally instead of as `code` of one actor)."
 >
 > Do NOT proceed to /preserve.
 
@@ -417,16 +417,16 @@ For non-`github-repo`/`local-dir` source types, no multi-actor scan is needed.
 Pass the **temp** graphify output path, provenance metadata, and (optional) `actor_context` to `/bedrock:preserve`. The skill's Phase 0.2 merges this temp output into the vault's cumulative `graphify-out/`:
 
 ```
-graphify_output_path: $GRAPHIFY_OUT_NEW       # = $TEACH_TMP/graphify-out/
+graphify_output_path: $GRAPHIFY_OUT_NEW       # = $LEARN_TMP/graphify-out/
 source_url: <source_url from Phase 1>
 source_type: <source_type from Phase 1>
 actor_context: <derived in 3.1.1, or omitted>
 ```
 
 **IMPORTANT:**
-- `/teach` does NOT classify graphify nodes into entity types. Entity classification, filtering,
-  matching, and user confirmation are all `/bedrock:preserve`'s responsibility (Phase 1.3). `/teach`'s only contribution is the `actor_context` hint.
-- `/teach` does NOT merge the graph into the vault. That is `/bedrock:preserve`'s responsibility
+- `/learn` does NOT classify graphify nodes into entity types. Entity classification, filtering,
+  matching, and user confirmation are all `/bedrock:preserve`'s responsibility (Phase 1.3). `/learn`'s only contribution is the `actor_context` hint.
+- `/learn` does NOT merge the graph into the vault. That is `/bedrock:preserve`'s responsibility
   (Phase 0.2). We pass the per-run temp path; preserve merges and then reads from the merged
   `<VAULT_PATH>/graphify-out/`.
 
@@ -456,8 +456,8 @@ Record the result for use in the report (Phase 4).
 After `/bedrock:preserve` confirms completion, remove the temporary directory:
 
 ```bash
-rm -rf "$TEACH_TMP"
-echo "Temporary directory cleaned up: $TEACH_TMP"
+rm -rf "$LEARN_TMP"
+echo "Temporary directory cleaned up: $LEARN_TMP"
 ```
 
 **IMPORTANT:** Clean up AFTER /preserve confirms, not after graphify finishes.
@@ -469,7 +469,7 @@ and is used by `/bedrock:ask` for graph traversal.
 Present to the user:
 
 ```
-## /bedrock:teach — Report
+## /bedrock:learn — Report
 
 ### Ingested source
 - **Type:** <source_type>
@@ -486,7 +486,7 @@ Summary: N converted, M passed-through, P failed-fallback.
 (Omit this block entirely for `source_type == "github-repo"` where docling is bypassed.)
 
 ### Extraction (via /graphify)
-- **Graph:** N nodes, M edges, P communities (fresh run into $TEACH_TMP)
+- **Graph:** N nodes, M edges, P communities (fresh run into $LEARN_TMP)
 - **Report:** $GRAPHIFY_OUT_NEW/GRAPH_REPORT.md (before merge)
 
 ### Graphify merge (via /bedrock:preserve Phase 0.2)
@@ -528,15 +528,15 @@ Each entity above received in the `sources` frontmatter field:
 | Rule | Detail |
 |---|---|
 | Invoke /graphify via Skill tool | NEVER call graphify Python API directly (`graphify.detect`, `graphify.build`, `graphify.extract`, etc.). Always invoke via the Skill tool. |
-| All remote content fetched to /tmp | Every input type is fetched to `/tmp/bedrock-teach-<ts>/` before invoking graphify. graphify receives only a local path. |
-| /teach does NOT classify entities | Entity classification, filtering, matching, and user confirmation are `/bedrock:preserve`'s responsibility. /teach passes the graphify output path and provenance metadata. |
-| Delegate to /bedrock:preserve | ALL entities are persisted via `/bedrock:preserve` — teach does NOT create, update, or write vault entities. |
-| /teach does NOT merge graphify output into the vault | Graphify is invoked into `$TEACH_TMP/graphify-out/` (per-run temp dir); `/bedrock:preserve`'s Phase 0.2 merges that into `<VAULT_PATH>/graphify-out/`. /teach never writes directly to the vault's `graphify-out/`. |
+| All remote content fetched to /tmp | Every input type is fetched to `/tmp/bedrock-learn-<ts>/` before invoking graphify. graphify receives only a local path. |
+| /learn does NOT classify entities | Entity classification, filtering, matching, and user confirmation are `/bedrock:preserve`'s responsibility. /learn passes the graphify output path and provenance metadata. |
+| Delegate to /bedrock:preserve | ALL entities are persisted via `/bedrock:preserve` — learn does NOT create, update, or write vault entities. |
+| /learn does NOT merge graphify output into the vault | Graphify is invoked into `$LEARN_TMP/graphify-out/` (per-run temp dir); `/bedrock:preserve`'s Phase 0.2 merges that into `<VAULT_PATH>/graphify-out/`. /learn never writes directly to the vault's `graphify-out/`. |
 | Docling auto-install is silent | Phase 0 auto-installs docling if missing with a single status line — no user prompt. Fail the skill if install fails; direct the user to `/bedrock:setup`. |
 | Docling skipped for GitHub repos | `source_type == "github-repo"` skips Phase 1.5 entirely — cloned repos flow straight to graphify. |
 | Docling routing rule | Run docling on files with docling-supported extensions (see Phase 1.5.1). Pass-through for `.md`/`.txt`/`.csv` and for extensions not in docling's supported list. |
-| Docling failure fallback | On docling non-zero exit: if file is `.md`/`.txt`/`.csv`, continue with raw file. For any other extension, abort the entire skill and clean up `$TEACH_TMP`. |
-| Cleanup /tmp after /preserve confirms | Remove `/tmp/bedrock-teach-<ts>/` only after /preserve confirms completion, not after graphify finishes. |
+| Docling failure fallback | On docling non-zero exit: if file is `.md`/`.txt`/`.csv`, continue with raw file. For any other extension, abort the entire skill and clean up `$LEARN_TMP`. |
+| Cleanup /tmp after /preserve confirms | Remove `/tmp/bedrock-learn-<ts>/` only after /preserve confirms completion, not after graphify finishes. |
 | Provenance via source_url | ALWAYS include `source_url` and `source_type` when delegating to /bedrock:preserve. |
 | Internal fetcher skills | Read internal skills from `<base_dir>/../confluence-to-markdown/SKILL.md` and `<base_dir>/../gdoc-to-markdown/SKILL.md` for content fetching. Never invoke external skills. |
 | Best-effort for external sources | If MCP or fetch fails, warn and continue with what was obtained. Never block ingestion. |

@@ -3,14 +3,14 @@ name: confluence-to-markdown
 description: >
   Internal fetcher module for Confluence pages. Fetches content via Atlassian MCP (preferred),
   REST API with Basic Auth (fallback), or browser DOM extraction via Claude in Chrome (last resort)
-  and returns Markdown. Used by /bedrock:teach and /bedrock:sync — not intended for direct user invocation.
+  and returns Markdown. Used by /bedrock:learn and /bedrock:sync — not intended for direct user invocation.
 user_invocable: false
 allowed-tools: Bash, Read, Write, WebFetch, ToolSearch, mcp__plugin_atlassian_atlassian__*, mcp__claude-in-chrome__*
 ---
 
 # Confluence Fetcher
 
-Internal module — invoked by `/bedrock:teach` Phase 1 and `/bedrock:sync` Phase 2, not user-invocable.
+Internal module — invoked by `/bedrock:learn` Phase 1 and `/bedrock:sync` Phase 2, not user-invocable.
 
 Fetches a Confluence page and returns its content as Markdown. Three layers in fallback order:
 **MCP (preferred) → REST API → Browser DOM extraction.**
@@ -264,7 +264,7 @@ Check that the result is not empty and not a login page. If validation fails:
 
 ## Output Contract
 
-Return to the caller (`/bedrock:teach` or `/bedrock:sync`):
+Return to the caller (`/bedrock:learn` or `/bedrock:sync`):
 - **Markdown content**: the full page content as Markdown
 - **Page title**: extracted from MCP response, API response (`title` field), or browser extraction (`title` in JSON)
 - **Layer used**: MCP, API, or Browser

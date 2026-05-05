@@ -6,10 +6,10 @@ import { AnimateIn } from "@/components/animate-in";
 const NARRATIVE_STEPS = [
   {
     number: "01",
-    title: "Teach it your sources",
+    title: "Learn from your sources",
     description:
       "Point Bedrock at a Confluence page, a GitHub repo, a Google Doc, or a CSV. It reads the source, extracts entities — people, systems, teams, topics — and classifies them automatically.",
-    command: "/bedrock:teach",
+    command: "/bedrock:learn",
     videoPath: "/videos/teach.mp4",
     accent: "purple" as const,
   },
@@ -48,7 +48,7 @@ export function HowItWorks() {
       <div className="max-w-5xl mx-auto px-6">
         <SectionHeader
           label="How It Works"
-          title="Teach, preserve, compress, ask"
+          title="Learn, preserve, compress, ask"
           subtitle="Four steps to turn scattered knowledge into a living, queryable graph."
         />
 
