@@ -1,6 +1,15 @@
 # Decision Log
 > Newest first. Updated automatically by the architect agent.
 
+## 2026-05-05 — `graph.json` promoted to primary index in `/bedrock:ask` Phase 2
+- **Context:** `ask-graph-index` feature. `/bedrock:ask` used glob/grep as the primary Phase 2 search strategy, ignoring `graph.json` until Phase 3-G escalation.
+- **Decision:** Phase 2.0 now reads `graph.json` nodes array first and scores by label match > community resonance > god-node boost (LLM-evaluated). Glob/grep becomes a per-term fallback for search terms with zero graph representation.
+- **Scoring model:** LLM instruction, not deterministic algorithm. Rationale: SKILL.md executes as a prompt; algorithmic scoring in natural-language instructions is brittle. Semantic instructions leverage the LLM's strength.
+- **Node cap:** 500 nodes from `graph.json` if array is large. Graphify orders by centrality — high-value nodes come first.
+- **Phase 3-G escalation:** changed from "graph.json exists?" to "graph.json covers the specific gap?". Live `/graphify` is now a last resort. Soft gate: when in doubt, escalate.
+- **Pitfall discovered:** The entity budget (15 total) is stated in two places (Phase 2.0 and Phase 2.5) without a unified accounting statement. Future spec should clarify: "15 entities total across 2.0 + 2.4 + 2.5 combined."
+- **Scope clarification:** PRD initially identified "teach doesn't update graph.json" as a gap. Investigation found `/bedrock:preserve` Phase 0.2 already implements the atomic merge on every `/teach` run. No changes needed to `/teach` or `/preserve`.
+
 ## 2026-04-18 — docling promoted to core `/bedrock:teach` dependency (alongside graphify)
 - **Context:** `teach-docling-integration-part-2` added docling (https://github.com/docling-project/docling) as the universal file → markdown converter inside `/teach`'s new Phase 1.5. Without docling, `/teach` is limited to markdown / text-native / CSV inputs; with it, `/teach` accepts DOCX, PPTX, XLSX, PDF, HTML, EPUB, and images.
 - **Install model:** silent auto-install via `pipx` (preferred) → `pip --user` (fallback) → abort. No user confirmation prompt, matching the graphify autoinstall precedent from §1.2.1. `/bedrock:setup` installs docling at vault-init time (new §1.2.1.1); `/teach`'s Phase 0 lazily re-installs for vaults that predate this change.

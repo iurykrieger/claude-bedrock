@@ -2,11 +2,10 @@
 name: ask
 description: >
   Adaptive vault reader skill. Receives a natural language question,
-  searches the vault first (Glob/Grep, entity reads, wikilink traversal),
-  then self-assesses whether more context is needed. Escalates to /graphify
-  for graph-level understanding or to /bedrock:teach for remote content ingestion
-  only when the vault alone is insufficient. Answers simple questions with zero
-  graphify calls.
+  uses graph.json as the primary index (Phase 2.0) before any glob/grep,
+  then self-assesses whether more context is needed. Escalates to live /graphify
+  only when graph coverage is insufficient, or to /bedrock:teach for remote content
+  ingestion. Answers simple questions with zero graphify calls.
   Use when: "bedrock ask", "bedrock-ask", "/bedrock:ask", any question about the vault,
   "what do we know about", "who owns", "what's the status of", "tell me about",
   "how does it work", or any Second Brain query.
@@ -153,10 +152,52 @@ At the end, you should have:
 
 ---
 
-## Phase 2 — Vault-First Search
+## Phase 2 — Graph-First Search
 
-This phase **always runs** for every question, regardless of graph availability.
-It is the foundation of the adaptive approach — read vault content first, decide later.
+This phase **always runs** for every question. It uses the cumulative knowledge graph
+as the primary index when available, falling back to glob/grep for terms not represented
+in the graph. Never skip this phase.
+
+### 2.0 Check graph.json and score nodes
+
+Before any glob/grep, check if the cumulative knowledge graph is available:
+
+```bash
+if [ -f "<VAULT_PATH>/graphify-out/graph.json" ] && [ -s "<VAULT_PATH>/graphify-out/graph.json" ]; then
+    echo "graph_available"
+else
+    echo "graph_not_available"
+fi
+```
+
+**If `graph_available`:**
+
+1. Read `<VAULT_PATH>/graphify-out/graph.json` — extract only the `nodes` array (skip edges to avoid context explosion on large graphs). If the nodes array exceeds 500 entries, read only the first 500 — graphify orders nodes by centrality, so high-value nodes come first.
+
+2. From the nodes array, extract per node: `id`, `label`, `file_type`, `source_file`, `community`, `is_god_node`.
+
+3. Score nodes by relevance to the search terms from Phase 1:
+   - **Primary signal:** node `label` contains or closely matches any search term
+   - **Secondary signal:** node belongs to a community that contains other high-scoring nodes (community resonance)
+   - **Boost:** `is_god_node: true` nodes get elevated priority when their label is even loosely relevant to the query
+
+4. Select top N nodes (N ≤ 15, same limit as the current entity read budget). Track which search terms produced ≥ 1 matching node and which produced none.
+
+5. For each selected node with a non-null `source_file`:
+   - Resolve the corresponding vault `.md` file: search for the `source_file` basename in entity directories
+     ```
+     Glob: <VAULT_PATH>/actors/<basename>.md, <VAULT_PATH>/people/<basename>.md, <VAULT_PATH>/teams/<basename>.md,
+           <VAULT_PATH>/topics/*<basename>*.md, <VAULT_PATH>/discussions/*<basename>*.md, <VAULT_PATH>/projects/<basename>.md
+     ```
+   - If found: read the full entity file — this node is fully resolved (skip steps 2.2–2.4 for this entity)
+   - If not found: record graph metadata only (label, community, relevant edge labels) — use this metadata in Phase 5 response to surface the concept even without a vault file
+
+6. For each search term that produced **zero** matching graph nodes → proceed to steps 2.2–2.4 (glob/grep) for **that term only**.
+
+**If `graph_not_available`:**
+Skip to step 2.1. No warning — this is the normal path for fresh vaults.
+
+---
 
 ### 2.1 Read entity definitions
 
@@ -248,9 +289,11 @@ If the limit is reached, prioritize entities directly mentioned in the question.
 ### 2.6 Phase 2 output
 
 At the end of Phase 2, you have:
-- A set of vault entities with their full content
-- Wikilinks between them (structural relationships)
-- External URLs found in their content (Confluence, GDocs, GitHub)
+- A set of vault entities with their full content (resolved from graph nodes or grep)
+- Graph-only nodes: concepts/entities from `graph.json` with no vault `.md` (label + community + edge metadata only)
+- Wikilinks between resolved entities (structural relationships)
+- External URLs found in entity content (Confluence, GDocs, GitHub)
+- A record of which search terms were covered by the graph vs. which fell back to grep
 - A sense of whether the vault content covers the question
 
 ---
@@ -304,22 +347,29 @@ then re-assess whether graphify is still needed.
 
 Execute only when the self-assessment determines `needs_graphify`.
 
-#### 3-G.0 Check graph availability
+#### 3-G.0 Assess graph coverage
 
-```bash
-if [ -f "<VAULT_PATH>/graphify-out/graph.json" ] && [ -s "<VAULT_PATH>/graphify-out/graph.json" ]; then
-    echo "graph_available"
-else
-    echo "graph_not_available"
-fi
-```
+Before escalating to a live `/graphify` call, assess whether the cumulative `graph.json`
+already covers the gap identified in Phase 3.1. Live `/graphify` invocations are a last resort —
+they re-extract what is likely already indexed.
 
-**If `graph_not_available`:** Display the following warning and skip to Phase 4 with vault-only content:
+**Step 1 — Check if graph was available in Phase 2.0:**
+
+- If Phase 2.0 determined `graph_not_available`: display the warning below and skip to Phase 4.
+- If Phase 2.0 determined `graph_available`: proceed to Step 2.
 
 > [!warning] Knowledge graph unavailable
 > The knowledge graph is not available (`<VAULT_PATH>/graphify-out/graph.json` missing or empty).
 > The answer below is based on vault content only — it may be incomplete for this type of question.
 > Run `/graphify build` to rebuild the graph from the vault's actor repositories.
+
+**Step 2 — Assess coverage for the specific gap:**
+
+Using the nodes collected in Phase 2.0, evaluate whether the gap identified in Phase 3.1 is covered:
+
+- If the gap is about relationships or dependencies: check whether `graph.json` nodes for the relevant entities have edges. If yes, read the edges section of `graph.json` filtered to those node IDs and incorporate into the working context. Only invoke live `/graphify` if edges are also insufficient.
+- If the gap is about a domain or concept with **zero** graph nodes (Phase 2.0 produced no matches for those search terms): live `/graphify` is warranted — proceed to 3-G.1.
+- **When in doubt, escalate.** The coverage assessment is a soft gate — if there is any uncertainty about whether the graph covers the gap, proceed to 3-G.1 and invoke live `/graphify`.
 
 #### 3-G.1 Formulate graphify calls
 
@@ -530,3 +580,4 @@ When appropriate, suggest actions to the user:
 | Weight hierarchy | permanent > bridge > index > fleeting. Use as guideline, not mathematical formula. |
 | Vault resolution first | Resolve `VAULT_PATH` before any file operation — never assume CWD is the vault |
 | All entity paths use `<VAULT_PATH>/` prefix | `<VAULT_PATH>/actors/`, not `actors/` |
+| Graph-first in Phase 2 | Phase 2.0 always runs before glob/grep. grep is a fallback for search terms that produced no matching graph nodes, not the primary strategy. |
