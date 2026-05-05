@@ -355,13 +355,28 @@ they re-extract what is likely already indexed.
 
 **Step 1 — Check if graph was available in Phase 2.0:**
 
-- If Phase 2.0 determined `graph_not_available`: display the warning below and skip to Phase 4.
+- If Phase 2.0 determined `graph_not_available`: display the warning below, ask the user whether to build the graph now, and wait for their response before proceeding.
 - If Phase 2.0 determined `graph_available`: proceed to Step 2.
 
 > [!warning] Knowledge graph unavailable
 > The knowledge graph is not available (`<VAULT_PATH>/graphify-out/graph.json` missing or empty).
 > The answer below is based on vault content only — it may be incomplete for this type of question.
-> Run `/graphify build` to rebuild the graph from the vault's actor repositories.
+
+After displaying the warning, ask the user:
+
+> "O knowledge graph não está disponível, o que pode tornar esta resposta incompleta. Deseja reconstruí-lo agora antes de continuar?
+> Se sim, rode: `/graphify build` — isso indexa todos os atores cadastrados no vault e pode levar alguns minutos.
+> Responda **sim** para aguardar e tentar novamente, ou **não** para continuar com o conteúdo disponível."
+
+- **If the user responds "sim" (or equivalent affirmative):**
+  1. Inform: "Aguardando `/graphify build`…"
+  2. Invoke `/graphify build` via the Skill tool
+  3. After completion, re-run the Phase 2.0 availability check
+  4. If `graph.json` is now available, continue to Step 2
+  5. If still unavailable: inform the user and skip to Phase 4 with vault-only content
+
+- **If the user responds "não" (or equivalent negative), or does not respond:**
+  Skip to Phase 4 with vault-only content. Never block indefinitely.
 
 **Step 2 — Assess coverage for the specific gap:**
 
