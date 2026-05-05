@@ -241,6 +241,7 @@ If the Python block exits non-zero, abort without running the `mv` — the vault
 
 **Step 4 — Append `obsidian/*.md` files.** For each markdown file in `<graphify_output_path>/obsidian/`:
 
+- Skip any file whose `source_file` frontmatter value starts with `/tmp/` — these are ephemeral visualization files produced by `/bedrock:teach` and must not accumulate in the vault.
 - If the corresponding file exists in `<VAULT_PATH>/graphify-out/obsidian/`: append the incoming content to the existing file, separated by `\n\n---\n\n`. Existing content is preserved verbatim.
 - If it does not exist: copy the file into `<VAULT_PATH>/graphify-out/obsidian/`.
 
@@ -248,6 +249,8 @@ If the Python block exits non-zero, abort without running the `mv` — the vault
 mkdir -p "<VAULT_PATH>/graphify-out/obsidian"
 for src in "<graphify_output_path>/obsidian/"*.md; do
   [ -e "$src" ] || continue
+  SRC_FILE=$(awk -F'"' '/^source_file:/{print $2; exit}' "$src")
+  case "$SRC_FILE" in /tmp/*) continue ;; esac
   dest="<VAULT_PATH>/graphify-out/obsidian/$(basename "$src")"
   if [ -e "$dest" ]; then
     printf '\n\n---\n\n' >> "$dest"
