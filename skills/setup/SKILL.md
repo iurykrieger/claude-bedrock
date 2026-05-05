@@ -107,10 +107,10 @@ Check for external tools, environment variables, and MCP servers that enhance th
 
 | Dependency | Check method | What it unlocks |
 |---|---|---|
-| graphify | Glob: `~/.claude/skills/graphify/SKILL.md` | **Required.** Extraction engine for all `/bedrock:teach` ingestion. Without it, /teach cannot function. |
-| docling | Bash: `command -v docling >/dev/null 2>&1` | **Required.** Universal file → markdown converter used by `/bedrock:teach` to ingest DOCX, PPTX, XLSX, HTML, EPUB, PDF, images, and other non-markdown formats. Without it, /teach can only ingest text-native formats. |
-| CONFLUENCE_API_TOKEN + CONFLUENCE_USER_EMAIL | Bash: `test -n "$CONFLUENCE_API_TOKEN" && test -n "$CONFLUENCE_USER_EMAIL"` | Confluence page ingestion via `/bedrock:teach` (API strategy). |
-| GOOGLE_ACCESS_TOKEN | Bash: `test -n "$GOOGLE_ACCESS_TOKEN"` | Google Docs and Sheets ingestion via `/bedrock:teach` (API strategy). |
+| graphify | Glob: `~/.claude/skills/graphify/SKILL.md` | **Required.** Extraction engine for all `/bedrock:learn` ingestion. Without it, /learn cannot function. |
+| docling | Bash: `command -v docling >/dev/null 2>&1` | **Required.** Universal file → markdown converter used by `/bedrock:learn` to ingest DOCX, PPTX, XLSX, HTML, EPUB, PDF, images, and other non-markdown formats. Without it, /learn can only ingest text-native formats. |
+| CONFLUENCE_API_TOKEN + CONFLUENCE_USER_EMAIL | Bash: `test -n "$CONFLUENCE_API_TOKEN" && test -n "$CONFLUENCE_USER_EMAIL"` | Confluence page ingestion via `/bedrock:learn` (API strategy). |
+| GOOGLE_ACCESS_TOKEN | Bash: `test -n "$GOOGLE_ACCESS_TOKEN"` | Google Docs and Sheets ingestion via `/bedrock:learn` (API strategy). |
 | claude-in-chrome MCP | ToolSearch: `select:mcp__claude-in-chrome__tabs_context_mcp` (succeeds = available) | **Optional.** Browser fallback for Confluence pages when API credentials are unavailable. |
 
 ### 1.2.1 Auto-install graphify if missing
@@ -199,8 +199,8 @@ If both steps failed (no `pipx`/`pip`, no network, or a permissions error), prin
 
 | Dependency | Status | What it unlocks |
 |---|---|---|
-| graphify | installed / NOT FOUND | Extraction engine for /teach |
-| docling | installed / NOT FOUND | Universal file → markdown converter for /teach |
+| graphify | installed / NOT FOUND | Extraction engine for /learn |
+| docling | installed / NOT FOUND | Universal file → markdown converter for /learn |
 | Confluence API credentials | configured / NOT SET | Confluence page ingestion (API) |
 | Google API token | configured / NOT SET | Google Docs/Sheets ingestion (API) |
 | claude-in-chrome MCP | available / NOT FOUND | Browser fallback for Confluence |
@@ -220,22 +220,22 @@ If both steps failed (no `pipx`/`pip`, no network, or a permissions error), prin
 For **graphify** specifically (required):
 
 ```
-> graphify is not installed. This is REQUIRED for /bedrock:teach to work.
+> graphify is not installed. This is REQUIRED for /bedrock:learn to work.
 > To install, check https://github.com/safishamsi/graphify for instructions.
 >
-> Your vault will initialize, but /bedrock:teach will not function until graphify is installed.
+> Your vault will initialize, but /bedrock:learn will not function until graphify is installed.
 ```
 
 For **docling** specifically (required for non-markdown ingestion):
 
 ```
-> docling is not installed. This is REQUIRED for /bedrock:teach to ingest non-markdown files
+> docling is not installed. This is REQUIRED for /bedrock:learn to ingest non-markdown files
 > (DOCX, PPTX, XLSX, PDF, HTML, EPUB, images, etc.).
 > To install manually: pipx install docling  (or: pip install --user docling)
 > More info: https://github.com/docling-project/docling
 >
-> Your vault will initialize, but /bedrock:teach will only handle markdown/text inputs until
-> docling is installed. /teach also attempts a silent auto-install on first invocation if the
+> Your vault will initialize, but /bedrock:learn will only handle markdown/text inputs until
+> docling is installed. /learn also attempts a silent auto-install on first invocation if the
 > dependency is still missing.
 ```
 
@@ -644,7 +644,7 @@ New domains can be added as the vault grows.
 | Action | Skill |
 |---|---|
 | Search and query the vault | `/bedrock:ask` |
-| Ingest external sources (Confluence, Google Docs, GitHub repositories, remote URLs, and any docling-supported file format — DOCX, PPTX, XLSX, PDF, HTML, EPUB, images, and more) | `/bedrock:teach` |
+| Ingest external sources (Confluence, Google Docs, GitHub repositories, remote URLs, and any docling-supported file format — DOCX, PPTX, XLSX, PDF, HTML, EPUB, images, and more) | `/bedrock:learn` |
 | Create or update entities manually | `/bedrock:preserve` |
 | Deduplicate and check vault health | `/bedrock:compress` |
 | Re-sync entities with external sources | `/bedrock:sync` |
@@ -1250,7 +1250,7 @@ After all files are created, present the user with a summary and next steps.
 1. **Open the vault in Obsidian** — Open this folder as an Obsidian vault. You'll see the example entities
    and their connections in the graph view immediately.
 
-2. **Ingest your first source** — Run `/bedrock:teach <url>` to import content from:
+2. **Ingest your first source** — Run `/bedrock:learn <url>` to import content from:
    - A GitHub repository URL
    - A Confluence page URL
    - A Google Docs URL

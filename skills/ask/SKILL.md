@@ -4,7 +4,7 @@ description: >
   Adaptive vault reader skill. Receives a natural language question,
   searches the vault first (Glob/Grep, entity reads, wikilink traversal),
   then self-assesses whether more context is needed. Escalates to /graphify
-  for graph-level understanding or to /bedrock:teach for remote content ingestion
+  for graph-level understanding or to /bedrock:learn for remote content ingestion
   only when the vault alone is insufficient. Answers simple questions with zero
   graphify calls.
   Use when: "bedrock ask", "bedrock-ask", "/bedrock:ask", any question about the vault,
@@ -78,14 +78,14 @@ Extract `language` and other relevant fields for use in later phases.
 
 This skill receives a natural language question and answers it using an adaptive,
 vault-first approach. It always reads vault content first, then decides whether
-to escalate to graphify or /teach based on what's actually needed — not what the
+to escalate to graphify or /learn ased on what's actually needed — not what the
 question looks like in isolation.
 
 **You are an adaptive context orchestrator agent. You only READ — never write, edit, or delete files directly.**
 
-Writes happen exclusively through `/bedrock:teach` delegation (which flows through `/bedrock:preserve`).
+Writes happen exclusively through `/bedrock:learn` delegation (which flows through `/bedrock:preserve`).
 If the query reveals outdated or missing information and no remote source is available to ingest,
-suggest that the user run `/bedrock:preserve` or `/bedrock:teach` to update the vault.
+suggest that the user run `/bedrock:preserve` or `/bedrock:learn` to update the vault.
 
 ---
 
@@ -391,31 +391,31 @@ that appear directly relevant to answering the question:
 **Limit:** 2 URLs per `/bedrock:ask` invocation. If more than 2 relevant URLs exist,
 prioritize those most directly related to the question.
 
-#### 3-T.2 Invoke /bedrock:teach
+#### 3-T.2 Invoke /bedrock:learn
 
-For each URL, invoke `/bedrock:teach` via the Skill tool:
+For each URL, invoke `/bedrock:learn` via the Skill tool:
 
 ```
-/bedrock:teach <URL>
+/bedrock:learn <URL>
 
 Context: Ingesting to answer the question: "<original question>"
 ```
 
 **IMPORTANT:**
 - Invoke via the Skill tool — same delegation pattern as teach → preserve
-- `/teach` handles its own flow: fetch content, extract entities, present to user for confirmation, delegate to `/preserve`
-- `/ask` waits for `/teach` to complete
+- `/learn` handles its own flow: fetch content, extract entities, present to user for confirmation, delegate to `/preserve`
+- `/ask` waits for `/learn` to complete
 
 #### 3-T.3 Re-read newly created entities
 
-After `/teach` completes successfully:
-1. Search the vault for entities that were just created or updated (based on `/teach`'s output)
+After `/learn` completes successfully:
+1. Search the vault for entities that were just created or updated (based on `/learn`'s output)
 2. Read these new entities (frontmatter + body)
 3. Add them to the working set of vault entities for response composition
 
 #### 3-T.4 Best-effort fallback
 
-If `/teach` fails or the user declines the confirmation:
+If `/learn` fails or the user declines the confirmation:
 - Log: "Teach delegation for <URL> did not complete. Continuing with available content."
 - Continue to Phase 4 with whatever content is available
 - **Never block the response** because of a failed teach delegation
@@ -466,12 +466,12 @@ Build the response following these rules:
 
 4. **Escalation transparency:**
    - If graphify was used, note: "I consulted the knowledge graph for deeper context."
-   - If /teach was invoked, note: "I ingested [source] into the vault to answer this question."
+   - If /learn was invoked, note: "I ingested [source] into the vault to answer this question."
    - If vault-only was sufficient, no special note needed
 
 5. **When nothing is found:**
    - State explicitly: "I didn't find information about [X] in the vault."
-   - If relevant, suggest: "You can use `/bedrock:teach <URL>` to ingest a source about this topic."
+   - If relevant, suggest: "You can use `/bedrock:learn <URL>` to ingest a source about this topic."
    - **NEVER fabricate information.** Only respond with what was found.
 
 6. **Response prioritization (Zettelkasten hierarchy):**
@@ -497,9 +497,9 @@ Build the response following these rules:
 
 When appropriate, suggest actions to the user:
 
-- If information is outdated: "The vault may be outdated about [X]. Consider running `/bedrock:teach <source>` to update."
+- If information is outdated: "The vault may be outdated about [X]. Consider running `/bedrock:learn <source>` to update."
 - If the question revealed gaps: "I didn't find [Y] in the vault. If you have this information, you can use `/bedrock:preserve` to record it."
-- If the question is complex and the response incomplete: "For a more complete view, you may also want to run `/bedrock:teach <URL>` to ingest additional sources."
+- If the question is complex and the response incomplete: "For a more complete view, you may also want to run `/bedrock:learn <URL>` to ingest additional sources."
 
 ---
 
@@ -510,14 +510,14 @@ When appropriate, suggest actions to the user:
 | Vault-first principle | Phase 2 ALWAYS runs before any escalation. Read vault content first, decide later. Never skip Phase 2. |
 | LLM self-assessment | The decision to escalate is made by the LLM after reading vault content (Phase 3.1), not by a heuristic rule table. Use the guidance provided, but the LLM makes the final call. |
 | Escalation priority | When multiple outcomes apply: `needs_remote_content` > `needs_graphify` > `vault_sufficient`. Internalize first, then analyze. |
-| No direct writes | `/ask` NEVER writes, edits, or deletes files directly. All writes are delegated through `/bedrock:teach` → `/bedrock:preserve`. |
-| Teach delegation via Skill tool | Invoke `/bedrock:teach` via the Skill tool. `/teach` owns its confirmation gate. `/ask` cannot bypass it. |
+| No direct writes | `/ask` NEVER writes, edits, or deletes files directly. All writes are delegated through `/bedrock:learn` → `/bedrock:preserve`. |
+| Teach delegation via Skill tool | Invoke `/bedrock:learn` via the Skill tool. `/learn` owns its confirmation gate. `/ask` cannot bypass it. |
 | Graphify via Skill tool | Invoke `/graphify` via the Skill tool — NEVER call the Python API directly. |
 | Max graphify calls | Read `query.max_graphify_calls` from `.bedrock/config.json` (default: 3, valid range: 1–5). Only consumed when graphify is actually invoked. |
 | Graph unavailable warning | When `needs_graphify` but `graphify-out/graph.json` is missing, display `> [!warning]` callout with `/graphify build` instruction. Continue with vault-only content. |
 | Best-effort escalation | If graphify fails or teach fails or user declines: continue with available content. NEVER block the response. |
 | Limit of 15 entities | Do not read more than 15 entities total across Phase 2 + Phase 3 |
-| Limit of 2 teach URLs | Do not invoke `/bedrock:teach` for more than 2 URLs per `/bedrock:ask` invocation |
+| Limit of 2 teach URLs | Do not invoke `/bedrock:learn` for more than 2 URLs per `/bedrock:ask` invocation |
 | No fabrication | Respond ONLY with information found in the vault or obtained through escalation. Never fabricate data. |
 | Clarification before guessing | If the question is ambiguous, ask for clarification. Do not assume. |
 | Vault language with technical terms in English | Response always in the vault's configured language |

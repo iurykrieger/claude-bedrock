@@ -4,14 +4,14 @@ description: >
   Internal fetcher module for Google Docs and Sheets. Fetches content via MCP (preferred, when available),
   Google API with bearer token or public URL export (fallback), or browser DOM extraction via Claude in
   Chrome (last resort) and returns Markdown.
-  Used by /bedrock:teach and /bedrock:sync — not intended for direct user invocation.
+  Used by /bedrock:learn and /bedrock:sync — not intended for direct user invocation.
 user_invocable: false
 allowed-tools: Bash, Read, Write, WebFetch, ToolSearch, mcp__claude-in-chrome__*
 ---
 
 # Google Docs & Sheets Fetcher
 
-Internal module — invoked by `/bedrock:teach` Phase 1 and `/bedrock:sync` Phase 2, not user-invocable.
+Internal module — invoked by `/bedrock:learn` Phase 1 and `/bedrock:sync` Phase 2, not user-invocable.
 
 Fetches a Google Docs document or Google Sheets spreadsheet and converts it to a local Markdown file.
 Supports both document types with automatic detection. Three layers in fallback order:
@@ -375,7 +375,7 @@ Write the Markdown content using the Write tool. Verify the file was written by 
 
 ### Return to caller
 
-Return to `/bedrock:teach` or `/bedrock:sync`:
+Return to `/bedrock:learn` or `/bedrock:sync`:
 - **Output file path**: `/tmp/gdoc_{docId}.md` or `/tmp/gsheet_{docId}.md`
 - **Document type**: Doc or Sheet
 - **Layer used**: MCP, API, Public Export, or Browser

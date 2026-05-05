@@ -34,7 +34,7 @@ sources:
 
 ## When to populate
 
-- An external source was ingested via `/teach` and the content created or updated this entity
+- An external source was ingested via `/learn` and the content created or updated this entity
 - `/sync` re-synchronized a source and updated `synced_at`
 - The user wants to manually record the provenance of an entity
 

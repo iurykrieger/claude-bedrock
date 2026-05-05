@@ -6,7 +6,7 @@ description: >
   (list of entities), free-form input (text, meeting notes, session context),
   or graphify output (graph.json + obsidian markdown from /graphify pipeline).
   Use when: "bedrock preserve", "bedrock-preserve", "save to vault", "record in vault", "/bedrock:preserve",
-  or when another skill (e.g., /bedrock:teach) needs to persist entities in the vault.
+  or when another skill (e.g., /bedrock:learn) needs to persist entities in the vault.
 user_invocable: true
 allowed-tools: Bash, Read, Write, Edit, Glob, Grep, Agent, mcp__plugin_github_github__*, mcp__plugin_atlassian_atlassian__*
 ---
@@ -101,7 +101,7 @@ If the pull fails:
 
 ### 0.2 Merge Incoming Graphify Output
 
-**When this runs:** Only when the skill was invoked with a `graphify_output_path` argument pointing at a graphify output directory (e.g., `/bedrock:teach` passes `$TEACH_TMP/graphify-out-new/`). Free-form text input and structured entity-list input skip this sub-phase entirely.
+**When this runs:** Only when the skill was invoked with a `graphify_output_path` argument pointing at a graphify output directory (e.g., `/bedrock:learn` passes `$TEACH_TMP/graphify-out-new/`). Free-form text input and structured entity-list input skip this sub-phase entirely.
 
 **Skip condition (backward compat):** If the input's `graphify_output_path` resolves to the same absolute path as `<VAULT_PATH>/graphify-out/`, skip this sub-phase. Legacy callers (and `/bedrock:sync` in its current form) point at the vault's own output directory — there is nothing to merge. Use `realpath` (or equivalent) to compare:
 
@@ -298,7 +298,7 @@ fi
 
 If the file does not exist, skip (nothing to mark).
 
-**Step 7 — Record merge stats for the Phase 7 report.** Capture `nodes_added`, `nodes_merged`, `edges_added` (from Step 3's Python stdout) and `stale_flag_set` (from Step 6). These values are threaded through to Phase 7's report block under a new **"Graphify merge"** section and returned in the skill's result payload to the caller (e.g., `/bedrock:teach`).
+**Step 7 — Record merge stats for the Phase 7 report.** Capture `nodes_added`, `nodes_merged`, `edges_added` (from Step 3's Python stdout) and `stale_flag_set` (from Step 6). These values are threaded through to Phase 7's report block under a new **"Graphify merge"** section and returned in the skill's result payload to the caller (e.g., `/bedrock:learn`).
 
 **Step 8 — Point subsequent phases at the merged location.** After the merge succeeds, set `graphify_output_path := <VAULT_PATH>/graphify-out/` for all downstream phases. Phase 1.3 (graphify-output parsing), Phase 2 (matching), and the rest of the flow read from the merged vault location — not from the original temp input.
 
@@ -310,7 +310,7 @@ If the file does not exist, skip (nothing to mark).
 
 ### 1.1 Structured input
 
-When called by another skill (e.g., `/bedrock:teach`) or when the user provides an explicit list.
+When called by another skill (e.g., `/bedrock:learn`) or when the user provides an explicit list.
 The format is an optional top-level header followed by a list of entities:
 
 ```yaml
@@ -375,7 +375,7 @@ Convert the result to the structured format from section 1.1 and proceed.
 
 ### 1.3 Graphify output input
 
-When called by `/bedrock:teach` (or any skill) with a graphify output reference,
+When called by `/bedrock:learn` (or any skill) with a graphify output reference,
 OR when the user invokes `/bedrock:preserve` directly pointing at a `graphify-out/` directory:
 
 **Input format:**
@@ -470,8 +470,8 @@ or references `graph.json`, treat as graphify output input.
 
 10. **Proceed to Phase 3** (Change Proposal) — present the classified cluster list for user confirmation, then execute writes as normal (Phases 4-7).
 
-> **Note:** When invoked directly by the user (not via /teach), the user confirmation in Phase 3
-> is the only gate before writes. When invoked via /teach, /teach has already shown the user
+> **Note:** When invoked directly by the user (not via /learn), the user confirmation in Phase 3
+> is the only gate before writes. When invoked via /learn, /learn has already shown the user
 > the graphify report (god nodes, communities) providing context for the confirmation.
 
 ### 1.4 Zettelkasten Classification
@@ -495,7 +495,7 @@ Consult the plugin's entity definitions ("Completeness Criteria" section) to det
 
 **When in doubt, err on the side of fleeting** — it is safer to capture as fleeting and promote later than to create an incomplete permanent entity.
 
-If the input came from another skill (e.g., `/bedrock:teach`) and already includes a classification suggestion (`type: fleeting`), respect the suggestion but validate against the criteria above.
+If the input came from another skill (e.g., `/bedrock:learn`) and already includes a classification suggestion (`type: fleeting`), respect the suggestion but validate against the criteria above.
 
 If no input was provided: ask the user "What would you like to preserve in the vault? Provide text, meeting notes, or a list of entities."
 
@@ -712,7 +712,7 @@ For each entity marked as `update`:
 
 ### 4.3 Populate `sources` field (when applicable)
 
-If the input contains `source_url` and `source_type` (provided by `/bedrock:teach` or another caller):
+If the input contains `source_url` and `source_type` (provided by `/bedrock:learn` or another caller):
 
 **When creating an entity:**
 - Add to frontmatter:
@@ -906,7 +906,7 @@ graph_back_pointers:
   unmatched_ids: ["..."]     # ids in touched entities but not found in graph.json
 ```
 
-These values are threaded through to Phase 7's report block under a new **"Graph back-pointers"** section and returned in the skill's result payload to callers (e.g. `/bedrock:teach`).
+These values are threaded through to Phase 7's report block under a new **"Graph back-pointers"** section and returned in the skill's result payload to callers (e.g. `/bedrock:learn`).
 
 ---
 
@@ -930,7 +930,7 @@ Sources: `memory`, `github`, `jira`, `confluence`, `gdoc`, `csv`, `manual`, `ses
 vault: preserves N entities [source: <sources>]
 ```
 
-Or, if called by `/bedrock:teach`:
+Or, if called by `/bedrock:learn`:
 ```
 vault: teaches <source-name>, creates N updates M entities [source: <type>]
 ```
@@ -1076,7 +1076,7 @@ Present to the user:
 
 Omit this section entirely when Phase 0.2 was skipped (no `graphify_output_path`, or backward-compat path match).
 
-The same four fields are included in the skill's return payload (e.g., consumed by `/bedrock:teach`):
+The same four fields are included in the skill's return payload (e.g., consumed by `/bedrock:learn`):
 
 ```yaml
 graphify_merge:
@@ -1147,7 +1147,7 @@ graph_back_pointers:
 | 20 | **Graphify merge backward-compat** — if `graphify_output_path` resolves to the same absolute path as `<VAULT_PATH>/graphify-out/`, Phase 0.2 is a no-op. Legacy callers and `/bedrock:sync` continue to work unchanged. |
 | 21 | **Graphify merge is atomic** — `graph.json` is merged into a `.staging` file and atomically renamed. If validation or merge fails, the vault's `graph.json` is untouched. |
 | 22 | **`.graphify_analysis.json` is marked stale, never recomputed** — Phase 0.2 sets `stale: true` on merge. `/bedrock:compress` owns recomputation. |
-| 23 | **`actor_context` scopes the corpus** — when present in Phase 1.1 / 1.3 input, `file_type=document/paper` graphify nodes become `code` of that actor with `node_type ∈ {concept, decision}`; when absent, classification falls back to corpus-agnostic logic (concept global / topic / fleeting). The caller (e.g. `/teach`) decides which mode to invoke. |
+| 23 | **`actor_context` scopes the corpus** — when present in Phase 1.1 / 1.3 input, `file_type=document/paper` graphify nodes become `code` of that actor with `node_type ∈ {concept, decision}`; when absent, classification falls back to corpus-agnostic logic (concept global / topic / fleeting). The caller (e.g. `/learn`) decides which mode to invoke. |
 | 24 | **Semantic grouping precedes filtering** — Phase 1.3 step 5 clusters graphify nodes by `semantically_similar_to ≥ code.cluster_threshold` (default 0.85) or community co-membership BEFORE the relevance filter. Each cluster maps to at most one `code` candidate carrying every `graphify_node_ids`. |
 | 25 | **Per-actor cap, no global cap** — `code.max_per_actor` (default 200, from `.bedrock/config.json`) caps `code` candidates per actor. Ranking inside the cap: `is_god_node` > `degree` > `edge_count`. There is NO absolute global cap on the number of `code` entities in the vault. |
 | 26 | **`graphify_node_ids` is always written as an array** — even when the cluster has a single member. At read time, `/preserve` accepts both the array form and the legacy singular `graphify_node_id` (string); it always writes the array on output. There is no batch migration. |

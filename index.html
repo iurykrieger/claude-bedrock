@@ -487,7 +487,7 @@
       <div class="workflow-pipeline">
         <div class="workflow-step"><div class="step-icon">&#9881;</div><div class="step-name">setup</div><div class="step-desc" data-i18n="wf_setup">Initialize vault structure and templates</div></div>
         <div class="workflow-arrow">&#8594;</div>
-        <div class="workflow-step"><div class="step-icon">&#128218;</div><div class="step-name">teach</div><div class="step-desc" data-i18n="wf_teach">Ingest from Confluence, GDocs, GitHub</div></div>
+        <div class="workflow-step"><div class="step-icon">&#128218;</div><div class="step-name">learn</div><div class="step-desc" data-i18n="wf_learn">Ingest from Confluence, GDocs, GitHub</div></div>
         <div class="workflow-arrow">&#8594;</div>
         <div class="workflow-step"><div class="step-icon">&#128279;</div><div class="step-name">preserve</div><div class="step-desc" data-i18n="wf_preserve">Create entities with bidirectional links</div></div>
         <div class="workflow-arrow">&#8594;</div>
@@ -552,7 +552,7 @@
       <div class="skills-grid">
         <div class="skill-card"><div class="skill-icon">&#9881;</div><span class="skill-name">/bedrock:setup</span><p data-i18n="sk_setup">Interactive wizard to scaffold directories, templates, and example entities. Pick a preset or go custom.</p></div>
         <div class="skill-card"><div class="skill-icon">&#128269;</div><span class="skill-name">/bedrock:ask</span><p data-i18n="sk_ask">Ask questions in natural language. Searches entities, follows wikilinks, and cross-references to build answers.</p></div>
-        <div class="skill-card"><div class="skill-icon">&#128218;</div><span class="skill-name">/bedrock:teach</span><p data-i18n="sk_teach">Feed it a Confluence page, Google Doc, GitHub repo, or CSV. It extracts entities and writes them to your vault.</p></div>
+        <div class="skill-card"><div class="skill-icon">&#128218;</div><span class="skill-name">/bedrock:learn</span><p data-i18n="sk_learn">Feed it a Confluence page, Google Doc, GitHub repo, or CSV. It extracts entities and writes them to your vault.</p></div>
         <div class="skill-card"><div class="skill-icon">&#128279;</div><span class="skill-name">/bedrock:preserve</span><p data-i18n="sk_preserve">Single write point for all entities. Detects type, matches existing files, creates or updates with bidirectional links.</p></div>
         <div class="skill-card"><div class="skill-icon">&#9878;</div><span class="skill-name">/bedrock:compress</span><p data-i18n="sk_compress">Finds duplicates, orphan entities, broken links, and stale content. Consolidates and reports vault health.</p></div>
         <div class="skill-card"><div class="skill-icon">&#128260;</div><span class="skill-name">/bedrock:sync</span><p data-i18n="sk_sync">Re-syncs entities with their external sources. Supports GitHub activity, contributor profiles, and source metadata.</p></div>
@@ -600,7 +600,7 @@
         hero_requires: 'Requires <a href="https://obsidian.md" target="_blank" rel="noopener">Obsidian</a> and <a href="https://docs.anthropic.com/en/docs/claude-code" target="_blank" rel="noopener">Claude Code</a>',
         workflow_label: 'How It Works', workflow_title: 'Six skills, one workflow',
         workflow_subtitle: 'Set up your vault, ingest knowledge from any source, and let Bedrock keep it organized.',
-        wf_setup: 'Initialize vault structure and templates', wf_teach: 'Ingest from Confluence, GDocs, GitHub',
+        wf_setup: 'Initialize vault structure and templates', wf_learn: 'Ingest from Confluence, GDocs, GitHub',
         wf_preserve: 'Create entities with bidirectional links', wf_ask: 'Search and cross-reference your vault',
         wf_compress: 'Deduplicate and consolidate entities', wf_sync: 'Re-sync with external sources',
         uc_label: 'Built For', uc_title: 'Your knowledge, structured',
@@ -615,7 +615,7 @@
         sk_subtitle: "Each skill is a specialized agent that reads your vault conventions and acts accordingly.",
         sk_setup: 'Interactive wizard to scaffold directories, templates, and example entities. Pick a preset or go custom.',
         sk_ask: 'Ask questions in natural language. Searches entities, follows wikilinks, and cross-references to build answers.',
-        sk_teach: 'Feed it a Confluence page, Google Doc, GitHub repo, or CSV. It extracts entities and writes them to your vault.',
+        sk_learn: 'Feed it a Confluence page, Google Doc, GitHub repo, or CSV. It extracts entities and writes them to your vault.',
         sk_preserve: 'Single write point for all entities. Detects type, matches existing files, creates or updates with bidirectional links.',
         sk_compress: 'Finds duplicates, orphan entities, broken links, and stale content. Consolidates and reports vault health.',
         sk_sync: 'Re-syncs entities with their external sources. Supports GitHub activity, contributor profiles, and source metadata.',
@@ -629,7 +629,7 @@
         hero_requires: 'Requer <a href="https://obsidian.md" target="_blank" rel="noopener">Obsidian</a> e <a href="https://docs.anthropic.com/en/docs/claude-code" target="_blank" rel="noopener">Claude Code</a>',
         workflow_label: 'Como Funciona', workflow_title: 'Seis skills, um fluxo',
         workflow_subtitle: 'Configure seu vault, ingira conhecimento de qualquer fonte e deixe o Bedrock manter tudo organizado.',
-        wf_setup: 'Inicializa estrutura e templates do vault', wf_teach: 'Ingere do Confluence, GDocs, GitHub',
+        wf_setup: 'Inicializa estrutura e templates do vault', wf_learn: 'Ingere do Confluence, GDocs, GitHub',
         wf_preserve: 'Cria entidades com links bidirecionais', wf_ask: 'Busca e cruza refer\u00eancias no vault',
         wf_compress: 'Deduplica e consolida entidades', wf_sync: 'Re-sincroniza com fontes externas',
         uc_label: 'Feito Para', uc_title: 'Seu conhecimento, estruturado',
@@ -644,7 +644,7 @@
         sk_subtitle: 'Cada skill \u00e9 um agente especializado que l\u00ea as conven\u00e7\u00f5es do vault e age de acordo.',
         sk_setup: 'Wizard interativo para criar diret\u00f3rios, templates e entidades de exemplo. Escolha um preset ou personalize.',
         sk_ask: 'Fa\u00e7a perguntas em linguagem natural. Busca entidades, segue wikilinks e cruza refer\u00eancias para construir respostas.',
-        sk_teach: 'Alimente com uma p\u00e1gina do Confluence, Google Doc, repo GitHub ou CSV. Extrai entidades e grava no vault.',
+        sk_learn: 'Alimente com uma p\u00e1gina do Confluence, Google Doc, repo GitHub ou CSV. Extrai entidades e grava no vault.',
         sk_preserve: 'Ponto \u00fanico de escrita. Detecta tipo, encontra arquivos existentes, cria ou atualiza com links bidirecionais.',
         sk_compress: 'Encontra duplicatas, entidades \u00f3rf\u00e3s, links quebrados e conte\u00fado obsoleto. Consolida e reporta a sa\u00fade do vault.',
         sk_sync: 'Re-sincroniza entidades com suas fontes externas. Suporta atividade GitHub, perfis de contribuidores e metadados.',

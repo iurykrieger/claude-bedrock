@@ -20,9 +20,9 @@ export const skills: Skill[] = [
     videoPath: "/videos/setup.mp4",
   },
   {
-    id: "teach",
-    name: "teach",
-    command: "/bedrock:teach",
+    id: "learn",
+    name: "learn",
+    command: "/bedrock:learn",
     shortDescription: "Ingest from Confluence, GDocs, GitHub",
     description:
       "Ingest external sources — feed it a Confluence page, Google Doc, GitHub repo, or CSV. It extracts entities and writes them to your vault via /bedrock:preserve.",

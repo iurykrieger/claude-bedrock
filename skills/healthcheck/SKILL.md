@@ -145,7 +145,7 @@ Also collect: `all_entity_slugs` — set of all entity slugs in the vault (for r
 
 2. If MISSING:
    - Status: **MISSING**
-   - Details: "graphify-out/ directory not found. Run `/bedrock:teach` on an actor repository to generate."
+   - Details: "graphify-out/ directory not found. Run `/bedrock:learn` on an actor repository to generate."
    - Skip remaining sub-checks.
 
 3. If EXISTS, check `<VAULT_PATH>/graphify-out/graph.json`:
@@ -155,7 +155,7 @@ Also collect: `all_entity_slugs` — set of all entity slugs in the vault (for r
 
 4. If graph.json MISSING:
    - Status: **MISSING**
-   - Details: "graph.json not found in graphify-out/. Run `/bedrock:teach` to generate."
+   - Details: "graph.json not found in graphify-out/. Run `/bedrock:learn` to generate."
    - Skip remaining sub-checks.
 
 5. If graph.json EXISTS, validate and extract stats:
@@ -184,7 +184,7 @@ Also collect: `all_entity_slugs` — set of all entity slugs in the vault (for r
    - Details: "graph.json exists but is not valid JSON."
 
 7. If valid:
-   - If stale (>30 days): Status: **WARN**, Details: "Graph.json is stale (>30 days). Last updated: {mod_date}. Run `/bedrock:teach` or `/bedrock:sync` to update."
+   - If stale (>30 days): Status: **WARN**, Details: "Graph.json is stale (>30 days). Last updated: {mod_date}. Run `/bedrock:learn` or `/bedrock:sync` to update."
    - If fresh: Status: **OK**, Details: "{total_nodes} nodes ({code_nodes} code). Last updated: {mod_date}."
 
 **Store:** `graphify_status`, `graphify_details`, `graphify_node_count`
@@ -342,7 +342,7 @@ Print the full report to the terminal.
 Based on findings, append actionable suggestions:
 
 - If orphan or dangling count > 0: "Run `/bedrock:compress` to detect and fix alignment issues (broken backlinks, missing entities)."
-- If graphify-out is MISSING or stale: "Run `/bedrock:teach` on an actor repository to generate or update the graph."
+- If graphify-out is MISSING or stale: "Run `/bedrock:learn` on an actor repository to generate or update the graph."
 - If old count > 0: "Review {N} stale entities for relevance. Consider updating or archiving."
 - If setup has issues: "Run `/bedrock:setup` to initialize missing directories or templates."
 - If all checks are OK: "Vault is healthy. No action needed."
@@ -368,7 +368,7 @@ Based on findings, append actionable suggestions:
 |---|---|
 | Read-only | NEVER use Write, Edit, Skill, or Agent tools. This skill only reads and reports. |
 | No git operations | NEVER run git add, commit, push, pull, or any mutating git command. |
-| No skill invocations | NEVER invoke /bedrock:compress, /bedrock:teach, /bedrock:preserve, or any other skill. Suggest them in text only. |
+| No skill invocations | NEVER invoke /bedrock:compress, /bedrock:learn, /bedrock:preserve, or any other skill. Suggest them in text only. |
 | Terminal output only | The report is printed to the terminal. No files are created or modified. |
 | Single-pass scan | Phase 1 scans once. All 5 checks in Phase 2 use the same scan data. |
 | Exclude templates | Always exclude `_template.md` and `_template_node.md` from entity counts and checks. |

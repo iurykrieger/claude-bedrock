@@ -25,7 +25,7 @@ Fleeting notes **do not need** to be complete — that is the point. They exist 
 
 ## When to create
 
-- Content ingested by `/teach` contains ideas, mentions, or fragments that do not meet the completeness criteria of any permanent or bridge type
+- Content ingested by `/learn` contains ideas, mentions, or fragments that do not meet the completeness criteria of any permanent or bridge type
 - The content mentions something potentially useful but without enough data to create an entity (e.g., "someone mentioned a new tokenization service" — no name, repo, or team)
 - The content captures a hypothesis, suggestion, or draft idea that needs refinement
 - `/preserve` receives content that does not pass the completeness criteria of any type
@@ -59,7 +59,7 @@ The fleeting note accumulates enough information to be self-contained:
 ### 2. Corroboration
 
 The information in the fleeting note is confirmed or supplemented by an existing permanent note:
-- A new ingestion via `/teach` brings data that validates or expands the fleeting
+- A new ingestion via `/learn` brings data that validates or expands the fleeting
 - An existing permanent is updated with information that confirms the fleeting's content
 - Two or more fleeting notes about the same subject can be consolidated into a permanent note
 
@@ -72,7 +72,7 @@ The information in the fleeting note is confirmed or supplemented by an existing
 
 ## Promotion Pipeline
 
-1. **Detection** — `/preserve`, `/teach`, or `/bedrock` identifies that a promotion criterion has been met
+1. **Detection** — `/preserve`, `/learn`, or `/bedrock` identifies that a promotion criterion has been met
 2. **Signaling** — The skill signals with a callout: `> [!info] Suggested promotion: this note can be promoted to <type>`
 3. **Promotion** — `/preserve` is invoked to create the destination entity, migrating the relevant content
 4. **Update** — The fleeting note receives `status: promoted` and `promoted_to: [[destination-note]]`

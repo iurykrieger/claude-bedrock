@@ -115,7 +115,7 @@ in the vault (incremental diff), and delegates all changes to `/bedrock:preserve
 `/bedrock:sync` **does NOT write entities directly** — all entity writing goes through `/bedrock:preserve`.
 After re-sync, `/bedrock:preserve` updates `synced_at` in the `sources` field of affected entities.
 
-`/bedrock:sync` **does NOT ingest new sources** — for that, use `/bedrock:teach`.
+`/bedrock:sync` **does NOT ingest new sources** — for that, use `/bedrock:learn`.
 
 **You are an execution agent.** Follow the phases below in order, without skipping steps.
 
